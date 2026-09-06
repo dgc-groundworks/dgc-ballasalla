@@ -52,6 +52,14 @@ function fmtShort(iso) {
   return d.getUTCDate() + ' ' + d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' });
 }
 
+// Salaried staff: blank weekdays auto-show contracted hours (read-only, for reference)
+const SALARIED = new Map([
+  ['Andy Wynne-Smythe', 8],
+  ['Andrew Wynne-Smythe', 8],
+  ['John McLoughlin', 8],
+  ['John Mcloughlin', 8],
+]);
+
 let periodStartVal = periodStartValFor(todayVal());
 let week1Approved = false;
 let week2Approved = false;
@@ -168,12 +176,14 @@ function cellFor(staffId, date) {
   if (leave) return { kind: leave.leave_type === 'Holiday' ? 'H' : 'U' };
   return { kind: 'blank' };
 }
-function rowTotal(staffId) {
+function rowTotal(staffId, staffName) {
+  const salaryHrs = SALARIED.get(staffName) || 0;
   let total = 0;
   periodDates.forEach(date => {
     const c = cellFor(staffId, date);
     if (c.kind === 'hours') total += Number(c.value) || 0;
     else if (c.kind === 'BH' || c.kind === 'H') total += 8;
+    else if (c.kind === 'blank' && salaryHrs) total += salaryHrs;
   });
   return total + overtimeFor(staffId);
 }
@@ -195,10 +205,11 @@ function renderHours() {
 
   staff.forEach(s => {
     const ot = overtimeFor(s.id);
-    const total = rowTotal(s.id);
+    const salaryHrs = SALARIED.get(s.name) || 0;
+    const total = rowTotal(s.id, s.name);
     footOT += ot; footTotal += total; footAdv += moneyFor(s.id, 'Advance'); footBonus += moneyFor(s.id, 'Bonus');
 
-    body += `<tr data-staff="${s.id}"><td class="hours-name">${s.name}</td>`;
+    body += `<tr data-staff="${s.id}"><td class="hours-name">${s.name}${salaryHrs ? ' <span style="font-size:0.7em;color:var(--muted);font-weight:400">(salary)</span>' : ''}</td>`;
     periodDates.forEach((date, i) => {
       const c = cellFor(s.id, date);
       const todayCls = date === todayIso ? 'today-col' : '';
@@ -213,7 +224,11 @@ function renderHours() {
       } else if (c.kind === 'weekend') {
         body += `<td class="${todayCls}"></td>`;
       } else if (c.kind === 'blank') {
-        if (isLocked) {
+        if (salaryHrs) {
+          // Salaried staff: show contracted hours read-only for reference
+          dayTotals[i] += salaryHrs;
+          body += `<td class="hours-readonly ${todayCls}" style="color:var(--muted);font-style:italic" title="Salaried — ${salaryHrs}h/day reference">${salaryHrs}</td>`;
+        } else if (isLocked) {
           body += `<td class="hours-readonly ${todayCls}"></td>`;
         } else {
           body += `<td class="${todayCls}"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" value=""></td>`;
