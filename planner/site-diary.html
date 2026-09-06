@@ -248,6 +248,7 @@ function getWorkersFromDeployment(dateStr, siteName) {
 }
 
 async function saveEntry(data, id = null) {
+  session = await ensureLoggedIn(); // always refresh before writing
   if (id) {
     const r = await fetch(REST + '/dgc_site_diary?id=eq.' + id, {
       method: 'PATCH',
@@ -624,6 +625,9 @@ function setStatus(msg, err = false) {
 (async () => {
   session = await ensureLoggedIn();
   if (!session) { window.location.replace('../staff/'); return; }
+
+  // Silently refresh the JWT every 45 minutes so long sessions don't expire mid-save
+  setInterval(async () => { session = await ensureLoggedIn(); }, 45 * 60 * 1000);
 
   try {
     await Promise.all([loadEntries(), loadPlannerJobs(), loadStaff()]);
