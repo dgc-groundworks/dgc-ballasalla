@@ -1649,10 +1649,12 @@ function bindResDragDrop() {
     });
   }
 
-  // Filter buttons — single-select; clicking active again resets to All
+  // Filter buttons — single-select; clone first to strip any stale listeners
   tab.querySelectorAll('.res-filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const f = btn.dataset.filter;
+    const fresh = btn.cloneNode(true);
+    btn.replaceWith(fresh);
+    fresh.addEventListener('click', () => {
+      const f = fresh.dataset.filter;
       if (f === 'all' || _resActiveFilters.has(f)) {
         _resActiveFilters.clear();
       } else {
