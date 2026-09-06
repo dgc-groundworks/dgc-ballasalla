@@ -1649,17 +1649,16 @@ function bindResDragDrop() {
     });
   }
 
-  // Filter buttons — multi-select; "All" clears the set
+  // Filter buttons — single-select; clicking active again resets to All
   tab.querySelectorAll('.res-filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const f = btn.dataset.filter;
-      if (f === 'all') {
+      if (f === 'all' || _resActiveFilters.has(f)) {
         _resActiveFilters.clear();
       } else {
-        if (_resActiveFilters.has(f)) _resActiveFilters.delete(f);
-        else _resActiveFilters.add(f);
+        _resActiveFilters.clear();
+        _resActiveFilters.add(f);
       }
-      // Update button active states
       tab.querySelectorAll('.res-filter-btn').forEach(b => {
         if (b.dataset.filter === 'all') b.classList.toggle('active', _resActiveFilters.size === 0);
         else b.classList.toggle('active', _resActiveFilters.has(b.dataset.filter));
