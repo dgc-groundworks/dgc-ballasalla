@@ -283,45 +283,48 @@ a{color:var(--accent);text-decoration:none}
 .split-section{margin-top:10px;padding:12px;border:1px solid var(--bord);border-radius:8px;background:var(--surf2)}
 .split-section .split-title{font-size:11px;font-weight:700;color:#3b82f6;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
 
-/* ── Deployment board — Trello-style redesign ── */
-#tab-resources .res-layout{background:linear-gradient(150deg,#0d1520 0%,#19233a 55%,#0f1827 100%)}
-#tab-resources .res-sidebar{background:rgba(8,12,20,.55);border-right:1px solid rgba(255,255,255,.07);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-#tab-resources .res-board{padding:20px 20px 20px 16px;gap:14px}
-#tab-resources .res-col{background:rgba(14,18,28,.87);border:none;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);width:230px}
-#tab-resources .res-col-hdr{background:rgba(0,0,0,.3);padding:12px 14px 10px;border-radius:14px 14px 0 0}
-#tab-resources .res-col-name{font-size:14px;letter-spacing:-.1px}
-#tab-resources .res-col-meta{font-size:10px;opacity:.75;margin-top:2px}
-#tab-resources .res-week-cell{border-top:1px solid rgba(255,255,255,.05);padding:9px 10px}
-#tab-resources .res-week-cell-hdr{font-size:10px;font-weight:700;color:rgba(148,163,184,.8);margin-bottom:7px;display:flex;align-items:center;gap:5px}
-#tab-resources .res-wk-num{background:rgba(245,158,11,.18);color:var(--accent);border-radius:4px;padding:1px 5px;font-size:9px;font-weight:700}
-/* Cards stack vertically like Trello */
-#tab-resources .res-week-zone{display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:5px;min-height:44px;border-radius:8px;padding:0;border:none;transition:background .15s}
-#tab-resources .res-week-zone.res-drag-over{background:rgba(245,158,11,.09);border:1.5px dashed rgba(245,158,11,.6)}
-/* Placed chips = dark cards matching column */
-#tab-resources .res-placed-chip{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.1);color:#e2e8f0;border-radius:7px;padding:7px 8px 7px 11px;font-size:12px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);width:100%;display:flex;align-items:center}
-#tab-resources .res-placed-chip .res-remove-btn{color:#64748b;margin-left:auto;font-size:14px;padding:0 3px;line-height:1}
-#tab-resources .res-placed-chip .res-remove-btn:hover{color:#ef4444;background:rgba(239,68,68,.15);border-radius:4px}
-#tab-resources .res-placed-chip--conflict{background:rgba(239,68,68,.18) !important;border-color:rgba(239,68,68,.35) !important;color:#fca5a5 !important;box-shadow:0 1px 4px rgba(239,68,68,.2) !important}
+/* ── Deployment board — sleek Trello-style v3 ── */
+/* Hierarchy: rich navy bg → lighter slate column → WHITE cards popping off */
+#tab-resources .res-layout{background:linear-gradient(135deg,#1a3048 0%,#1e3a58 55%,#172840 100%)}
+#tab-resources .res-sidebar{background:rgba(10,20,33,.82);border-right:1px solid rgba(255,255,255,.07)}
+#tab-resources .res-board{padding:20px;gap:14px}
+/* Column — clearly distinguishable slate box */
+#tab-resources .res-col{background:#263f5a;border:none;border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.35);width:230px}
+#tab-resources .res-col-hdr{background:#1e3350;padding:12px 14px 10px;border-radius:12px 12px 0 0;border-bottom:1px solid rgba(255,255,255,.07)}
+#tab-resources .res-col-name{font-size:14px;font-weight:700;color:#ddeeff;letter-spacing:-.1px}
+#tab-resources .res-col-meta{font-size:10px;color:rgba(180,205,230,.65);margin-top:2px}
+#tab-resources .res-week-cell{border-top:1px solid rgba(255,255,255,.05);padding:9px 10px;background:#263f5a}
+#tab-resources .res-week-cell-hdr{font-size:10px;font-weight:700;color:rgba(150,185,220,.85);margin-bottom:7px;display:flex;align-items:center;gap:5px}
+#tab-resources .res-wk-num{background:rgba(245,158,11,.22);color:var(--accent);border-radius:4px;padding:1px 5px;font-size:9px;font-weight:700}
+/* Cards stack vertically — WHITE so they pop */
+#tab-resources .res-week-zone{display:flex;flex-direction:column;gap:5px;min-height:44px;border-radius:6px;padding:0;border:none;transition:background .15s}
+#tab-resources .res-week-zone.res-drag-over{background:rgba(245,158,11,.12);outline:1.5px dashed rgba(245,158,11,.6);border-radius:6px}
+#tab-resources .res-placed-chip{background:#e8f2ff;border:none;color:#1a2d42;border-radius:7px;padding:7px 8px 7px 11px;font-size:12px;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.22);width:100%;display:flex;align-items:center}
+#tab-resources .res-placed-chip .res-remove-btn{color:#7aaac8;margin-left:auto;font-size:14px;padding:0 3px;line-height:1}
+#tab-resources .res-placed-chip .res-remove-btn:hover{color:#ef4444;background:rgba(239,68,68,.1);border-radius:4px}
+/* Conflict — crisp red card on top */
+#tab-resources .res-placed-chip--conflict{background:#fee2e2 !important;color:#991b1b !important;box-shadow:0 1px 3px rgba(239,68,68,.3) !important}
+#tab-resources .res-week-cell--conflict{background:rgba(239,68,68,.07)}
 /* Sidebar chips */
-#tab-resources .res-chip{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#d1d8e6;padding:9px 12px;font-size:12px;font-weight:600;transition:all .15s}
+#tab-resources .res-chip{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.11);border-radius:9px;color:#b8d0ea;padding:9px 12px;font-size:12px;font-weight:600;transition:all .15s}
 #tab-resources .res-chip:hover{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.5);color:var(--accent)}
 /* Toolbar buttons */
-#tab-resources .res-filter-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:11px;font-weight:700;padding:6px 14px;color:#94a3b8;transition:all .15s}
-#tab-resources .res-filter-btn:hover{background:rgba(255,255,255,.13);border-color:rgba(245,158,11,.4);color:var(--accent)}
-#tab-resources .res-filter-btn.active{background:var(--accent);border-color:var(--accent);color:#111827;box-shadow:0 2px 10px rgba(245,158,11,.3)}
-#tab-resources .res-collapse-all-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:11px;font-weight:700;color:#94a3b8;transition:all .15s}
-#tab-resources .res-collapse-all-btn:hover{background:rgba(255,255,255,.12);border-color:rgba(245,158,11,.4);color:var(--accent)}
-#tab-resources .res-undo-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:11px;color:#94a3b8;transition:all .15s}
-#tab-resources .res-undo-btn:not(:disabled):hover{background:rgba(255,255,255,.12);border-color:rgba(245,158,11,.4);color:var(--accent)}
+#tab-resources .res-filter-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:11px;font-weight:700;padding:6px 14px;color:#94a3b8;transition:all .15s}
+#tab-resources .res-filter-btn:hover{background:rgba(255,255,255,.16);border-color:rgba(245,158,11,.45);color:var(--accent)}
+#tab-resources .res-filter-btn.active{background:var(--accent);border-color:var(--accent);color:#111827;box-shadow:0 2px 8px rgba(245,158,11,.35)}
+#tab-resources .res-collapse-all-btn{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.11);border-radius:8px;font-size:11px;font-weight:700;color:#94a3b8;transition:all .15s}
+#tab-resources .res-collapse-all-btn:hover{background:rgba(255,255,255,.15);border-color:rgba(245,158,11,.4);color:var(--accent)}
+#tab-resources .res-undo-btn{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.11);border-radius:8px;font-size:11px;color:#94a3b8;transition:all .15s}
+#tab-resources .res-undo-btn:not(:disabled):hover{background:rgba(255,255,255,.15);border-color:rgba(245,158,11,.4);color:var(--accent)}
 #tab-resources .res-undo-btn:disabled{opacity:.3}
-/* Clear buttons */
-#tab-resources .res-clear-week-btn{font-size:9px;border-radius:5px;padding:1px 5px;border-color:rgba(239,68,68,.25)}
+/* Clear / toggle */
+#tab-resources .res-clear-week-btn{font-size:9px;border-radius:5px;padding:1px 5px;border-color:rgba(239,68,68,.3);color:rgba(239,68,68,.75)}
 #tab-resources .res-clear-job-btn{border-radius:7px;font-size:10px;margin-top:7px}
-#tab-resources .res-col-drag-handle{color:rgba(148,163,184,.4);font-size:16px}
+#tab-resources .res-col-drag-handle{color:rgba(150,185,220,.3);font-size:16px}
 #tab-resources .res-col-drag-handle:hover{color:var(--accent)}
-#tab-resources .res-col-toggle{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#94a3b8;font-size:10px;font-weight:700;padding:2px 7px;transition:all .15s}
+#tab-resources .res-col-toggle{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#7aaac8;font-size:10px;font-weight:700;padding:2px 7px;transition:all .15s}
 #tab-resources .res-col-toggle:hover{border-color:rgba(245,158,11,.4);color:var(--accent)}
-/* Drop-on-header override */
+/* Drop-on-header */
 #tab-resources .res-col-hdr--drop-target{background:rgba(245,158,11,.22) !important;outline:2px dashed rgba(245,158,11,.7);outline-offset:-1px}
 </style>
 </head>
