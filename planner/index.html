@@ -12,13 +12,41 @@
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <link rel="icon" type="image/png" href="../icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="theme.js"></script>
 <style>
+/* ── Dark theme (default) ── */
 :root {
   --bg:#0f1117; --surf:#1a1d27; --surf2:#222636; --bord:#2e3347;
   --accent:#f59e0b; --text:#e2e8f0; --muted:#64748b;
+  --board-bg:#1b2a3b; --board-col:#243d57; --board-col-hdr:#0d1a26;
+  --tl-bg:#1b2a3b; --tl-col-even:rgba(0,0,0,.18); --tl-col-odd:rgba(0,0,0,.06);
+  --tl-lbl-bg:#1b2a3b; --tl-sep:rgba(0,0,0,.35); --tl-foot:rgba(0,0,0,.35);
+  --tl-day:#5a7a9a; --tl-date:#8ab0cc; --tl-row-lbl:#cde0f5;
   --c-run:#22c55e; --c-award:#3b82f6; --c-conf:#10b981;
   --c-likely:#f97316; --c-tend:#f59e0b; --c-ph:#94a3b8;
 }
+/* ── Light theme ── */
+[data-theme="light"] {
+  --bg:#f0f4f8; --surf:#ffffff; --surf2:#e4ecf4; --bord:#b8ccd8;
+  --accent:#e08a00; --text:#1a2b3c; --muted:#5c7a94;
+  --board-bg:#dde8f3; --board-col:#ffffff; --board-col-hdr:#1b2a3b;
+  --tl-bg:#dde8f3; --tl-col-even:rgba(0,0,0,.04); --tl-col-odd:rgba(255,255,255,.5);
+  --tl-lbl-bg:#f0f4f8; --tl-sep:rgba(0,0,0,.1); --tl-foot:rgba(0,0,0,.08);
+  --tl-day:#4a6a88; --tl-date:#1a2b3c; --tl-row-lbl:#1a2b3c;
+  --c-run:#16a34a; --c-award:#2563eb; --c-conf:#059669;
+  --c-likely:#ea580c; --c-tend:#d97706; --c-ph:#64748b;
+}
+/* Light: keep header + nav navy so they stay readable */
+[data-theme="light"] .hdr{background:#1b2a3b;border-bottom-color:#0d1a26}
+[data-theme="light"] .nav{background:#243347;border-bottom-color:#0d1a26}
+[data-theme="light"] .nav button{color:#8ab0cc}
+[data-theme="light"] .nav button.active{color:#f59e0b;border-bottom-color:#f59e0b}
+[data-theme="light"] .usr{color:#cde0f5}
+[data-theme="light"] .ver{color:#8ab0cc}
+[data-theme="light"] .sync-dot{background:#5a7a9a}
+/* Light: theme toggle button visibility */
+[data-theme="light"] .theme-toggle-btn{color:#cde0f5;border-color:rgba(255,255,255,.2)}
+[data-theme="light"] .theme-toggle-btn:hover{background:rgba(255,255,255,.1)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh}
 a{color:var(--accent);text-decoration:none}
@@ -55,7 +83,7 @@ a{color:var(--accent);text-decoration:none}
 .panel{display:none}.panel.active{display:block}
 
 /* ── Timeline ── */
-#tab-timeline{background:#1b2a3b}
+#tab-timeline{background:var(--tl-bg)}
 #tl-wrap{overflow-x:auto;padding:10px 0 0;-webkit-overflow-scrolling:touch}
 #tab-timeline .job-tbl{margin-top:18px}
 #tl-wrap svg text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
@@ -288,16 +316,16 @@ a{color:var(--accent);text-decoration:none}
 .split-section .split-title{font-size:11px;font-weight:700;color:#3b82f6;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
 
 /* ── Deployment board — sleek Trello-style v4 ── */
-#tab-resources .res-layout{background:#1b2a3b}
+#tab-resources .res-layout{background:var(--board-bg)}
 #tab-resources .res-sidebar{background:rgba(6,13,22,.88);border-right:1px solid rgba(255,255,255,.07)}
 #tab-resources .res-board{padding:20px;gap:14px}
 /* Column */
-#tab-resources .res-col{background:#243d57;border:none;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.5);width:230px}
-#tab-resources .res-col-hdr{background:#0d1a26;padding:12px 14px 10px;border-radius:12px 12px 0 0;border-bottom:2px solid rgba(0,0,0,.4)}
+#tab-resources .res-col{background:var(--board-col);border:none;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.3);width:230px}
+#tab-resources .res-col-hdr{background:var(--board-col-hdr);padding:12px 14px 10px;border-radius:12px 12px 0 0;border-bottom:2px solid rgba(0,0,0,.4)}
 #tab-resources .res-col-name{font-size:14px;font-weight:700;color:#ddeeff;letter-spacing:-.1px}
 #tab-resources .res-col-meta{font-size:10px;color:rgba(180,205,230,.6);margin-top:2px}
 /* Weeks — clear gap between each row */
-#tab-resources .res-week-cell{border-top:2px solid rgba(0,0,0,.4);padding:10px 10px 10px;background:#243d57}
+#tab-resources .res-week-cell{border-top:2px solid rgba(0,0,0,.2);padding:10px 10px 10px;background:var(--board-col)}
 #tab-resources .res-week-cell:first-of-type{border-top:none}
 #tab-resources .res-week-cell-hdr{font-size:10px;font-weight:700;color:rgba(150,185,220,.8);margin-bottom:6px;display:flex;align-items:center;gap:5px}
 #tab-resources .res-wk-num{background:rgba(245,158,11,.22);color:var(--accent);border-radius:4px;padding:1px 5px;font-size:9px;font-weight:700}
@@ -362,6 +390,7 @@ a{color:var(--accent);text-decoration:none}
       <img src="../dgc-logo-white.png" class="logo-svg" alt="DGC" style="height:32px;width:auto">
     </div>
     <div class="hdr-r">
+      <button class="theme-toggle-btn" onclick="toggleTheme()" title="Switch light/dark mode" style="background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em">Light Mode</button>
       <span class="ver" id="ver-badge"></span>
       <span class="sync-dot" id="sync-dot" title="Sync status"></span>
       <span class="usr" id="usr-badge"></span>
@@ -838,6 +867,18 @@ function renderTimeline(jobs) {
   const svgW = containerW;
   const svgH = HEAD_H + Math.max(jobs.length,1) * ROW_H + FOOT_H;
 
+  // Read theme CSS variables for SVG colours
+  const cs = getComputedStyle(document.documentElement);
+  const tlColEven = cs.getPropertyValue('--tl-col-even').trim() || 'rgba(0,0,0,.18)';
+  const tlColOdd  = cs.getPropertyValue('--tl-col-odd').trim()  || 'rgba(0,0,0,.06)';
+  const tlDay     = cs.getPropertyValue('--tl-day').trim()     || '#5a7a9a';
+  const tlDate    = cs.getPropertyValue('--tl-date').trim()    || '#8ab0cc';
+  const tlLblBg   = cs.getPropertyValue('--tl-lbl-bg').trim()  || '#1b2a3b';
+  const tlSep     = cs.getPropertyValue('--tl-sep').trim()     || 'rgba(0,0,0,.35)';
+  const tlFoot    = cs.getPropertyValue('--tl-foot').trim()    || 'rgba(0,0,0,.35)';
+  const tlRowLbl  = cs.getPropertyValue('--tl-row-lbl').trim() || '#cde0f5';
+  const accentCol = cs.getPropertyValue('--accent').trim()     || '#f59e0b';
+
   let s = `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
 
   // Week column backgrounds + headers
@@ -845,24 +886,24 @@ function renderTimeline(jobs) {
     const wDate = addDays(origin, w * 7);
     const x = LBL_W + w * W_PX;
     const isEven = w % 2 === 0;
-    s += `<rect x="${x}" y="0" width="${W_PX}" height="${svgH}" fill="${isEven?'rgba(0,0,0,.18)':'rgba(0,0,0,.06)'}" />`;
+    s += `<rect x="${x}" y="0" width="${W_PX}" height="${svgH}" fill="${isEven?tlColEven:tlColOdd}" />`;
     const d = new Date(wDate+'T12:00:00');
     const dayName = d.toLocaleDateString('en-GB',{weekday:'short'});
     const dateLbl = d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
     const cx = x + W_PX / 2;
-    s += `<text x="${cx}" y="17" font-size="9" text-anchor="middle" fill="#5a7a9a" font-weight="600">${dayName}</text>`;
-    s += `<text x="${cx}" y="34" font-size="11" text-anchor="middle" fill="#8ab0cc" font-weight="700">${dateLbl}</text>`;
+    s += `<text x="${cx}" y="17" font-size="9" text-anchor="middle" fill="${tlDay}" font-weight="600">${dayName}</text>`;
+    s += `<text x="${cx}" y="34" font-size="11" text-anchor="middle" fill="${tlDate}" font-weight="700">${dateLbl}</text>`;
   }
 
   // Today line
   const todayOff = daysBetween(origin, today);
   const todayX   = LBL_W + (todayOff / 7) * W_PX;
-  s += `<line x1="${todayX}" y1="${HEAD_H}" x2="${todayX}" y2="${svgH - FOOT_H}" stroke="#f59e0b" stroke-width="2" opacity=".7" stroke-dasharray="4,3"/>`;
-  s += `<text x="${todayX+4}" y="${HEAD_H-8}" font-size="10" fill="#f59e0b" font-weight="800">Today</text>`;
+  s += `<line x1="${todayX}" y1="${HEAD_H}" x2="${todayX}" y2="${svgH - FOOT_H}" stroke="${accentCol}" stroke-width="2" opacity=".7" stroke-dasharray="4,3"/>`;
+  s += `<text x="${todayX+4}" y="${HEAD_H-8}" font-size="10" fill="${accentCol}" font-weight="800">Today</text>`;
 
   // Label column bg
-  s += `<rect x="0" y="0" width="${LBL_W}" height="${svgH}" fill="#1b2a3b"/>`;
-  s += `<line x1="${LBL_W}" y1="0" x2="${LBL_W}" y2="${svgH}" stroke="rgba(0,0,0,.5)" stroke-width="2"/>`;
+  s += `<rect x="0" y="0" width="${LBL_W}" height="${svgH}" fill="${tlLblBg}"/>`;
+  s += `<line x1="${LBL_W}" y1="0" x2="${LBL_W}" y2="${svgH}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>`;
 
   // Job rows
   if (!jobs.length) {
@@ -877,12 +918,12 @@ function renderTimeline(jobs) {
     const rw  = revisedWeeks(j);
 
     // Row separator
-    s += `<line x1="0" y1="${y1}" x2="${svgW}" y2="${y1}" stroke="rgba(0,0,0,.35)" stroke-width="1"/>`;
+    s += `<line x1="0" y1="${y1}" x2="${svgW}" y2="${y1}" stroke="${tlSep}" stroke-width="1"/>`;
 
     // Label — more characters now we have more width
     const maxLblChars = Math.floor((LBL_W - 16) / 7.5);
     const lbl = j.name.length > maxLblChars ? j.name.substring(0, maxLblChars-1)+'…' : j.name;
-    s += `<text x="${LBL_W-10}" y="${by + bh/2 + 4}" font-size="12.5" text-anchor="end" fill="#cde0f5" font-weight="700">${esc(lbl)}</text>`;
+    s += `<text x="${LBL_W-10}" y="${by + bh/2 + 4}" font-size="12.5" text-anchor="end" fill="${tlRowLbl}" font-weight="700">${esc(lbl)}</text>`;
 
     // Bar position
     const startOff = daysBetween(origin, j.start_date || today);
@@ -930,8 +971,8 @@ function renderTimeline(jobs) {
   // Breaks into 5 daily bars when any day differs (mid-week overlaps, starts/ends, or explicit overrides).
   // Bank holiday days (isWorkingDay = false) are skipped and never cause a split.
   const footY = HEAD_H + Math.max(jobs.length,1) * ROW_H;
-  s += `<rect x="0" y="${footY}" width="${svgW}" height="${FOOT_H}" fill="rgba(0,0,0,.35)"/>`;
-  s += `<line x1="0" y1="${footY}" x2="${svgW}" y2="${footY}" stroke="rgba(0,0,0,.5)" stroke-width="2"/>`;
+  s += `<rect x="0" y="${footY}" width="${svgW}" height="${FOOT_H}" fill="${tlFoot}"/>`;
+  s += `<line x1="0" y1="${footY}" x2="${svgW}" y2="${footY}" stroke="${tlSep}" stroke-width="2"/>`;
   s += `<text x="${LBL_W-8}" y="${footY+FOOT_H/2+4}" font-size="11" text-anchor="end" fill="#64748b" font-weight="700">Gang</text>`;
 
   const weekData = [];

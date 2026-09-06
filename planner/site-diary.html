@@ -6,12 +6,23 @@
 <title>Site Diary</title>
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js"></script>
+<script src="theme.js"></script>
 <style>
 :root {
   --bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;
   --accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;
   --green:#22c55e;--red:#ef4444;--blue:#3b82f6;
 }
+[data-theme="light"] {
+  --bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;
+  --accent:#e08a00;--text:#1a2b3c;--muted:#5c7a94;
+  --green:#16a34a;--red:#dc2626;--blue:#2563eb;
+}
+[data-theme="light"] .topbar{background:#1b2a3b;border-bottom-color:#0d1a26}
+[data-theme="light"] .topbar h1{color:#f59e0b}
+[data-theme="light"] .back-btn{color:#8ab0cc;border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.08)}
+[data-theme="light"] .new-btn{background:#f59e0b}
+[data-theme="light"] .theme-toggle-btn{color:#cde0f5;border-color:rgba(255,255,255,.2)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
 
@@ -143,6 +154,7 @@ textarea{resize:vertical;line-height:1.5}
 <body>
 <header class="topbar">
   <a class="back-btn" href="index.html" target="_top">&#8592; Planner</a>
+  <button class="theme-toggle-btn" onclick="toggleTheme()" style="background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em;margin-left:auto;margin-right:8px">Light Mode</button>
   <h1>Site Diary</h1>
   <button class="new-btn" id="newEntryBtn">+ New Entry</button>
 </header>

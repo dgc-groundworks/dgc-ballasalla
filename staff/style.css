@@ -10,6 +10,22 @@
   --danger: #d9534f;
   --off: #5b7fd9;
 }
+[data-theme="light"] {
+  --bg: #f0f4f8;
+  --panel: #ffffff;
+  --panel2: #e4ecf4;
+  --border: #b8ccd8;
+  --text: #1a2b3c;
+  --muted: #5c7a94;
+  --accent: #d97706;
+  --accent-dark: #b45309;
+  --danger: #dc2626;
+  --off: #2563eb;
+}
+[data-theme="light"] .topbar { background: #1b2a3b; border-bottom-color: #0d1a26; }
+[data-theme="light"] .topbar .brand h1,
+[data-theme="light"] .topbar h1 { color: #e2e8f0; }
+[data-theme="light"] .theme-toggle-btn { color: #cde0f5; border-color: rgba(255,255,255,.2); }
 
 * { box-sizing: border-box; }
 
