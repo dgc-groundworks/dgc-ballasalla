@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holiday Tracker</title>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<style>
+:root {
+  --bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;
+  --accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;
+  --green:#22c55e;--red:#ef4444;--blue:#3b82f6;--amber:#f97316;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+
+.topbar{background:var(--surf);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:1rem;font-weight:700;color:var(--accent);flex:1}
+.back-btn{background:none;border:1px solid var(--bord);color:var(--muted);padding:5px 12px;border-radius:6px;font-size:0.8rem;cursor:pointer;font-family:inherit}
+.back-btn:hover{color:var(--text)}
+
+.content{max-width:1100px;margin:0 auto;padding:16px}
+
+.section-label{font-size:0.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:10px;margin-top:24px}
+.section-label:first-child{margin-top:0}
+
+/* Balance table */
+.bal-table{width:100%;border-collapse:collapse;margin-bottom:8px}
+.bal-table th{font-size:0.72rem;font-weight:700;color:var(--muted);text-align:left;padding:6px 10px;border-bottom:1px solid var(--bord);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.bal-table td{padding:7px 10px;border-bottom:1px solid var(--bord);font-size:0.88rem;vertical-align:middle}
+.bal-table tr:hover td{background:var(--surf)}
+.name-cell{font-weight:600}
+.role-cell{font-size:0.78rem;color:var(--muted)}
+.bal-num{text-align:right;font-variant-numeric:tabular-nums;font-size:0.88rem;white-space:nowrap}
+.bal-warn{color:var(--red);font-weight:700}
+.bal-ok{color:var(--green)}
+.bal-low{color:var(--amber)}
+.no-start{color:var(--muted);font-size:0.78rem;font-style:italic}
+
+.pill{display:inline-block;border-radius:4px;padding:1px 7px;font-size:0.75rem;font-weight:700}
+.pill-taken{background:rgba(59,130,246,.2);color:var(--blue)}
+.pill-forced{background:rgba(249,115,22,.2);color:var(--amber)}
+.pill-remain{background:rgba(34,197,94,.2);color:var(--green)}
+.pill-remain.low{background:rgba(239,68,68,.15);color:var(--red)}
+
+/* Remaining bar */
+.bar-wrap{background:var(--surf2);border-radius:4px;height:6px;width:100px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .3s}
+
+/* Calendar */
+.cal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:800px){.cal-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.cal-grid{grid-template-columns:1fr}}
+
+.month-box{background:var(--surf);border:1px solid var(--bord);border-radius:10px;overflow:hidden}
+.month-hdr{background:var(--surf2);padding:8px 12px;font-size:0.85rem;font-weight:700;color:var(--accent)}
+.cal-body{padding:8px}
+.day-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}
+.day-label{font-size:0.65rem;color:var(--muted);text-align:center;padding:2px 0;font-weight:700}
+.day-cell{border-radius:4px;padding:2px 1px;min-height:28px;font-size:0.7rem;text-align:center;position:relative}
+.day-num{font-size:0.72rem;color:var(--muted);line-height:1}
+.day-empty{background:transparent}
+.day-weekend{background:#131620}
+.day-bh{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3)}
+.day-bh .day-num{color:var(--accent);font-weight:700}
+.day-forced{background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3)}
+.day-forced .day-num{color:var(--amber)}
+.bh-tag{font-size:0.55rem;color:var(--accent);font-weight:700;display:block;line-height:1}
+.f-tag{font-size:0.55rem;color:var(--amber);font-weight:700;display:block;line-height:1}
+.leave-dots{display:flex;flex-wrap:wrap;justify-content:center;gap:1px;margin-top:1px}
+.ldot{width:10px;height:10px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:#fff;flex-shrink:0}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;margin-bottom:16px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:0.75rem;color:var(--muted)}
+.leg-box{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+
+/* Note */
+.note{font-size:0.78rem;color:var(--muted);padding:8px 12px;background:var(--surf2);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;margin-bottom:14px}
+
+.loading{color:var(--muted);padding:24px;text-align:center}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <h1>Holiday Tracker &mdash; <span id="yearLabel"></span></h1>
+  <button class="back-btn" onclick="history.back()">← Back</button>
+</header>
+<div class="content" id="content">
+  <p class="loading" id="loadMsg">Loading…</p>
+</div>
+
+<script>
+const REST = SUPABASE_URL + '/rest/v1';
+let session = null;
+
+// ── IoM bank holidays 2025-2027 (includes Spring BH and TT Senior Race Day) ──
+// ⚠ TT Senior Race Day dates are ESTIMATED — confirm against IOM Govt calendar
+const IOM_BH = new Set([
+  '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-05-26',
+  '2025-06-06', // TT Senior Race Day 2025 — approx, verify
+  '2025-07-07','2025-08-25','2025-12-25','2025-12-26',
+  '2026-01-01','2026-04-03','2026-04-06','2026-05-04','2026-05-25',
+  '2026-06-12', // TT Senior Race Day 2026 — approx, verify
+  '2026-07-06','2026-08-31','2026-12-25','2026-12-28',
+  '2027-01-01','2027-03-26','2027-03-29','2027-05-03','2027-05-31',
+  '2027-07-05','2027-08-30','2027-12-27','2027-12-28',
+]);
+
+// ── Forced company closure days (charged to annual leave per contract) ──
+// 4 days TT race week (Mon-Thu; Fri = bank holiday) + up to 3 days Christmas shutdown
+const FORCED_DAYS_BY_YEAR = {
+  2026: new Set([
+    // TT race week (approx — verify)
+    '2026-06-08','2026-06-09','2026-06-10','2026-06-11',
+    // Christmas shutdown (25/28 Dec are bank holidays)
+    '2026-12-29','2026-12-30','2026-12-31',
+  ]),
+};
+
+const ENTITLEMENT = 22; // days per year (per DGC contract)
+
+// Staff display colours (stable by staff id hash)
+const PALETTE = ['#f59e0b','#3b82f6','#22c55e','#ef4444','#a855f7','#06b6d4','#f97316','#ec4899','#84cc16','#14b8a6','#fb923c','#8b5cf6'];
+function staffColor(id) {
+  let h = 0;
+  for (let i = 0; i < (id||'').length; i++) h = (h * 31 + (id||'').charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+function initials(name) {
+  const parts = (name||'').split(' ').filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0,2).toUpperCase();
+  return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+}
+
+// ── Date helpers ──────────────────────────────────────────────────
+function toDateStr(d) { return d.toISOString().slice(0,10); }
+function isWeekend(ds) { const d = new Date(ds+'T12:00:00'); return d.getDay()===0||d.getDay()===6; }
+function isWorkingDay(ds) { return !isWeekend(ds) && !IOM_BH.has(ds); }
+
+function workingDaysInRange(from, to) {
+  let n = 0, d = new Date(from+'T12:00:00');
+  const end = new Date(to+'T12:00:00');
+  while (d <= end) { if (isWorkingDay(toDateStr(d))) n++; d.setDate(d.getDate()+1); }
+  return n;
+}
+
+function entitlementForYear(startDate, year) {
+  if (!startDate) return null;
+  const sy = parseInt(startDate.slice(0,4));
+  if (sy > year) return 0;
+  if (sy < year) return ENTITLEMENT;
+  // First (partial) year — pro-rate
+  const wd = workingDaysInRange(startDate, `${year}-12-31`);
+  const wdFull = workingDaysInRange(`${year}-01-01`, `${year}-12-31`);
+  return Math.ceil(ENTITLEMENT * wd / wdFull * 2) / 2; // round up to 0.5
+}
+
+function accrualToDate(startDate, targetDate) {
+  const year = parseInt(targetDate.slice(0,4));
+  const ent = entitlementForYear(startDate, year);
+  if (!ent) return 0;
+  const sy = parseInt(startDate.slice(0,4));
+  const yearStart = sy === year ? startDate : `${year}-01-01`;
+  const wd = workingDaysInRange(yearStart, targetDate);
+  const wdFull = workingDaysInRange(yearStart, `${year}-12-31`);
+  return Math.min(Math.round(ent * wd / wdFull * 100) / 100, ent);
+}
+
+function countHolidaysTaken(staffId, year, leaveRecs) {
+  return leaveRecs
+    .filter(l => l.staff_id === staffId && l.leave_type === 'Holiday')
+    .reduce((sum, l) => {
+      const from = l.from_date < `${year}-01-01` ? `${year}-01-01` : l.from_date;
+      const to   = l.to_date   > `${year}-12-31` ? `${year}-12-31` : l.to_date;
+      if (from > to) return sum;
+      return sum + workingDaysInRange(from, to);
+    }, 0);
+}
+
+function forcedDays(startDate, year) {
+  const forced = FORCED_DAYS_BY_YEAR[year];
+  if (!forced) return 0;
+  return [...forced].filter(d => d >= (startDate||'0000-00-00')).length;
+}
+
+// ── Build holiday day map: dateStr → [{staffId, name, type}] ──────
+function buildDayMap(leaveRecs, staff) {
+  const map = {};
+  leaveRecs.forEach(l => {
+    const s = staff.find(x => x.id === l.staff_id);
+    if (!s) return;
+    let d = new Date(l.from_date+'T12:00:00');
+    const end = new Date(l.to_date+'T12:00:00');
+    while (d <= end) {
+      const ds = toDateStr(d);
+      if (!map[ds]) map[ds] = [];
+      map[ds].push({ id: l.staff_id, name: s.name, type: l.leave_type });
+      d.setDate(d.getDate()+1);
+    }
+  });
+  return map;
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function renderAll(staff, leaveRecs) {
+  const today = toDateStr(new Date());
+  const year = parseInt(today.slice(0,4));
+  document.getElementById('yearLabel').textContent = year;
+
+  const dayMap = buildDayMap(leaveRecs, staff);
+  const activeStaff = staff.filter(s => s.active && !['Test Harry','Test John','Test Test'].includes(s.name));
+
+  // ── Balance table ─────────────────────────────────────────────
+  const balRows = activeStaff.map(s => {
+    const ent = entitlementForYear(s.start_date, year);
+    if (ent === null) {
+      return `<tr><td class="name-cell">${esc(s.name)}</td><td class="role-cell">${esc(s.role||'')}</td><td colspan="5" class="no-start">No start date — paste SQL above to fix</td></tr>`;
+    }
+    const accrued = Math.round(accrualToDate(s.start_date, today) * 10) / 10;
+    const taken   = countHolidaysTaken(s.id, year, leaveRecs);
+    const forced  = forcedDays(s.start_date, year);
+    const remain  = Math.round((accrued - taken - forced) * 10) / 10;
+    const pct     = ent > 0 ? Math.max(0, Math.min(100, (remain / ent) * 100)) : 0;
+    const barCol  = remain <= 0 ? '#ef4444' : remain <= 3 ? '#f97316' : '#22c55e';
+    const remCls  = remain <= 0 ? 'bal-warn' : remain <= 3 ? 'bal-low' : 'bal-ok';
+    return `<tr>
+      <td class="name-cell"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${staffColor(s.id)};margin-right:6px;vertical-align:middle"></span>${esc(s.name)}</td>
+      <td class="role-cell">${esc(s.role||'')}</td>
+      <td class="bal-num">${ent}</td>
+      <td class="bal-num">${accrued}</td>
+      <td class="bal-num"><span class="pill pill-taken">${taken}</span></td>
+      <td class="bal-num"><span class="pill pill-forced">${forced}</span></td>
+      <td class="bal-num">
+        <span class="${remCls}">${remain}</span>
+        <div class="bar-wrap" style="margin-top:3px"><div class="bar-fill" style="width:${pct}%;background:${barCol}"></div></div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // ── Calendar ──────────────────────────────────────────────────
+  const months = [];
+  const startD = new Date(today+'T12:00:00');
+  startD.setDate(1);
+  for (let m = 0; m < 6; m++) {
+    const yr = startD.getFullYear(), mo = startD.getMonth();
+    months.push({ yr, mo, label: startD.toLocaleString('en-GB',{month:'long',year:'numeric'}) });
+    startD.setMonth(startD.getMonth()+1);
+  }
+
+  const DOW = ['M','T','W','T','F','S','S'];
+  const forcedAllYears = Object.values(FORCED_DAYS_BY_YEAR).reduce((s,set) => { for(const d of set) s.add(d); return s; }, new Set());
+
+  const calHtml = months.map(({yr, mo, label}) => {
+    const firstDay = new Date(yr, mo, 1);
+    const lastDay  = new Date(yr, mo+1, 0);
+    // ISO week: Mon=0
+    let startDow = firstDay.getDay(); // 0=Sun
+    startDow = startDow === 0 ? 6 : startDow - 1; // shift to Mon=0
+
+    const cells = [];
+    // Blanks
+    for (let i = 0; i < startDow; i++) cells.push({ empty: true });
+    // Days
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      const ds = `${yr}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      cells.push({ ds, day, isWeekend: isWeekend(ds), isBH: IOM_BH.has(ds), isForced: forcedAllYears.has(ds), people: dayMap[ds]||[] });
+    }
+    // Fill to multiple of 7
+    while (cells.length % 7 !== 0) cells.push({ empty: true });
+
+    const rows = [];
+    for (let i = 0; i < cells.length; i += 7) {
+      const week = cells.slice(i, i+7);
+      rows.push('<div class="day-row">' + week.map(c => {
+        if (c.empty) return '<div class="day-cell day-empty"></div>';
+        let cls = 'day-cell';
+        if (c.isWeekend) cls += ' day-weekend';
+        else if (c.isBH) cls += ' day-bh';
+        else if (c.isForced) cls += ' day-forced';
+
+        const tag = c.isBH ? '<span class="bh-tag">BH</span>' : c.isForced ? '<span class="f-tag">F</span>' : '';
+        const dots = c.people.length
+          ? '<div class="leave-dots">' + c.people.slice(0,6).map(p =>
+              `<div class="ldot" style="background:${staffColor(p.id)};opacity:${p.type==='Holiday'?1:0.5}" title="${esc(p.name)}">${esc(initials(p.name))}</div>`
+            ).join('') + (c.people.length>6 ? `<div class="ldot" style="background:var(--muted)">+${c.people.length-6}</div>` : '') + '</div>'
+          : '';
+        return `<div class="${cls}"><div class="day-num">${c.day}</div>${tag}${dots}</div>`;
+      }).join('') + '</div>');
+    }
+
+    return `<div class="month-box">
+      <div class="month-hdr">${label}</div>
+      <div class="cal-body">
+        <div class="day-row">${DOW.map(d=>`<div class="day-label">${d}</div>`).join('')}</div>
+        ${rows.join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div class="note">⚠ TT Senior Race Day and forced TT closure dates are <strong>estimated</strong> (approx Jun 12 + Mon–Thu 8–11 Jun 2026). Confirm against the official IoM Government calendar and update if needed.</div>
+
+    <div class="section-label">Holiday Balance &mdash; ${year}</div>
+    <div style="overflow-x:auto">
+      <table class="bal-table">
+        <thead><tr>
+          <th>Name</th><th>Role</th>
+          <th class="bal-num" title="Days entitlement this year">Entitlement</th>
+          <th class="bal-num" title="Accrued to today">Accrued</th>
+          <th class="bal-num" title="Paid holiday days taken">Taken (H)</th>
+          <th class="bal-num" title="Forced company closure days (TT + Christmas)">Forced</th>
+          <th class="bal-num" title="Remaining = Accrued − Taken − Forced">Remaining</th>
+        </tr></thead>
+        <tbody>${balRows}</tbody>
+      </table>
+    </div>
+
+    <div class="section-label">Calendar — next 6 months</div>
+    <div class="legend">
+      <span class="leg-item"><span class="leg-box" style="background:rgba(245,158,11,.2);border:1px solid rgba(245,158,11,.4)"></span> Bank Holiday</span>
+      <span class="leg-item"><span class="leg-box" style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.4)"></span> Forced (TT/Xmas)</span>
+      <span class="leg-item"><span class="leg-box" style="background:#131620"></span> Weekend</span>
+      ${activeStaff.slice(0,8).map(s => `<span class="leg-item"><span class="leg-box" style="background:${staffColor(s.id)}"></span> ${esc(s.name.split(' ')[0])}</span>`).join('')}
+    </div>
+    <div class="cal-grid">${calHtml}</div>
+  `;
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Boot ──────────────────────────────────────────────────────────
+(async () => {
+  session = await ensureLoggedIn();
+  if (!session) { window.location.replace('./'); return; }
+  const ah = authedHeaders(session);
+  try {
+    const [sR, lR] = await Promise.all([
+      fetch(REST + '/dgc_staff?order=name.asc', { headers: ah }),
+      fetch(REST + '/dgc_staff_leave?order=from_date.asc', { headers: ah }),
+    ]);
+    const staff = sR.ok ? await sR.json() : [];
+    const leave = lR.ok ? await lR.json() : [];
+    renderAll(staff, leave);
+  } catch (err) {
+    document.getElementById('loadMsg').textContent = 'Error: ' + err.message;
+  }
+})();
+</script>
+</body>
+</html>

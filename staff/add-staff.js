@@ -453,8 +453,34 @@ function openModal(person) {
     const holSection = document.getElementById('editHolidaySection');
     holSection.style.display = 'block';
     document.getElementById('editHolidayInfo').textContent = 'Loading…';
-    // TODO: wire to holiday data when available
-    document.getElementById('editHolidayInfo').textContent = 'No holiday record found for this name yet.';
+    // Fetch leave and compute balance
+    (async () => {
+      try {
+        const ah = authedHeaders(session);
+        const year = new Date().getFullYear();
+        const r = await fetch(`${REST}/dgc_staff_leave?staff_id=eq.${person.id}&select=leave_type,from_date,to_date`, { headers: ah });
+        const leaves = r.ok ? await r.json() : [];
+        const IOM_BH = new Set(['2026-01-01','2026-04-03','2026-04-06','2026-05-04','2026-05-25','2026-06-12','2026-07-06','2026-08-31','2026-12-25','2026-12-28']);
+        function isWD(ds) { const d = new Date(ds+'T12:00:00'); return d.getDay()!==0&&d.getDay()!==6&&!IOM_BH.has(ds); }
+        function wdRange(a,b) { let n=0,d=new Date(a+'T12:00:00'),e=new Date(b+'T12:00:00'); while(d<=e){if(isWD(d.toISOString().slice(0,10)))n++;d.setDate(d.getDate()+1);} return n; }
+        const sd = person.start_date;
+        if (!sd) { document.getElementById('editHolidayInfo').textContent = 'No start date — holiday balance unavailable.'; return; }
+        const ent = sd.slice(0,4) < String(year) ? 22 : Math.ceil(22 * wdRange(sd, `${year}-12-31`) / wdRange(`${year}-01-01`, `${year}-12-31`) * 2) / 2;
+        const today = new Date().toISOString().slice(0,10);
+        const ysStart = sd.slice(0,4) < String(year) ? `${year}-01-01` : sd;
+        const accrued = Math.min(ent, Math.round(ent * wdRange(ysStart, today) / wdRange(ysStart, `${year}-12-31`) * 10) / 10);
+        const taken = leaves.filter(l=>l.leave_type==='Holiday').reduce((s,l) => {
+          const f = l.from_date < `${year}-01-01` ? `${year}-01-01` : l.from_date;
+          const t = l.to_date > `${year}-12-31` ? `${year}-12-31` : l.to_date;
+          return f > t ? s : s + wdRange(f, t);
+        }, 0);
+        const forced = ['2026-06-08','2026-06-09','2026-06-10','2026-06-11','2026-12-29','2026-12-30','2026-12-31'].filter(d=>d.startsWith(String(year))&&d>=sd).length;
+        const remain = Math.round((accrued - taken - forced) * 10) / 10;
+        const col = remain <= 0 ? '#ef4444' : remain <= 3 ? '#f97316' : '#22c55e';
+        document.getElementById('editHolidayInfo').innerHTML =
+          `Entitlement: <b>${ent}</b> days &nbsp;|&nbsp; Accrued: <b>${accrued}</b> &nbsp;|&nbsp; Taken: <b>${taken}</b> &nbsp;|&nbsp; Forced: <b>${forced}</b> &nbsp;|&nbsp; Remaining: <b style="color:${col}">${remain}</b> &nbsp;— <a href="holiday-tracker.html" target="_top" style="color:#f59e0b">Full tracker</a>`;
+      } catch(e) { document.getElementById('editHolidayInfo').textContent = 'Could not load holiday data.'; }
+    })();
   } else {
     document.getElementById('modalTitle').textContent = 'Add Person';
     document.getElementById('saveFormBtn').textContent = 'Save & Add';
