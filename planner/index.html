@@ -199,9 +199,25 @@ a{color:var(--accent);text-decoration:none}
 .st-setup-box p{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:6px}
 .st-setup-box pre{background:var(--bg);border:1px solid var(--bord);border-radius:8px;padding:12px;font-size:10px;color:#94a3b8;overflow-x:auto;margin-top:8px;white-space:pre;line-height:1.5}
 .st-empty{padding:20px;text-align:center;color:var(--muted);font-size:13px}
-/* ── Resource Planner ── */
+/* ── Resource Planner (Deployment board) ──
+   --panel/--panel2 were referenced below but never defined anywhere in
+   :root, so every chip/column/header was rendering with no fill at all
+   (transparent, relying on whatever sat behind it). Defined here as
+   translucent panels, scoped to this tab only, so a background shows
+   through underneath — Trello-style board photo, without touching the
+   rest of the app's theme. */
+#tab-resources{
+  --panel: rgba(26,29,39,0.74);
+  --panel2: rgba(34,38,54,0.8);
+  position:relative;
+  background:
+    radial-gradient(1100px 700px at 12% -10%, rgba(245,158,11,0.12), transparent 60%),
+    radial-gradient(900px 650px at 100% 105%, rgba(11,61,108,0.4), transparent 55%),
+    linear-gradient(160deg, #0f1117 0%, #141826 45%, #1b2130 100%);
+  background-attachment:fixed;
+}
 .res-layout{display:flex;height:calc(100vh - 100px);overflow:hidden}
-.res-sidebar{width:180px;flex-shrink:0;border-right:1px solid var(--bord);padding:12px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.res-sidebar{width:180px;flex-shrink:0;border-right:1px solid var(--bord);padding:12px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;background:rgba(15,17,23,0.45);backdrop-filter:blur(3px)}
 .res-sidebar-hdr{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;padding:4px 2px 6px}
 .res-staff-list{display:flex;flex-direction:column;gap:5px}
 .res-chip{background:var(--panel);border:1px solid var(--bord);border-radius:6px;padding:7px 10px;font-size:12px;font-weight:600;cursor:grab;user-select:none;transition:background .15s,border-color .15s}
