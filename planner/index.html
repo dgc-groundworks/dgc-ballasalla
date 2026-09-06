@@ -1395,18 +1395,26 @@ function resWeeks(job) {
   const weeks = [];
   const today = new Date().toISOString().slice(0, 10);
   const base = new Date(job.start_date + 'T00:00:00');
-  const n = Math.max(1, job.base_weeks || 4);
+  const bd = job.id ? getBaseDays(job.id) : 0;
+  const totalDays = (job.base_weeks || 0) * 5 + bd;
+  const subWeek = job.base_weeks === 0;
+  // 0-week jobs: show one row; other jobs: show their weeks (default 4 if somehow 0)
+  const n = subWeek ? 1 : Math.max(1, job.base_weeks);
   for (let i = 0; i < n; i++) {
     const s = new Date(base); s.setDate(base.getDate() + i * 7);
     const e = new Date(s);    e.setDate(s.getDate() + 4);
     const fmt = d => d.getDate() + ' ' + d.toLocaleString('en-GB', { month: 'short' });
     const startIso = s.toISOString().slice(0, 10);
+    const dayLabel = subWeek
+      ? (totalDays > 0 ? `${totalDays}d · ` : '') + fmt(s) + '–' + fmt(e)
+      : 'W' + (i + 1) + ' · ' + fmt(s) + '–' + fmt(e);
     weeks.push({
       num: i + 1,
       startIso,
       wkNum: isoWeekNum(startIso),
-      label: 'W' + (i + 1) + ' · ' + fmt(s) + '–' + fmt(e),
+      label: dayLabel,
       isPast: startIso < today,
+      subWeek,
     });
   }
   return weeks;
@@ -1486,13 +1494,16 @@ function renderResourcePlanner() {
     const clearJobBtn = hasAnyAlloc
       ? `<button class="res-clear-job-btn" data-clearjob="${esc(j.id)}" ondragstart="event.stopPropagation()" title="Remove all staff from all weeks">Clear all weeks</button>`
       : '';
+    const jBd = getBaseDays(j.id);
+    const jTotalDays = (j.base_weeks || 0) * 5 + jBd;
+    const durationLabel = j.base_weeks > 0 ? `${j.base_weeks}w` : `${jTotalDays || '< 1'}d`;
     return `<div class="res-col${collapsed ? ' res-col--collapsed' : ''}" data-jobid="${esc(j.id)}">
       <div class="res-col-hdr" draggable="true" style="border-top:3px solid ${col};cursor:grab">
         <div class="res-col-hdr-row">
           <span class="res-col-drag-handle" title="Drag to reorder">⠿</span>
           <div style="flex:1;min-width:0">
             <div class="res-col-name">${esc(j.name)}</div>
-            <div class="res-col-meta">${j.base_weeks}w · ${j.people_on_site || 0} on site · <span style="color:${col}">${statusLabel}</span></div>
+            <div class="res-col-meta">${durationLabel} · ${j.people_on_site || 0} on site · <span style="color:${col}">${statusLabel}</span></div>
           </div>
           <button class="res-col-toggle" data-toggle-job="${esc(j.id)}" ondragstart="event.stopPropagation()">${collapsed ? '▼' : '▲'}</button>
         </div>
