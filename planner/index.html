@@ -214,6 +214,8 @@ a{color:var(--accent);text-decoration:none}
 .res-col-meta{font-size:10px;color:var(--muted)}
 .res-week-cell{border-top:1px solid var(--bord);padding:8px 10px}
 .res-week-cell-hdr{font-size:10px;font-weight:700;color:var(--muted);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.res-clear-week-btn{margin-left:auto;background:none;border:1px solid rgba(239,68,68,.35);color:#ef4444;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;cursor:pointer;font-family:inherit;line-height:1.5;flex-shrink:0}
+.res-clear-week-btn:hover{background:rgba(239,68,68,.1)}
 .res-wk-num{background:var(--panel2);border-radius:4px;padding:1px 5px;font-size:9px;color:var(--accent);font-weight:700}
 .res-week-zone{display:flex;flex-wrap:wrap;gap:4px;min-height:38px;border-radius:6px;padding:4px;border:1px solid transparent;transition:background .15s,border .15s}
 .res-week-zone.res-drag-over{background:rgba(230,184,75,0.12);border:1px dashed var(--accent)}
@@ -440,7 +442,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.34';
+const VERSION = 'v2.35';
 const BUILD   = 'Aug 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1271,8 +1273,11 @@ function renderResourcePlanner() {
         `<div class="res-placed-chip">${esc(name)}<button class="res-remove-btn" data-job="${esc(j.id)}" data-week="${w.startIso}" data-name="${esc(name)}" title="Remove">×</button></div>`
       ).join('');
       const pastCls = w.isPast ? ' res-week-cell--past' : '';
+      const clearBtn = placed.length > 0
+        ? `<button class="res-clear-week-btn" data-job="${esc(j.id)}" data-week="${w.startIso}" title="Remove all staff from this week">Clear</button>`
+        : '';
       return `<div class="res-week-cell${pastCls}">
-        <div class="res-week-cell-hdr">${w.label} <span class="res-wk-num">Wk&nbsp;${w.wkNum}</span></div>
+        <div class="res-week-cell-hdr">${w.label} <span class="res-wk-num">Wk&nbsp;${w.wkNum}</span>${clearBtn}</div>
         <div class="res-week-zone" data-job="${esc(j.id)}" data-week="${w.startIso}">${placedHtml}</div>
       </div>`;
     }).join('');
@@ -1333,7 +1338,32 @@ function bindResDragDrop() {
       const name = e.dataTransfer.getData('text/plain');
       if (!name) return;
       const { job: jobId, week: weekStart } = zone.dataset;
+
+      // DEP2: conflict detection
+      const weekEndDate = new Date(weekStart + 'T00:00:00');
+      weekEndDate.setDate(weekEndDate.getDate() + 6);
+      const weekEndIso = weekEndDate.toISOString().slice(0, 10);
       const alloc = resGetAlloc();
+      const conflicts = [];
+
+      for (const [otherJobId, weeks] of Object.entries(alloc)) {
+        if (String(otherJobId) === String(jobId)) continue;
+        if ((weeks[weekStart] || []).includes(name)) {
+          const otherJob = (_jobs || []).find(j => String(j.id) === String(otherJobId));
+          conflicts.push(`already on "${otherJob ? otherJob.name : 'another project'}" this week`);
+        }
+      }
+      const staffMember = _resStaff.find(s => s.name === name);
+      if (staffMember && _resLeave.some(l =>
+        l.staff_id === staffMember.id &&
+        l.from_date <= weekEndIso && l.to_date >= weekStart
+      )) {
+        conflicts.push('on holiday this week');
+      }
+      if (conflicts.length > 0 && !confirm(`⚠️ ${name} is ${conflicts.join(' and ')}.\n\nAdd anyway?`)) {
+        return;
+      }
+
       if (!alloc[jobId]) alloc[jobId] = {};
       if (!alloc[jobId][weekStart]) alloc[jobId][weekStart] = [];
       if (!alloc[jobId][weekStart].includes(name)) {
@@ -1350,6 +1380,19 @@ function bindResDragDrop() {
       const alloc = resGetAlloc();
       if (alloc[job] && alloc[job][week]) {
         alloc[job][week] = alloc[job][week].filter(n => n !== name);
+        resSaveAlloc(alloc);
+        renderResourcePlanner();
+      }
+    });
+  });
+
+  // DEP1: clear week buttons
+  tab.querySelectorAll('.res-clear-week-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { job, week } = btn.dataset;
+      const alloc = resGetAlloc();
+      if (alloc[job]) {
+        delete alloc[job][week];
         resSaveAlloc(alloc);
         renderResourcePlanner();
       }

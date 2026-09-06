@@ -110,9 +110,31 @@ textarea{resize:vertical;line-height:1.5}
 const REST = SUPABASE_URL + '/rest/v1';
 let session = null;
 let entries = [];
+let plannerJobs = [];
 let selectedId = null;
 let editMode = false;
 let currentWeather = '';
+
+// H7/D2: map logged-in email to display name
+const EMAIL_NAME_MAP = {
+  'ash@dgc.im': 'Ash',
+  'ash@silverdale.im': 'Ash',
+  'harry@dgc.im': 'Andrew Harrison',
+  'andrew@dgc.im': 'Andrew Harrison',
+  'andy@dgc.im': 'Andy W-Smythe',
+  'john@dgc.im': 'John McLoughlin',
+};
+function mapEmailToName(email) {
+  if (!email) return '';
+  const lower = email.toLowerCase().trim();
+  if (EMAIL_NAME_MAP[lower]) return EMAIL_NAME_MAP[lower];
+  const local = lower.split('@')[0];
+  if (local.startsWith('ash')) return 'Ash';
+  if (local.startsWith('harry') || local === 'andrew') return 'Andrew Harrison';
+  if (local.startsWith('andy')) return 'Andy W-Smythe';
+  if (local.startsWith('john')) return 'John McLoughlin';
+  return '';
+}
 
 function ah(extra = {}) {
   return { ...authedHeaders(session), ...extra };
@@ -123,6 +145,39 @@ async function loadEntries() {
   const r = await fetch(REST + '/dgc_site_diary?order=diary_date.desc,created_at.desc&limit=200', { headers: ah() });
   if (!r.ok) throw new Error(await r.text());
   entries = await r.json();
+}
+
+// D1: load active planner jobs for the site dropdown
+async function loadPlannerJobs() {
+  try {
+    const r = await fetch(REST + '/dgc_planner_jobs?archived=eq.false&select=id,name,start_date,base_weeks&order=name.asc', { headers: ah() });
+    if (r.ok) plannerJobs = await r.json();
+  } catch {}
+}
+
+// D3: look up deployment board allocation for a given site + date
+function getWorkersFromDeployment(dateStr, siteName) {
+  const job = plannerJobs.find(j => j.name === siteName);
+  if (!job || !job.start_date) return '';
+  let alloc = {};
+  try { alloc = JSON.parse(localStorage.getItem('dgc_resource_alloc') || '{}'); } catch {}
+  const jobAlloc = alloc[job.id];
+  if (!jobAlloc) return '';
+  const diaryDate = new Date(dateStr + 'T00:00:00');
+  const base = new Date(job.start_date + 'T00:00:00');
+  const n = Math.max(1, job.base_weeks || 4);
+  for (let i = 0; i < n; i++) {
+    const s = new Date(base);
+    s.setDate(base.getDate() + i * 7);
+    const weekEnd = new Date(s);
+    weekEnd.setDate(s.getDate() + 6);
+    if (diaryDate >= s && diaryDate <= weekEnd) {
+      const weekStart = s.toISOString().slice(0, 10);
+      const workers = jobAlloc[weekStart];
+      return workers ? workers.join(', ') : '';
+    }
+  }
+  return '';
 }
 
 async function saveEntry(data, id = null) {
@@ -249,15 +304,35 @@ function showForm(existing = null) {
 
   const WEATHER = ['Sunny','Partly Cloudy','Overcast','Drizzle','Rain','Heavy Rain','Windy','Foggy','Frost'];
 
+  // D1: build site dropdown options (active jobs + past diary sites + Other)
+  const pastSites = [...new Set(entries.map(e => e.site).filter(Boolean))];
+  const jobNames = plannerJobs.map(j => j.name);
+  const allSites = [...new Set([...jobNames, ...pastSites])].sort((a, b) => a.localeCompare(b));
+  const existingSite = existing?.site || '';
+  const existingIsCustom = existingSite && !allSites.includes(existingSite);
+  const siteOptions = allSites.map(s =>
+    `<option value="${esc(s)}" ${existingSite === s ? 'selected' : ''}>${esc(s)}</option>`
+  ).join('');
+
+  // H7/D2: author prefill from email
+  const authorDefault = existing?.author || mapEmailToName(session?.user?.email) || '';
+
   panel.innerHTML = `
     <div class="section-title">Date &amp; Site</div>
     <div class="grid2">
       <label>Date <input type="date" id="f-date" value="${existing?.diary_date || today}" required></label>
-      <label>Site / Job <input type="text" id="f-site" value="${esc(existing?.site || '')}" placeholder="e.g. Ballasalla Ph4, Glenfaba" required list="site-list">
-        <datalist id="site-list">${[...new Set(entries.map(e=>e.site).filter(Boolean))].map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
+      <label>Site / Job
+        <select id="f-site-select" required>
+          <option value="">— Select a job —</option>
+          ${siteOptions}
+          <option value="__custom__" ${existingIsCustom ? 'selected' : ''}>Other (type below)…</option>
+        </select>
+        <input type="text" id="f-site-custom" placeholder="Custom site name"
+          style="margin-top:6px;display:${existingIsCustom ? 'block' : 'none'}"
+          value="${existingIsCustom ? esc(existingSite) : ''}">
       </label>
     </div>
-    <label>Written by <input type="text" id="f-author" value="${esc(existing?.author || (session?.user?.email || ''))}" placeholder="Name"></label>
+    <label>Written by <input type="text" id="f-author" value="${esc(authorDefault)}" placeholder="Name"></label>
 
     <div class="section-title">Conditions</div>
     <div style="font-size:0.82rem;color:var(--muted);margin-bottom:6px">Weather</div>
@@ -267,6 +342,7 @@ function showForm(existing = null) {
 
     <div class="section-title">Site Activity</div>
     <label>Workers on site <textarea id="f-workers" rows="4" placeholder="e.g. David Smith, Lee Clinton, Ryan King">${esc(existing?.workers || '')}</textarea></label>
+    <p id="workers-hint" style="font-size:0.75rem;color:var(--muted);margin-top:-6px;margin-bottom:8px"></p>
     <label>Plant &amp; Equipment on site <textarea id="f-plant" rows="3" placeholder="e.g. 13T Excavator, Dumper">${esc(existing?.plant || '')}</textarea></label>
 
     <div class="section-title">Work Carried Out *</div>
@@ -288,6 +364,35 @@ function showForm(existing = null) {
     </div>
     <p class="form-status" id="formStatus"></p>`;
 
+  // D1: custom site toggle
+  function getSiteValue() {
+    const sel = document.getElementById('f-site-select');
+    if (sel.value === '__custom__') return document.getElementById('f-site-custom').value.trim();
+    return sel.value;
+  }
+  document.getElementById('f-site-select').addEventListener('change', function() {
+    document.getElementById('f-site-custom').style.display = this.value === '__custom__' ? 'block' : 'none';
+    autoFillWorkers();
+  });
+
+  // D3: auto-fill workers from deployment board
+  function autoFillWorkers() {
+    const site = getSiteValue();
+    const date = document.getElementById('f-date').value;
+    const workersEl = document.getElementById('f-workers');
+    const hint = document.getElementById('workers-hint');
+    if (!site || !date || site === '__custom__') return;
+    if (workersEl.value.trim()) return; // don't overwrite manual input
+    const w = getWorkersFromDeployment(date, site);
+    if (w) {
+      workersEl.value = w;
+      hint.textContent = 'Auto-filled from deployment board — add others as needed';
+    }
+  }
+  document.getElementById('f-date').addEventListener('change', autoFillWorkers);
+  // Trigger once for new entries if site already selected
+  if (!existing) setTimeout(autoFillWorkers, 0);
+
   // Weather chips
   document.querySelectorAll('.wx-chip').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -297,9 +402,9 @@ function showForm(existing = null) {
   });
 
   document.getElementById('saveBtn').addEventListener('click', async () => {
-    const site = document.getElementById('f-site').value.trim();
+    const site = getSiteValue();
     const work = document.getElementById('f-work').value.trim();
-    if (!site) { setStatus('Site is required', true); return; }
+    if (!site) { setStatus('Site / Job is required', true); return; }
     if (!work)  { setStatus('Work Carried Out is required', true); return; }
     const btn = document.getElementById('saveBtn');
     btn.disabled = true; btn.textContent = 'Saving…';
@@ -358,7 +463,7 @@ function setStatus(msg, err = false) {
   if (!session) { window.location.replace('../staff/'); return; }
 
   try {
-    await loadEntries();
+    await Promise.all([loadEntries(), loadPlannerJobs()]);
     renderList();
   } catch (err) {
     const msg = err.message.includes('does not exist') || err.message.includes('42P01')
