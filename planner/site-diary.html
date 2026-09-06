@@ -73,6 +73,15 @@ textarea{resize:vertical;line-height:1.5}
 
 .empty-state{padding:40px 20px;text-align:center;color:var(--muted);font-size:0.9rem}
 
+/* Staff picker */
+.staff-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:6px}
+.sp-item{background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:9px 11px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s;user-select:none}
+.sp-item:hover{border-color:var(--accent)}
+.sp-item.checked{background:rgba(245,158,11,.13);border-color:var(--accent)}
+.sp-cb{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;flex-shrink:0}
+.sp-name{font-size:0.84rem;font-weight:600;color:var(--text)}
+.sp-role{font-size:0.7rem;color:var(--muted);display:block;margin-top:1px}
+
 /* ── Report / document view ── */
 .report-doc{background:#fff;color:#1a2a3f;border-radius:10px;padding:36px 40px;max-width:820px;box-shadow:0 4px 32px rgba(0,0,0,.45);font-family:'Segoe UI',Calibri,Arial,sans-serif}
 
@@ -158,6 +167,7 @@ const REST = SUPABASE_URL + '/rest/v1';
 let session = null;
 let entries = [];
 let plannerJobs = [];
+let staffList = [];
 let selectedId = null;
 let editMode = false;
 let currentWeather = '';
@@ -192,6 +202,13 @@ async function loadEntries() {
   const r = await fetch(REST + '/dgc_site_diary?order=diary_date.desc,created_at.desc&limit=200', { headers: ah() });
   if (!r.ok) throw new Error(await r.text());
   entries = await r.json();
+}
+
+async function loadStaff() {
+  try {
+    const r = await fetch(REST + '/dgc_staff?active=eq.true&order=name.asc&select=id,name,role', { headers: ah() });
+    if (r.ok) staffList = await r.json();
+  } catch {}
 }
 
 // D1: load active planner jobs for the site dropdown
@@ -411,6 +428,32 @@ function block(title, content) {
   return `<div class="view-block"><h3>${title}</h3><p>${esc(content)}</p></div>`;
 }
 
+function buildStaffPicker(existingWorkers) {
+  const checked = new Set((existingWorkers || '').split(',').map(n => n.trim()).filter(Boolean));
+  // Active staff from Supabase
+  const rows = staffList.map(s => {
+    const isChecked = checked.has(s.name);
+    checked.delete(s.name); // track which names are "known"
+    return `<label class="sp-item${isChecked?' checked':''}" onclick="this.classList.toggle('checked',this.querySelector('.sp-cb').checked)">
+      <input type="checkbox" class="sp-cb" value="${esc(s.name)}"${isChecked?' checked':''}>
+      <span><span class="sp-name">${esc(s.name)}</span><span class="sp-role">${esc(s.role||'')}</span></span>
+    </label>`;
+  });
+  // Any names from existing entry not in current staff list (left the company etc)
+  checked.forEach(name => {
+    if (!name) return;
+    rows.push(`<label class="sp-item checked" onclick="this.classList.toggle('checked',this.querySelector('.sp-cb').checked)">
+      <input type="checkbox" class="sp-cb" value="${esc(name)}" checked>
+      <span><span class="sp-name">${esc(name)}</span><span class="sp-role">Former</span></span>
+    </label>`);
+  });
+  return rows.join('');
+}
+
+function getSelectedWorkers() {
+  return [...document.querySelectorAll('.sp-cb:checked')].map(cb => cb.value).join(', ');
+}
+
 function showForm(existing = null) {
   editMode = true;
   currentWeather = existing?.weather || '';
@@ -456,8 +499,9 @@ function showForm(existing = null) {
     </div>
 
     <div class="section-title">Site Activity</div>
-    <label>Workers on site <textarea id="f-workers" rows="4" placeholder="e.g. David Smith, Lee Clinton, Ryan King">${esc(existing?.workers || '')}</textarea></label>
-    <p id="workers-hint" style="font-size:0.75rem;color:var(--muted);margin-top:-6px;margin-bottom:8px"></p>
+    <div style="font-size:0.82rem;color:var(--muted);margin-bottom:6px">Workers on site</div>
+    <div class="staff-picker" id="staffPicker">${buildStaffPicker(existing?.workers)}</div>
+    <p id="workers-hint" style="font-size:0.75rem;color:var(--muted);margin-bottom:8px"></p>
     <label>Plant &amp; Equipment on site <textarea id="f-plant" rows="3" placeholder="e.g. 13T Excavator, Dumper">${esc(existing?.plant || '')}</textarea></label>
 
     <div class="section-title">Work Carried Out *</div>
@@ -490,19 +534,20 @@ function showForm(existing = null) {
     autoFillWorkers();
   });
 
-  // D3: auto-fill workers from deployment board
+  // D3: auto-tick workers from deployment board
   function autoFillWorkers() {
     const site = getSiteValue();
     const date = document.getElementById('f-date').value;
-    const workersEl = document.getElementById('f-workers');
     const hint = document.getElementById('workers-hint');
     if (!site || !date || site === '__custom__') return;
-    if (workersEl.value.trim()) return; // don't overwrite manual input
     const w = getWorkersFromDeployment(date, site);
-    if (w) {
-      workersEl.value = w;
-      hint.textContent = 'Auto-filled from deployment board — add others as needed';
-    }
+    if (!w) return;
+    const names = w.split(',').map(n => n.trim()).filter(Boolean);
+    let ticked = 0;
+    document.querySelectorAll('.sp-cb').forEach(cb => {
+      if (names.includes(cb.value) && !cb.checked) { cb.checked = true; cb.closest('.sp-item').classList.add('checked'); ticked++; }
+    });
+    if (ticked && hint) hint.textContent = 'Deployment board names pre-ticked — adjust as needed';
   }
   document.getElementById('f-date').addEventListener('change', autoFillWorkers);
   // Trigger once for new entries if site already selected
@@ -529,7 +574,7 @@ function showForm(existing = null) {
         site,
         author:  document.getElementById('f-author').value.trim() || null,
         weather: currentWeather || null,
-        workers: document.getElementById('f-workers').value.trim() || null,
+        workers: getSelectedWorkers() || null,
         plant:   document.getElementById('f-plant').value.trim() || null,
         work_done: work,
         issues:   document.getElementById('f-issues').value.trim() || null,
@@ -578,7 +623,7 @@ function setStatus(msg, err = false) {
   if (!session) { window.location.replace('../staff/'); return; }
 
   try {
-    await Promise.all([loadEntries(), loadPlannerJobs()]);
+    await Promise.all([loadEntries(), loadPlannerJobs(), loadStaff()]);
     renderList();
   } catch (err) {
     const msg = err.message.includes('does not exist') || err.message.includes('42P01')
