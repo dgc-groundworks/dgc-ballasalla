@@ -1674,18 +1674,20 @@ function bindResDragDrop() {
     else b.classList.toggle('active', _resActiveFilters.has(b.dataset.filter));
   });
 
-  // Collapse all toggle
+  // Collapse all toggle — clone first to strip stale listeners
   const collapseAllBtn = document.getElementById('resCollapseAllBtn');
   if (collapseAllBtn) {
-    collapseAllBtn.addEventListener('click', () => {
+    collapseAllBtn.replaceWith(collapseAllBtn.cloneNode(true));
+    const freshCollapse = document.getElementById('resCollapseAllBtn');
+    freshCollapse.addEventListener('click', () => {
       const visibleJobs = (_jobs || []).filter(j => !j.archived);
       const allCollapsed = visibleJobs.every(j => _resCollapsed.has(j.id));
       if (allCollapsed) {
         _resCollapsed.clear();
-        collapseAllBtn.textContent = 'Collapse All';
+        freshCollapse.textContent = 'Collapse All';
       } else {
         visibleJobs.forEach(j => _resCollapsed.add(j.id));
-        collapseAllBtn.textContent = 'Expand All';
+        freshCollapse.textContent = 'Expand All';
       }
       renderResourcePlanner();
     });
