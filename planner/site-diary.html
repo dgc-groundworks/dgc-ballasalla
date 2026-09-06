@@ -15,8 +15,10 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
 
-.topbar{background:var(--surf);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
-.topbar h1{font-size:1rem;font-weight:700;color:var(--accent)}
+.topbar{background:var(--surf);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:1rem;font-weight:700;color:var(--accent);flex:1}
+.back-btn{display:flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bord);border-radius:7px;padding:6px 12px;color:var(--muted);font-size:0.82rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:all .15s;font-family:inherit}
+.back-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 .layout{display:grid;grid-template-columns:340px 1fr;min-height:calc(100vh - 49px)}
 @media(max-width:700px){.layout{grid-template-columns:1fr;grid-template-rows:auto 1fr}}
@@ -140,6 +142,7 @@ textarea{resize:vertical;line-height:1.5}
 </head>
 <body>
 <header class="topbar">
+  <a class="back-btn" href="index.html" target="_top">&#8592; Planner</a>
   <h1>Site Diary</h1>
   <button class="new-btn" id="newEntryBtn">+ New Entry</button>
 </header>
