@@ -257,6 +257,10 @@ a{color:var(--accent);text-decoration:none}
 .job-tbl tr.tl-row-dragging td{opacity:0.4}
 .job-tbl tr.tl-row-drop-above td{border-top:2px solid var(--accent)}
 .job-tbl tr.tl-row-drop-below td{border-bottom:2px solid var(--accent)}
+/* ── Drop-on-header (all weeks) ── */
+.res-col-hdr--drop-target{background:rgba(245,158,11,.18) !important;outline:2px dashed var(--accent);border-top-color:var(--accent) !important}
+.res-col-hdr--drop-target .res-col-name{color:var(--accent)}
+.res-col-hdr--drop-target .res-col-meta{color:var(--accent);opacity:.7}
 /* ── Split button ── */
 .btn-split{background:none;border:1px solid var(--bord);color:var(--muted);padding:7px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit}
 .btn-split:hover{border-color:#3b82f6;color:#3b82f6}
@@ -483,7 +487,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.41';
+const VERSION = 'v2.42';
 const BUILD   = 'Aug 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1485,6 +1489,64 @@ function bindResDragDrop() {
     const undoBtn = document.getElementById('resUndoBtn');
     if (undoBtn) undoBtn.disabled = _resUndoStack.length === 0;
   }
+
+  // Drop on column header → assign person to ALL (future) weeks of that job
+  tab.querySelectorAll('.res-col-hdr').forEach(hdr => {
+    const col = hdr.closest('.res-col');
+    if (!col) return;
+    const jobId = col.dataset.jobid;
+    hdr.addEventListener('dragover', e => {
+      if (_draggingColId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      hdr.classList.add('res-col-hdr--drop-target');
+    });
+    hdr.addEventListener('dragleave', e => {
+      if (!hdr.contains(e.relatedTarget)) hdr.classList.remove('res-col-hdr--drop-target');
+    });
+    hdr.addEventListener('drop', e => {
+      hdr.classList.remove('res-col-hdr--drop-target');
+      if (_draggingColId) return;
+      e.preventDefault();
+      const name = e.dataTransfer.getData('text/plain');
+      if (!name) return;
+      const job = (_jobs || []).find(j => String(j.id) === String(jobId));
+      if (!job) return;
+      const futureWeeks = resWeeks(job).filter(w => !w.isPast);
+      if (!futureWeeks.length) return;
+      const alloc = resGetAlloc();
+      // Collect conflicts across all target weeks
+      const conflictWeeks = [], leaveWeeks = [];
+      const staffMember = _resStaff.find(s => s.name === name);
+      for (const w of futureWeeks) {
+        const wEnd = new Date(w.startIso + 'T00:00:00');
+        wEnd.setDate(wEnd.getDate() + 6);
+        const wEndIso = wEnd.toISOString().slice(0, 10);
+        for (const [otherId, wks] of Object.entries(alloc)) {
+          if (String(otherId) === String(jobId)) continue;
+          if ((wks[w.startIso] || []).includes(name)) {
+            const oj = (_jobs || []).find(j => String(j.id) === String(otherId));
+            conflictWeeks.push(`Wk ${w.wkNum} (${oj ? oj.name : 'another job'})`);
+          }
+        }
+        if (staffMember && _resLeave.some(l =>
+          l.staff_id === staffMember.id && l.from_date <= wEndIso && l.to_date >= w.startIso
+        )) leaveWeeks.push('Wk ' + w.wkNum);
+      }
+      const warnings = [];
+      if (conflictWeeks.length) warnings.push('double-booked in ' + conflictWeeks.join(', '));
+      if (leaveWeeks.length) warnings.push('on leave in ' + leaveWeeks.join(', '));
+      if (warnings.length && !confirm(`⚠️ ${name} is ${warnings.join(' and ')}.\n\nAdd to all weeks of "${job.name}" anyway?`)) return;
+      resPushUndo(JSON.parse(JSON.stringify(alloc)));
+      if (!alloc[jobId]) alloc[jobId] = {};
+      let added = 0;
+      for (const w of futureWeeks) {
+        if (!alloc[jobId][w.startIso]) alloc[jobId][w.startIso] = [];
+        if (!alloc[jobId][w.startIso].includes(name)) { alloc[jobId][w.startIso].push(name); added++; }
+      }
+      if (added) { resSaveAlloc(alloc); renderResourcePlanner(); }
+    });
+  });
 
   // DEP1: clear week buttons
   tab.querySelectorAll('.res-clear-week-btn').forEach(btn => {
