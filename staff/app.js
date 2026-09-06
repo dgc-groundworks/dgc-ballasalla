@@ -247,7 +247,7 @@ function renderHours() {
 
   let foot = '<tr class="hours-footer-row"><td>TEAM TOTALS</td>';
   dayTotals.forEach(t => foot += `<td>${t || ''}</td>`);
-  foot += `<td></td><td>${footOT}h</td><td>${footTotal}</td></tr>`;
+  foot += `<td></td><td>${footOT > 0 ? footOT.toFixed(1)+'h' : ''}</td><td>${footTotal > 0 ? footTotal.toFixed(1) : ''}</td></tr>`;
   foot += `<tr class="hours-footer-row"><td colspan="${PERIOD_DAYS + 1}" style="text-align:right">Advances £${footAdv.toFixed(2)} · Bonuses £${footBonus.toFixed(2)}</td><td colspan="2"></td></tr>`;
 
   table.innerHTML = head + body + foot;

@@ -18,6 +18,10 @@ function toggleTheme() {
   }
   // Re-render deployment board if present
   if (typeof renderResourcePlanner === 'function') renderResourcePlanner();
+  // Propagate to embedded iframes (staff sub-tabs)
+  document.querySelectorAll('iframe').forEach(f => {
+    try { f.contentWindow.postMessage({ type: 'dgc-theme', theme: next }, '*'); } catch (e) {}
+  });
 }
 
 function _updateThemeBtn() {
@@ -26,6 +30,15 @@ function _updateThemeBtn() {
     btn.textContent = isDark ? 'Light Mode' : 'Dark Mode';
   });
 }
+
+// Listen for theme messages from parent (when embedded as iframe)
+window.addEventListener('message', function (e) {
+  if (e.data && e.data.type === 'dgc-theme') {
+    document.documentElement.setAttribute('data-theme', e.data.theme);
+    localStorage.setItem('dgc_theme', e.data.theme);
+    _updateThemeBtn();
+  }
+});
 
 // Sync button label once DOM is ready
 document.addEventListener('DOMContentLoaded', _updateThemeBtn);

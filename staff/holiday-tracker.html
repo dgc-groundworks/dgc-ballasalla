@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Holiday Tracker</title>
+<script src="../planner/theme.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <style>
@@ -12,6 +13,15 @@
   --accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;
   --green:#22c55e;--red:#ef4444;--blue:#3b82f6;--amber:#f97316;
 }
+[data-theme="light"] {
+  --bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;
+  --accent:#e08a00;--text:#1a2b3c;--muted:#5c7a94;
+  --green:#16a34a;--red:#dc2626;--blue:#2563eb;--amber:#ea580c;
+}
+[data-theme="light"] .topbar{background:#1b2a3b;border-bottom-color:#0d1a26}
+[data-theme="light"] .topbar h1{color:#f59e0b}
+[data-theme="light"] .back-btn{color:#8ab0cc;border-color:rgba(255,255,255,.2)}
+[data-theme="light"] .back-btn:hover{color:#ffffff}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
 

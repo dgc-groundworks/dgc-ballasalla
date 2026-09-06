@@ -90,8 +90,8 @@ body {
 }
 .week-approve-btn:hover { filter: brightness(1.12); }
 .week-approve-btn:disabled { opacity: 0.6; cursor: default; }
-.week-approve-btn.unapproved { background: #dc2626; color: #fff; }
-.week-approve-btn.approved   { background: #16a34a; color: #fff; }
+.week-approve-btn.unapproved { background: var(--panel2); color: var(--muted); border: 1px solid var(--border); }
+.week-approve-btn.approved   { background: #16a34a; color: #fff; border: none; }
 
 main { max-width: 1100px; margin: 0 auto; padding: 20px; }
 
