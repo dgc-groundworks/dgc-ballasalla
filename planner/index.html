@@ -61,17 +61,19 @@ a{color:var(--accent);text-decoration:none}
 
 /* ── Jobs table ── */
 .job-tbl{width:100%;border-collapse:collapse}
-.job-tbl th{font-size:10px;font-weight:700;color:var(--muted);text-align:left;padding:7px 10px;border-bottom:3px solid rgba(0,0,0,.6);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
-.job-tbl td{padding:7px 10px;border-bottom:1px solid var(--bord);vertical-align:middle}
-.job-tbl tr:hover td{background:var(--surf);cursor:pointer}
+.job-tbl th{font-size:10px;font-weight:700;color:var(--muted);text-align:left;padding:9px 14px;border-bottom:3px solid rgba(0,0,0,.6);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+.job-tbl td{padding:11px 14px;border-bottom:1px solid rgba(0,0,0,.35);vertical-align:middle;transition:background .1s}
+.job-tbl tbody tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+.job-tbl tr:hover td{background:rgba(255,255,255,.055);cursor:pointer}
+.job-tbl tr:hover td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-right:6px}
-.jname{font-weight:600;font-size:13px;line-height:1.2}
-.jnote{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
-.wks{font-size:13px;white-space:nowrap}
-.wks-delta{font-size:10px;margin-top:1px}
+.jname{font-weight:700;font-size:13.5px;line-height:1.2;letter-spacing:-.1px}
+.jnote{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+.wks{font-size:13px;white-space:nowrap;font-weight:600}
+.wks-delta{font-size:10px;margin-top:2px}
 .wks-delta.fast{color:var(--c-run)}
 .wks-delta.slow{color:#ef4444}
-.ppl{font-size:13px;white-space:nowrap}
+.ppl{font-size:13px;white-space:nowrap;font-weight:600}
 .tbl-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:3px 6px;border-radius:4px;line-height:1;font-family:inherit}
 .tbl-btn:hover{color:var(--text);background:var(--surf2)}
 
@@ -289,12 +291,12 @@ a{color:var(--accent);text-decoration:none}
 #tab-resources .res-sidebar{background:rgba(6,13,22,.88);border-right:1px solid rgba(255,255,255,.07)}
 #tab-resources .res-board{padding:20px;gap:14px}
 /* Column */
-#tab-resources .res-col{background:#1e3249;border:none;border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.4);width:230px}
-#tab-resources .res-col-hdr{background:#0d1a26;padding:12px 14px 10px;border-radius:12px 12px 0 0;border-bottom:1px solid rgba(255,255,255,.08)}
+#tab-resources .res-col{background:#243d57;border:none;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.5);width:230px}
+#tab-resources .res-col-hdr{background:#0d1a26;padding:12px 14px 10px;border-radius:12px 12px 0 0;border-bottom:2px solid rgba(0,0,0,.4)}
 #tab-resources .res-col-name{font-size:14px;font-weight:700;color:#ddeeff;letter-spacing:-.1px}
 #tab-resources .res-col-meta{font-size:10px;color:rgba(180,205,230,.6);margin-top:2px}
 /* Weeks — clear gap between each row */
-#tab-resources .res-week-cell{border-top:2px solid rgba(0,0,0,.35);padding:10px 10px 10px;background:#1e3249}
+#tab-resources .res-week-cell{border-top:2px solid rgba(0,0,0,.4);padding:10px 10px 10px;background:#243d57}
 #tab-resources .res-week-cell:first-of-type{border-top:none}
 #tab-resources .res-week-cell-hdr{font-size:10px;font-weight:700;color:rgba(150,185,220,.8);margin-bottom:6px;display:flex;align-items:center;gap:5px}
 #tab-resources .res-wk-num{background:rgba(245,158,11,.22);color:var(--accent);border-radius:4px;padding:1px 5px;font-size:9px;font-weight:700}
