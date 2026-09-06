@@ -224,11 +224,12 @@ function renderList() {
         <button data-status="Off Work" data-off-type="Leave" style="display:block;width:100%;padding:10px 16px;background:none;border:none;color:var(--text);text-align:left;cursor:pointer">Off Work &ndash; Leave (L, unpaid)</button>
         <button data-status="Left" style="display:block;width:100%;padding:10px 16px;background:none;border:none;color:#f85149;text-align:left;cursor:pointer">Delete (no longer working)</button>`;
       menu.querySelectorAll('button').forEach(b => {
-        b.addEventListener('click', async () => {
-          menu.remove();
+        b.addEventListener('click', async e => {
+          e.stopPropagation(); // prevent layout-shift click from reaching name handler
           const status    = b.dataset.status;
           const offType   = b.dataset.offType || null;
           const newActive = status !== 'Left';
+          menu.remove();
           try {
             await sbPatch('dgc_staff', 'id=eq.' + p.id, { status, off_work_type: offType, active: newActive });
             await loadStaff();
@@ -243,7 +244,15 @@ function renderList() {
     });
   });
 
-  document.addEventListener('click', () => document.querySelectorAll('.status-menu').forEach(m => m.remove()), { once: true });
+  // Outside-click closes any open status menu — named fn so it's never added twice
+  document.removeEventListener('click', _closeStatusMenus);
+  document.addEventListener('click', _closeStatusMenus);
+}
+
+function _closeStatusMenus(e) {
+  if (!e.target.closest('.status-menu') && !e.target.closest('.menu-btn')) {
+    document.querySelectorAll('.status-menu').forEach(m => m.remove());
+  }
 }
 
 function renderRow(p) {
