@@ -8,8 +8,8 @@
 <script src="../staff/auth.js"></script>
 <style>
 :root {
-  --bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;
-  --accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;
+  --bg:#1b2a3b;--surf:#243347;--surf2:#2d3f55;--bord:#374f68;
+  --accent:#f59e0b;--text:#e2e8f0;--muted:#7a95b0;
   --green:#22c55e;--red:#ef4444;--blue:#3b82f6;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -76,13 +76,13 @@ textarea{resize:vertical;line-height:1.5}
 .empty-state{padding:40px 20px;text-align:center;color:var(--muted);font-size:0.9rem}
 
 /* Staff picker */
-.staff-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px;margin-bottom:6px}
-.sp-item{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:5px 8px;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .15s;user-select:none}
-.sp-item:hover{background:rgba(255,255,255,.11);border-color:var(--accent)}
-.sp-item.checked{background:rgba(245,158,11,.15);border-color:var(--accent)}
-.sp-cb{accent-color:var(--accent);width:13px;height:13px;cursor:pointer;flex-shrink:0}
-.sp-name{font-size:0.76rem;font-weight:600;color:var(--text);line-height:1.2}
-.sp-role{font-size:0.65rem;color:var(--muted);display:block;margin-top:1px}
+.staff-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:3px;margin-bottom:6px}
+.sp-item{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:3px 6px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s;user-select:none}
+.sp-item:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.25)}
+.sp-item.checked{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.35)}
+.sp-cb{accent-color:#60a5fa;width:11px;height:11px;cursor:pointer;flex-shrink:0}
+.sp-name{font-size:0.71rem;font-weight:600;color:var(--text);line-height:1.2}
+.sp-role{font-size:0.61rem;color:var(--muted);display:block;margin-top:1px}
 
 /* ── Report / document view ── */
 .report-doc{background:#fff;color:#1a2a3f;border-radius:10px;padding:36px 40px;max-width:820px;box-shadow:0 4px 32px rgba(0,0,0,.45);font-family:'Segoe UI',Calibri,Arial,sans-serif}
