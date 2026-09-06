@@ -283,27 +283,28 @@ a{color:var(--accent);text-decoration:none}
 .split-section{margin-top:10px;padding:12px;border:1px solid var(--bord);border-radius:8px;background:var(--surf2)}
 .split-section .split-title{font-size:11px;font-weight:700;color:#3b82f6;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
 
-/* ── Deployment board — sleek Trello-style v3 ── */
-/* Hierarchy: rich navy bg → lighter slate column → WHITE cards popping off */
-#tab-resources .res-layout{background:linear-gradient(135deg,#1a3048 0%,#1e3a58 55%,#172840 100%)}
-#tab-resources .res-sidebar{background:rgba(10,20,33,.82);border-right:1px solid rgba(255,255,255,.07)}
+/* ── Deployment board — sleek Trello-style v4 ── */
+#tab-resources .res-layout{background:linear-gradient(135deg,#0c1a27 0%,#0f2035 55%,#0a1720 100%)}
+#tab-resources .res-sidebar{background:rgba(6,13,22,.88);border-right:1px solid rgba(255,255,255,.07)}
 #tab-resources .res-board{padding:20px;gap:14px}
-/* Column — clearly distinguishable slate box */
-#tab-resources .res-col{background:#263f5a;border:none;border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.35);width:230px}
-#tab-resources .res-col-hdr{background:#1e3350;padding:12px 14px 10px;border-radius:12px 12px 0 0;border-bottom:1px solid rgba(255,255,255,.07)}
+/* Column */
+#tab-resources .res-col{background:#1e3249;border:none;border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.4);width:230px}
+#tab-resources .res-col-hdr{background:#172840;padding:12px 14px 10px;border-radius:12px 12px 0 0;border-bottom:1px solid rgba(255,255,255,.08)}
 #tab-resources .res-col-name{font-size:14px;font-weight:700;color:#ddeeff;letter-spacing:-.1px}
-#tab-resources .res-col-meta{font-size:10px;color:rgba(180,205,230,.65);margin-top:2px}
-#tab-resources .res-week-cell{border-top:1px solid rgba(255,255,255,.05);padding:9px 10px;background:#263f5a}
-#tab-resources .res-week-cell-hdr{font-size:10px;font-weight:700;color:rgba(150,185,220,.85);margin-bottom:7px;display:flex;align-items:center;gap:5px}
+#tab-resources .res-col-meta{font-size:10px;color:rgba(180,205,230,.6);margin-top:2px}
+/* Weeks — clear gap between each row */
+#tab-resources .res-week-cell{border-top:2px solid rgba(0,0,0,.35);padding:10px 10px 10px;background:#1e3249}
+#tab-resources .res-week-cell:first-of-type{border-top:none}
+#tab-resources .res-week-cell-hdr{font-size:10px;font-weight:700;color:rgba(150,185,220,.8);margin-bottom:6px;display:flex;align-items:center;gap:5px}
 #tab-resources .res-wk-num{background:rgba(245,158,11,.22);color:var(--accent);border-radius:4px;padding:1px 5px;font-size:9px;font-weight:700}
-/* Cards stack vertically — WHITE so they pop */
-#tab-resources .res-week-zone{display:flex;flex-direction:column;gap:5px;min-height:44px;border-radius:6px;padding:0;border:none;transition:background .15s}
-#tab-resources .res-week-zone.res-drag-over{background:rgba(245,158,11,.12);outline:1.5px dashed rgba(245,158,11,.6);border-radius:6px}
-#tab-resources .res-placed-chip{background:#e8f2ff;border:none;color:#1a2d42;border-radius:7px;padding:7px 8px 7px 11px;font-size:12px;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.22);width:100%;display:flex;align-items:center}
-#tab-resources .res-placed-chip .res-remove-btn{color:#7aaac8;margin-left:auto;font-size:14px;padding:0 3px;line-height:1}
-#tab-resources .res-placed-chip .res-remove-btn:hover{color:#ef4444;background:rgba(239,68,68,.1);border-radius:4px}
-/* Conflict — crisp red card on top */
-#tab-resources .res-placed-chip--conflict{background:#fee2e2 !important;color:#991b1b !important;box-shadow:0 1px 3px rgba(239,68,68,.3) !important}
+/* Cards — compact, dark glass */
+#tab-resources .res-week-zone{display:flex;flex-direction:column;gap:4px;min-height:36px;border-radius:6px;padding:0;border:none;transition:background .15s}
+#tab-resources .res-week-zone.res-drag-over{background:rgba(245,158,11,.1);outline:1.5px dashed rgba(245,158,11,.6);border-radius:6px}
+#tab-resources .res-placed-chip{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.1);color:#cce0f5;border-radius:6px;padding:5px 6px 5px 9px;font-size:11px;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.3);width:100%;display:flex;align-items:center}
+#tab-resources .res-placed-chip .res-remove-btn{color:rgba(150,185,220,.5);margin-left:auto;font-size:13px;padding:0 3px;line-height:1}
+#tab-resources .res-placed-chip .res-remove-btn:hover{color:#ef4444;background:rgba(239,68,68,.12);border-radius:3px}
+/* Conflict — red sits clearly on top */
+#tab-resources .res-placed-chip--conflict{background:rgba(239,68,68,.25) !important;border-color:rgba(239,68,68,.4) !important;color:#fca5a5 !important;box-shadow:0 1px 3px rgba(239,68,68,.2) !important}
 #tab-resources .res-week-cell--conflict{background:rgba(239,68,68,.07)}
 /* Sidebar chips */
 #tab-resources .res-chip{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.11);border-radius:9px;color:#b8d0ea;padding:9px 12px;font-size:12px;font-weight:600;transition:all .15s}
