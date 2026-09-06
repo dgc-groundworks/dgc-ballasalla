@@ -29,7 +29,7 @@
 [data-theme="light"] {
   --bg:#f0f4f8; --surf:#ffffff; --surf2:#e4ecf4; --bord:#b8ccd8;
   --accent:#e08a00; --text:#1a2b3c; --muted:#5c7a94;
-  --board-bg:#dde8f3; --board-col:#ffffff; --board-col-hdr:#1b2a3b;
+  --board-bg:#b8cfe8; --board-col:#dde8f3; --board-col-hdr:#1b2a3b;
   --tl-bg:#dde8f3; --tl-col-even:rgba(0,0,0,.04); --tl-col-odd:rgba(255,255,255,.5);
   --tl-lbl-bg:#f0f4f8; --tl-sep:rgba(0,0,0,.1); --tl-foot:rgba(0,0,0,.08);
   --tl-day:#4a6a88; --tl-date:#1a2b3c; --tl-row-lbl:#1a2b3c;
@@ -47,6 +47,11 @@
 /* Light: theme toggle button visibility */
 [data-theme="light"] .theme-toggle-btn{color:#cde0f5;border-color:rgba(255,255,255,.2)}
 [data-theme="light"] .theme-toggle-btn:hover{background:rgba(255,255,255,.1)}
+[data-theme="light"] .nav button:hover{color:#ffffff}
+[data-theme="light"] .snav button:hover{color:var(--text)}
+[data-theme="light"] .hrs-tbl td.bh-td{background:#c8d8ea;color:var(--muted)}
+[data-theme="light"] .hrs-tbl td.leave-td{background:#dcfce7;color:#166534}
+[data-theme="light"] .hrs-tbl td.leave-td.unpaid{background:#fef3c7;color:#92400e}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh}
 a{color:var(--accent);text-decoration:none}
