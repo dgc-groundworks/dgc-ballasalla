@@ -297,11 +297,11 @@ a{color:var(--accent);text-decoration:none}
 /* Cards stack vertically like Trello */
 #tab-resources .res-week-zone{display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:5px;min-height:44px;border-radius:8px;padding:0;border:none;transition:background .15s}
 #tab-resources .res-week-zone.res-drag-over{background:rgba(245,158,11,.09);border:1.5px dashed rgba(245,158,11,.6)}
-/* Placed chips = Trello cards */
-#tab-resources .res-placed-chip{background:#e9edf5;border:none;color:#1e273a;border-radius:7px;padding:7px 8px 7px 11px;font-size:12px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.22),0 0 0 1px rgba(0,0,0,.06);width:100%;display:flex;align-items:center}
-#tab-resources .res-placed-chip .res-remove-btn{color:#94a3b8;margin-left:auto;font-size:14px;padding:0 3px;line-height:1}
-#tab-resources .res-placed-chip .res-remove-btn:hover{color:#ef4444;background:rgba(239,68,68,.1);border-radius:4px}
-#tab-resources .res-placed-chip--conflict{background:#fee2e2 !important;color:#991b1b !important;box-shadow:0 1px 4px rgba(239,68,68,.25),0 0 0 1px rgba(239,68,68,.15) !important}
+/* Placed chips = dark cards matching column */
+#tab-resources .res-placed-chip{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.1);color:#e2e8f0;border-radius:7px;padding:7px 8px 7px 11px;font-size:12px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);width:100%;display:flex;align-items:center}
+#tab-resources .res-placed-chip .res-remove-btn{color:#64748b;margin-left:auto;font-size:14px;padding:0 3px;line-height:1}
+#tab-resources .res-placed-chip .res-remove-btn:hover{color:#ef4444;background:rgba(239,68,68,.15);border-radius:4px}
+#tab-resources .res-placed-chip--conflict{background:rgba(239,68,68,.18) !important;border-color:rgba(239,68,68,.35) !important;color:#fca5a5 !important;box-shadow:0 1px 4px rgba(239,68,68,.2) !important}
 /* Sidebar chips */
 #tab-resources .res-chip{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#d1d8e6;padding:9px 12px;font-size:12px;font-weight:600;transition:all .15s}
 #tab-resources .res-chip:hover{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.5);color:var(--accent)}
