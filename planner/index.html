@@ -216,6 +216,11 @@ a{color:var(--accent);text-decoration:none}
 .res-week-cell-hdr{font-size:10px;font-weight:700;color:var(--muted);margin-bottom:5px;display:flex;align-items:center;gap:5px}
 .res-clear-week-btn{margin-left:auto;background:none;border:1px solid rgba(239,68,68,.35);color:#ef4444;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;cursor:pointer;font-family:inherit;line-height:1.5;flex-shrink:0}
 .res-clear-week-btn:hover{background:rgba(239,68,68,.1)}
+.res-clear-job-btn{background:none;border:1px solid rgba(239,68,68,.3);color:#ef4444;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;cursor:pointer;font-family:inherit;line-height:1.5;flex-shrink:0;margin-top:4px;width:100%}
+.res-clear-job-btn:hover{background:rgba(239,68,68,.1)}
+.res-undo-btn{background:none;border:1px solid var(--bord);color:var(--muted);font-size:11px;font-weight:700;padding:5px 10px;border-radius:7px;cursor:pointer;font-family:inherit;margin-left:auto}
+.res-undo-btn:not(:disabled):hover{border-color:var(--accent);color:var(--accent)}
+.res-undo-btn:disabled{opacity:.35;cursor:default}
 .res-wk-num{background:var(--panel2);border-radius:4px;padding:1px 5px;font-size:9px;color:var(--accent);font-weight:700}
 .res-week-zone{display:flex;flex-wrap:wrap;gap:4px;min-height:38px;border-radius:6px;padding:4px;border:1px solid transparent;transition:background .15s,border .15s}
 .res-week-zone.res-drag-over{background:rgba(230,184,75,0.12);border:1px dashed var(--accent)}
@@ -349,6 +354,7 @@ a{color:var(--accent);text-decoration:none}
           <button class="res-filter-btn" data-filter="tendering_likely">Likely Awarded</button>
           <button class="res-filter-btn" data-filter="tendering">Tendering</button>
           <button class="res-collapse-all-btn" id="resCollapseAllBtn">Collapse All</button>
+          <button class="res-undo-btn" id="resUndoBtn" disabled title="Undo last clear">↩ Undo</button>
         </div>
         <div id="res-jobs-body" style="display:flex;flex-wrap:nowrap;gap:12px;align-items:flex-start;flex:1;overflow-x:auto;padding-bottom:8px"></div>
       </div>
@@ -442,7 +448,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.36';
+const VERSION = 'v2.37';
 const BUILD   = 'Aug 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1162,6 +1168,7 @@ let _resLeave = [];
 let _resActiveFilters = new Set(); // empty = show all
 let _resCollapsed = new Set();
 let _resColOrder = [];
+let _resUndoStack = [];
 let _draggingColId = null;
 
 function resLoadColOrder() {
@@ -1282,6 +1289,10 @@ function renderResourcePlanner() {
       </div>`;
     }).join('');
     const statusLabel = STATUS_LBL[j.status] || j.status;
+    const hasAnyAlloc = weeks.some(w => ((alloc[j.id] || {})[w.startIso] || []).length > 0);
+    const clearJobBtn = hasAnyAlloc
+      ? `<button class="res-clear-job-btn" data-clearjob="${esc(j.id)}" ondragstart="event.stopPropagation()" title="Remove all staff from all weeks">Clear all weeks</button>`
+      : '';
     return `<div class="res-col${collapsed ? ' res-col--collapsed' : ''}" data-jobid="${esc(j.id)}">
       <div class="res-col-hdr" draggable="true" style="border-top:3px solid ${col};cursor:grab">
         <div class="res-col-hdr-row">
@@ -1292,6 +1303,7 @@ function renderResourcePlanner() {
           </div>
           <button class="res-col-toggle" data-toggle-job="${esc(j.id)}" ondragstart="event.stopPropagation()">${collapsed ? '▼' : '▲'}</button>
         </div>
+        ${clearJobBtn}
       </div>
       ${weeksHtml}
     </div>`;
@@ -1386,18 +1398,61 @@ function bindResDragDrop() {
     });
   });
 
+  // Undo helper
+  function resPushUndo(snapshot) {
+    _resUndoStack.push(snapshot);
+    if (_resUndoStack.length > 20) _resUndoStack.shift();
+    const undoBtn = document.getElementById('resUndoBtn');
+    if (undoBtn) undoBtn.disabled = false;
+  }
+  function resUpdateUndoBtn() {
+    const undoBtn = document.getElementById('resUndoBtn');
+    if (undoBtn) undoBtn.disabled = _resUndoStack.length === 0;
+  }
+
   // DEP1: clear week buttons
   tab.querySelectorAll('.res-clear-week-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const { job, week } = btn.dataset;
       const alloc = resGetAlloc();
-      if (alloc[job]) {
+      if (alloc[job] && alloc[job][week] && alloc[job][week].length) {
+        resPushUndo(JSON.parse(JSON.stringify(alloc)));
         delete alloc[job][week];
         resSaveAlloc(alloc);
         renderResourcePlanner();
       }
     });
   });
+
+  // Clear all weeks for a project
+  tab.querySelectorAll('[data-clearjob]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const jobId = btn.dataset.clearjob;
+      const alloc = resGetAlloc();
+      if (alloc[jobId] && Object.keys(alloc[jobId]).length) {
+        resPushUndo(JSON.parse(JSON.stringify(alloc)));
+        delete alloc[jobId];
+        resSaveAlloc(alloc);
+        renderResourcePlanner();
+      }
+    });
+  });
+
+  // Undo button
+  const undoBtn = document.getElementById('resUndoBtn');
+  if (undoBtn) {
+    undoBtn.replaceWith(undoBtn.cloneNode(true)); // strip old listeners
+    const freshUndo = document.getElementById('resUndoBtn');
+    resUpdateUndoBtn();
+    freshUndo.addEventListener('click', () => {
+      if (!_resUndoStack.length) return;
+      const prev = _resUndoStack.pop();
+      resSaveAlloc(prev);
+      resUpdateUndoBtn();
+      renderResourcePlanner();
+    });
+  }
 
   // Filter buttons — multi-select; "All" clears the set
   tab.querySelectorAll('.res-filter-btn').forEach(btn => {
