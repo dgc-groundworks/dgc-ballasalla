@@ -1278,6 +1278,17 @@ let _resCollapsed = new Set();
 let _resColOrder = [];
 let _resUndoStack = [];
 let _draggingColId = null;
+
+function resPushUndo(snapshot) {
+  _resUndoStack.push(snapshot);
+  if (_resUndoStack.length > 20) _resUndoStack.shift();
+  const btn = document.getElementById('resUndoBtn');
+  if (btn) btn.disabled = false;
+}
+function resUpdateUndoBtn() {
+  const btn = document.getElementById('resUndoBtn');
+  if (btn) btn.disabled = _resUndoStack.length === 0;
+}
 let _tlRowOrder = [];
 let _tlDraggingRow = null;
 
@@ -1297,9 +1308,60 @@ function isoWeekNum(dateStr) {
   return Math.max(1, Math.floor((d - startW1) / (7 * 86400000)) + 1);
 }
 
+function initResStaticButtons() {
+  const tab = document.getElementById('tab-resources');
+
+  // Filter buttons — single-select, bound once
+  tab.querySelectorAll('.res-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const f = btn.dataset.filter;
+      if (f === 'all' || _resActiveFilters.has(f)) {
+        _resActiveFilters.clear();
+      } else {
+        _resActiveFilters.clear();
+        _resActiveFilters.add(f);
+      }
+      tab.querySelectorAll('.res-filter-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.filter === 'all' ? _resActiveFilters.size === 0 : _resActiveFilters.has(b.dataset.filter));
+      });
+      renderResourcePlanner();
+    });
+  });
+
+  // Collapse All — bound once
+  const collapseAllBtn = document.getElementById('resCollapseAllBtn');
+  if (collapseAllBtn) {
+    collapseAllBtn.addEventListener('click', () => {
+      const visibleJobs = (_jobs || []).filter(j => !j.archived);
+      const allCollapsed = visibleJobs.every(j => _resCollapsed.has(j.id));
+      if (allCollapsed) {
+        _resCollapsed.clear();
+        collapseAllBtn.textContent = 'Collapse All';
+      } else {
+        visibleJobs.forEach(j => _resCollapsed.add(j.id));
+        collapseAllBtn.textContent = 'Expand All';
+      }
+      renderResourcePlanner();
+    });
+  }
+
+  // Undo — bound once
+  const undoBtn = document.getElementById('resUndoBtn');
+  if (undoBtn) {
+    undoBtn.addEventListener('click', () => {
+      if (!_resUndoStack.length) return;
+      const prev = _resUndoStack.pop();
+      resSaveAlloc(prev);
+      resUpdateUndoBtn();
+      renderResourcePlanner();
+    });
+  }
+}
+
 async function initResourcePlanner() {
   if (_resInitDone) { renderResourcePlanner(); return; }
   _resInitDone = true;
+  initResStaticButtons();
   try {
     const today = new Date().toISOString().slice(0, 10);
     const future = new Date(Date.now() + 180 * 24 * 3600000).toISOString().slice(0, 10);
@@ -1535,18 +1597,6 @@ function bindResDragDrop() {
     });
   });
 
-  // Undo helper
-  function resPushUndo(snapshot) {
-    _resUndoStack.push(snapshot);
-    if (_resUndoStack.length > 20) _resUndoStack.shift();
-    const undoBtn = document.getElementById('resUndoBtn');
-    if (undoBtn) undoBtn.disabled = false;
-  }
-  function resUpdateUndoBtn() {
-    const undoBtn = document.getElementById('resUndoBtn');
-    if (undoBtn) undoBtn.disabled = _resUndoStack.length === 0;
-  }
-
   // Drop on column header → assign person to ALL (future) weeks of that job
   tab.querySelectorAll('.res-col-hdr').forEach(hdr => {
     const col = hdr.closest('.res-col');
@@ -1634,64 +1684,11 @@ function bindResDragDrop() {
     });
   });
 
-  // Undo button
-  const undoBtn = document.getElementById('resUndoBtn');
-  if (undoBtn) {
-    undoBtn.replaceWith(undoBtn.cloneNode(true)); // strip old listeners
-    const freshUndo = document.getElementById('resUndoBtn');
-    resUpdateUndoBtn();
-    freshUndo.addEventListener('click', () => {
-      if (!_resUndoStack.length) return;
-      const prev = _resUndoStack.pop();
-      resSaveAlloc(prev);
-      resUpdateUndoBtn();
-      renderResourcePlanner();
-    });
-  }
-
-  // Filter buttons — single-select; clone first to strip any stale listeners
-  tab.querySelectorAll('.res-filter-btn').forEach(btn => {
-    const fresh = btn.cloneNode(true);
-    btn.replaceWith(fresh);
-    fresh.addEventListener('click', () => {
-      const f = fresh.dataset.filter;
-      if (f === 'all' || _resActiveFilters.has(f)) {
-        _resActiveFilters.clear();
-      } else {
-        _resActiveFilters.clear();
-        _resActiveFilters.add(f);
-      }
-      tab.querySelectorAll('.res-filter-btn').forEach(b => {
-        if (b.dataset.filter === 'all') b.classList.toggle('active', _resActiveFilters.size === 0);
-        else b.classList.toggle('active', _resActiveFilters.has(b.dataset.filter));
-      });
-      renderResourcePlanner();
-    });
-  });
-  // Sync All button active state on first render
+  // Sync filter button active states after each render
   tab.querySelectorAll('.res-filter-btn').forEach(b => {
-    if (b.dataset.filter === 'all') b.classList.toggle('active', _resActiveFilters.size === 0);
-    else b.classList.toggle('active', _resActiveFilters.has(b.dataset.filter));
+    b.classList.toggle('active', b.dataset.filter === 'all' ? _resActiveFilters.size === 0 : _resActiveFilters.has(b.dataset.filter));
   });
-
-  // Collapse all toggle — clone first to strip stale listeners
-  const collapseAllBtn = document.getElementById('resCollapseAllBtn');
-  if (collapseAllBtn) {
-    collapseAllBtn.replaceWith(collapseAllBtn.cloneNode(true));
-    const freshCollapse = document.getElementById('resCollapseAllBtn');
-    freshCollapse.addEventListener('click', () => {
-      const visibleJobs = (_jobs || []).filter(j => !j.archived);
-      const allCollapsed = visibleJobs.every(j => _resCollapsed.has(j.id));
-      if (allCollapsed) {
-        _resCollapsed.clear();
-        freshCollapse.textContent = 'Collapse All';
-      } else {
-        visibleJobs.forEach(j => _resCollapsed.add(j.id));
-        freshCollapse.textContent = 'Expand All';
-      }
-      renderResourcePlanner();
-    });
-  }
+  resUpdateUndoBtn();
 
   // Individual column collapse toggles
   tab.querySelectorAll('[data-toggle-job]').forEach(btn => {
