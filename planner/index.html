@@ -56,12 +56,13 @@ a{color:var(--accent);text-decoration:none}
 
 /* ── Timeline ── */
 #tab-timeline{background:#1b2a3b}
-#tl-wrap{overflow-x:auto;padding:10px 12px;-webkit-overflow-scrolling:touch}
+#tl-wrap{overflow-x:auto;padding:10px 0 0;-webkit-overflow-scrolling:touch}
+#tab-timeline .job-tbl{margin-top:18px}
 #tl-wrap svg text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
 
 /* ── Jobs table ── */
 .job-tbl{width:100%;border-collapse:collapse}
-.job-tbl th{font-size:10px;font-weight:700;color:var(--muted);text-align:left;padding:9px 14px;border-bottom:3px solid rgba(0,0,0,.6);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+.job-tbl th{font-size:10px;font-weight:700;color:#8ab0cc;text-align:left;padding:14px 14px;background:rgba(255,255,255,.06);border-top:3px solid rgba(0,0,0,.35);border-bottom:3px solid rgba(0,0,0,.5);text-transform:uppercase;letter-spacing:.7px;white-space:nowrap}
 .job-tbl td{padding:11px 14px;border-bottom:1px solid rgba(0,0,0,.35);vertical-align:middle;transition:background .1s}
 .job-tbl tbody tr:nth-child(even) td{background:rgba(255,255,255,.02)}
 .job-tbl tr:hover td{background:rgba(255,255,255,.055);cursor:pointer}
@@ -818,45 +819,50 @@ let _origin = null; // current timeline origin (Monday of this week), set by ren
 let _lastTap = { id: null, time: 0 }; // touch double-tap tracking
 
 function renderTimeline(jobs) {
-  const W_PX  = 52;   // px per week
-  const ROW_H = 46;
-  const HEAD_H = 44;  // two-line header
-  const FOOT_H = 56;  // gang chart footer
-  const LBL_W = 130;
-  const WEEKS  = 26;
+  const LBL_W  = 165;
+  const ROW_H  = 54;
+  const HEAD_H = 46;
+  const FOOT_H = 60;
+  const WEEKS_BEFORE = 1; // weeks of history before today
+  const WEEKS  = 16;      // total weeks shown
+
+  const wrap = document.getElementById('tl-wrap');
+  const containerW = wrap ? Math.max(wrap.clientWidth - 2, 600) : 1000;
+  const W_PX = Math.floor((containerW - LBL_W) / WEEKS);
 
   const today = toDateStr(new Date());
-  const origin = mondayOf(today); // first Monday of current week
+  const currentMonday = mondayOf(today);
+  const origin = addDays(currentMonday, -WEEKS_BEFORE * 7); // start 1 week before today
   _origin = origin; // expose for drag handlers
 
-  const svgW = LBL_W + WEEKS * W_PX + 20;
+  const svgW = containerW;
   const svgH = HEAD_H + Math.max(jobs.length,1) * ROW_H + FOOT_H;
 
   let s = `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
 
-  // Week column backgrounds + full Mon/date headers every week
+  // Week column backgrounds + headers
   for (let w = 0; w < WEEKS; w++) {
     const wDate = addDays(origin, w * 7);
     const x = LBL_W + w * W_PX;
     const isEven = w % 2 === 0;
-    s += `<rect x="${x}" y="0" width="${W_PX}" height="${svgH}" fill="${isEven?'#1a1d27':'#1e2130'}" />`;
+    s += `<rect x="${x}" y="0" width="${W_PX}" height="${svgH}" fill="${isEven?'rgba(0,0,0,.18)':'rgba(0,0,0,.06)'}" />`;
     const d = new Date(wDate+'T12:00:00');
     const dayName = d.toLocaleDateString('en-GB',{weekday:'short'});
     const dateLbl = d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
     const cx = x + W_PX / 2;
-    s += `<text x="${cx}" y="16" font-size="8" text-anchor="middle" fill="#475569" font-weight="600">${dayName}</text>`;
-    s += `<text x="${cx}" y="32" font-size="9" text-anchor="middle" fill="#94a3b8" font-weight="700">${dateLbl}</text>`;
+    s += `<text x="${cx}" y="17" font-size="9" text-anchor="middle" fill="#5a7a9a" font-weight="600">${dayName}</text>`;
+    s += `<text x="${cx}" y="34" font-size="11" text-anchor="middle" fill="#8ab0cc" font-weight="700">${dateLbl}</text>`;
   }
 
   // Today line
   const todayOff = daysBetween(origin, today);
   const todayX   = LBL_W + (todayOff / 7) * W_PX;
-  s += `<line x1="${todayX}" y1="${HEAD_H}" x2="${todayX}" y2="${svgH - FOOT_H}" stroke="#f59e0b" stroke-width="1.5" opacity=".6" stroke-dasharray="4,3"/>`;
-  s += `<text x="${todayX+3}" y="${HEAD_H-8}" font-size="9" fill="#f59e0b" font-weight="700">Today</text>`;
+  s += `<line x1="${todayX}" y1="${HEAD_H}" x2="${todayX}" y2="${svgH - FOOT_H}" stroke="#f59e0b" stroke-width="2" opacity=".7" stroke-dasharray="4,3"/>`;
+  s += `<text x="${todayX+4}" y="${HEAD_H-8}" font-size="10" fill="#f59e0b" font-weight="800">Today</text>`;
 
   // Label column bg
-  s += `<rect x="0" y="0" width="${LBL_W}" height="${svgH}" fill="#0f1117"/>`;
-  s += `<line x1="${LBL_W}" y1="${HEAD_H}" x2="${LBL_W}" y2="${svgH}" stroke="#2e3347" stroke-width="1"/>`;
+  s += `<rect x="0" y="0" width="${LBL_W}" height="${svgH}" fill="#1b2a3b"/>`;
+  s += `<line x1="${LBL_W}" y1="0" x2="${LBL_W}" y2="${svgH}" stroke="rgba(0,0,0,.5)" stroke-width="2"/>`;
 
   // Job rows
   if (!jobs.length) {
@@ -865,24 +871,24 @@ function renderTimeline(jobs) {
   jobs.forEach((j, i) => {
     const y0 = HEAD_H + i * ROW_H;
     const y1 = y0 + ROW_H;
-    const by = y0 + 7;
-    const bh = ROW_H - 14;
+    const by = y0 + 8;
+    const bh = ROW_H - 16;
     const col = STATUS_COL[j.status] || '#94a3b8';
     const rw  = revisedWeeks(j);
 
     // Row separator
-    s += `<line x1="0" y1="${y1}" x2="${svgW}" y2="${y1}" stroke="#2e3347" stroke-width=".5" opacity=".6"/>`;
+    s += `<line x1="0" y1="${y1}" x2="${svgW}" y2="${y1}" stroke="rgba(0,0,0,.35)" stroke-width="1"/>`;
 
-    // Label
-    const lbl = j.name.length > 16 ? j.name.substring(0,15)+'…' : j.name;
-    s += `<text x="${LBL_W-8}" y="${by + bh/2 + 4}" font-size="12" text-anchor="end" fill="#e2e8f0" font-weight="600">${esc(lbl)}</text>`;
+    // Label — more characters now we have more width
+    const maxLblChars = Math.floor((LBL_W - 16) / 7.5);
+    const lbl = j.name.length > maxLblChars ? j.name.substring(0, maxLblChars-1)+'…' : j.name;
+    s += `<text x="${LBL_W-10}" y="${by + bh/2 + 4}" font-size="12.5" text-anchor="end" fill="#cde0f5" font-weight="700">${esc(lbl)}</text>`;
 
     // Bar position
     const startOff = daysBetween(origin, j.start_date || today);
     const bx = LBL_W + (startOff / 7) * W_PX;
     const endDate = jobEndDate(j);
     const endOff = daysBetween(origin, endDate);
-    // Bar ends at actual last working day — weekend gap shows between jobs
     const bEnd = LBL_W + ((endOff + 1) / 7) * W_PX;
     const bw = Math.max(bEnd - bx, 8);
 
@@ -924,8 +930,8 @@ function renderTimeline(jobs) {
   // Breaks into 5 daily bars when any day differs (mid-week overlaps, starts/ends, or explicit overrides).
   // Bank holiday days (isWorkingDay = false) are skipped and never cause a split.
   const footY = HEAD_H + Math.max(jobs.length,1) * ROW_H;
-  s += `<rect x="0" y="${footY}" width="${svgW}" height="${FOOT_H}" fill="#0a0d14"/>`;
-  s += `<line x1="0" y1="${footY}" x2="${svgW}" y2="${footY}" stroke="#2e3347" stroke-width="1"/>`;
+  s += `<rect x="0" y="${footY}" width="${svgW}" height="${FOOT_H}" fill="rgba(0,0,0,.35)"/>`;
+  s += `<line x1="0" y1="${footY}" x2="${svgW}" y2="${footY}" stroke="rgba(0,0,0,.5)" stroke-width="2"/>`;
   s += `<text x="${LBL_W-8}" y="${footY+FOOT_H/2+4}" font-size="11" text-anchor="end" fill="#64748b" font-weight="700">Gang</text>`;
 
   const weekData = [];
