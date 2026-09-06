@@ -45,6 +45,10 @@
 [data-theme="light"] .ver{color:#8ab0cc}
 [data-theme="light"] .sync-dot{background:#5a7a9a}
 /* Light: theme toggle button visibility */
+[data-theme="light"] .snav{background:#243347;border-bottom-color:#0d1a26}
+[data-theme="light"] .snav button{color:#8ab0cc}
+[data-theme="light"] .snav button.active{color:#f59e0b;border-bottom-color:#f59e0b}
+[data-theme="light"] .snav button:hover{color:#ffffff}
 [data-theme="light"] .theme-toggle-btn{color:#cde0f5;border-color:rgba(255,255,255,.2)}
 [data-theme="light"] .theme-toggle-btn:hover{background:rgba(255,255,255,.1)}
 [data-theme="light"] .nav button:hover{color:#ffffff}
@@ -1329,6 +1333,9 @@ function showTab(name, btn) {
   const iframe = tab.querySelector('iframe[data-src]');
   if (iframe) { iframe.src = iframe.dataset.src; iframe.removeAttribute('data-src'); }
   if (name === 'resources') initResourcePlanner();
+  if (name === 'timeline' && typeof renderTimeline === 'function' && typeof _jobs !== 'undefined') {
+    requestAnimationFrame(() => { const j = (_jobs||[]).filter(j=>j.on_timeline&&!j.archived); renderTimeline(j); });
+  }
 }
 
 // ── Resource Planner ──────────────────────────────────────

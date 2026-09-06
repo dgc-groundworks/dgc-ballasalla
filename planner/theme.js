@@ -11,10 +11,13 @@ function toggleTheme() {
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('dgc_theme', next);
   _updateThemeBtn();
-  // Re-render SVG timeline if present (uses theme-aware colours)
+  // Re-render SVG timeline only if currently visible (hidden panel gives clientWidth=0 → squish)
   if (typeof renderTimeline === 'function' && typeof _jobs !== 'undefined') {
-    const tlJobs = (_jobs || []).filter(j => j.on_timeline && !j.archived);
-    renderTimeline(tlJobs);
+    const tlPanel = document.getElementById('tab-timeline');
+    if (tlPanel && tlPanel.classList.contains('active')) {
+      const tlJobs = (_jobs || []).filter(j => j.on_timeline && !j.archived);
+      renderTimeline(tlJobs);
+    }
   }
   // Re-render deployment board if present
   if (typeof renderResourcePlanner === 'function') renderResourcePlanner();
