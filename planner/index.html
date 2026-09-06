@@ -244,6 +244,24 @@ a{color:var(--accent);text-decoration:none}
 .res-col--dragging{opacity:0.35;outline:2px dashed var(--accent)}
 .res-col--drop-left{box-shadow:-4px 0 0 0 var(--accent)}
 .res-col--drop-right{box-shadow:4px 0 0 0 var(--accent)}
+/* ── Clash detection ── */
+.res-week-cell--conflict{background:rgba(239,68,68,.07);border-left:2px solid rgba(239,68,68,.4)}
+.res-placed-chip--conflict{border-color:#ef4444 !important;background:rgba(239,68,68,.18) !important;color:#fca5a5}
+.res-conflict-badge{background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:12px;letter-spacing:.2px}
+.res-clash-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #ef4444;border-radius:12px;padding:14px 18px;font-size:13px;color:#e2e8f0;z-index:600;box-shadow:0 6px 24px rgba(0,0,0,.6);max-width:360px;text-align:center;animation:toast-in .2s ease;width:max-content}
+@keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.res-clash-toast-title{font-weight:800;color:#ef4444;margin-bottom:5px;font-size:14px}
+.res-clash-toast-link{color:#f59e0b;font-weight:700;cursor:pointer;text-decoration:underline;margin-top:7px;display:block;font-size:13px}
+/* ── Timeline row drag ── */
+.job-tbl tr[draggable]{cursor:grab}
+.job-tbl tr.tl-row-dragging td{opacity:0.4}
+.job-tbl tr.tl-row-drop-above td{border-top:2px solid var(--accent)}
+.job-tbl tr.tl-row-drop-below td{border-bottom:2px solid var(--accent)}
+/* ── Split button ── */
+.btn-split{background:none;border:1px solid var(--bord);color:var(--muted);padding:7px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit}
+.btn-split:hover{border-color:#3b82f6;color:#3b82f6}
+.split-section{margin-top:10px;padding:12px;border:1px solid var(--bord);border-radius:8px;background:var(--surf2)}
+.split-section .split-title{font-size:11px;font-weight:700;color:#3b82f6;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
 </style>
 </head>
 <body>
@@ -358,6 +376,7 @@ a{color:var(--accent);text-decoration:none}
           <button class="res-filter-btn" data-filter="tendering_likely">Likely Awarded</button>
           <button class="res-filter-btn" data-filter="tendering">Tendering</button>
           <button class="res-collapse-all-btn" id="resCollapseAllBtn">Collapse All</button>
+          <span id="resConflictBadge" class="res-conflict-badge" hidden></span>
           <button class="res-undo-btn" id="resUndoBtn" disabled title="Undo last clear">↩ Undo</button>
         </div>
         <div id="res-jobs-body" style="display:flex;flex-wrap:nowrap;gap:12px;align-items:flex-start;flex:1;overflow-x:auto;padding-bottom:8px"></div>
@@ -441,9 +460,21 @@ a{color:var(--accent);text-decoration:none}
       </div>
       <div id="ov-list"></div>
     </div>
+    <div class="split-section" id="split-section" style="display:none">
+      <div class="split-title">Split job into two segments</div>
+      <div class="fr" style="margin-bottom:8px">
+        <label>Split on this date — Part 1 ends here, Part 2 starts the next working day</label>
+        <input id="split-date" type="date">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-sv" style="background:#3b82f6;font-size:12px;padding:6px 14px" onclick="confirmSplit()">Confirm Split</button>
+        <button class="btn-cx" onclick="document.getElementById('split-section').style.display='none'">Cancel</button>
+      </div>
+    </div>
     <div class="mac">
       <button class="btn-sv" onclick="saveModal()">Save</button>
       <button class="btn-cx" onclick="closeModal()">Cancel</button>
+      <button class="btn-split" id="btn-split" onclick="openSplitSection()" style="display:none" title="Split this job into two date segments">Split</button>
       <button class="btn-arch" id="btn-archive-action" onclick="archiveJob()">Archive</button>
     </div>
   </div>
@@ -452,7 +483,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.39';
+const VERSION = 'v2.41';
 const BUILD   = 'Aug 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -695,9 +726,11 @@ async function removeJob(id) {
 let _jobs = [];
 async function refresh() {
   _jobs = await loadJobs();
-  renderTimeline(_jobs.filter(j => !j.archived && j.on_timeline !== false));
-  renderTable(_jobs.filter(j => !j.archived), 'jobs-body', false);
+  const tlJobs = applyTlRowOrder(_jobs.filter(j => !j.archived && j.on_timeline !== false));
+  renderTimeline(tlJobs);
+  renderTable(applyTlRowOrder(_jobs.filter(j => !j.archived)), 'jobs-body', false);
   renderTable(_jobs.filter(j => j.archived), 'archive-body', true);
+  bindTableRowDrag();
 }
 
 // ── Realtime ───────────────────────────────────────────────
@@ -976,10 +1009,11 @@ function renderTable(jobs, bodyId, isArchive) {
     const pplNote = j.people_on_site !== j.people_needed ? ` <span style="color:var(--muted)">(${j.people_needed} needed)</span>` : '';
     const statusLbl = STATUS_LBL[j.status]||j.status;
     const note = (j.note||'').substring(0,60);
-    return `<tr onclick="openEdit(_jobs.find(x=>x.id=='${j.id}'))">
+    return `<tr onclick="openEdit(_jobs.find(x=>x.id=='${j.id}'))" ${!isArchive ? `data-jobid="${esc(j.id)}" draggable="true"` : ''}>
       <td>
-        <div style="display:flex;align-items:flex-start;gap:0">
-          <span class="dot" style="background:${col};margin-top:3px"></span>
+        <div style="display:flex;align-items:flex-start;gap:4px">
+          ${!isArchive ? `<span style="color:var(--muted);font-size:13px;margin-top:2px;flex-shrink:0;cursor:grab" title="Drag to reorder" onclick="event.stopPropagation()">⠿</span>` : ''}
+          <span class="dot" style="background:${col};margin-top:3px;flex-shrink:0"></span>
           <div>
             <div class="jname">${esc(j.name)}</div>
             ${note ? `<div class="jnote">${esc(note)}</div>` : ''}
@@ -1013,6 +1047,9 @@ function openAdd() {
   document.getElementById('m-status').value = 'tendering';
   document.getElementById('m-note').value = '';
   document.getElementById('btn-archive-action').style.display = 'none';
+  const _splitBtn = document.getElementById('btn-split');
+  if (_splitBtn) _splitBtn.style.display = 'none';
+  document.getElementById('split-section').style.display = 'none';
   renderOverrideList('');
   calcPreview();
   document.getElementById('edit-modal').classList.add('open');
@@ -1038,11 +1075,17 @@ function openEdit(j) {
   archBtn.style.display = '';
   archBtn.textContent = j.archived ? 'Restore' : 'Archive';
   archBtn.className = j.archived ? 'btn-unarch' : 'btn-arch';
+  const splitBtn = document.getElementById('btn-split');
+  if (splitBtn) splitBtn.style.display = j.archived ? 'none' : '';
+  document.getElementById('split-section').style.display = 'none';
   renderOverrideList(j.id);
   calcPreview();
   document.getElementById('edit-modal').classList.add('open');
 }
-function closeModal() { document.getElementById('edit-modal').classList.remove('open'); }
+function closeModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+  document.getElementById('split-section').style.display = 'none';
+}
 
 let _finishLock = false;
 function calcPreview() {
@@ -1174,6 +1217,8 @@ let _resCollapsed = new Set();
 let _resColOrder = [];
 let _resUndoStack = [];
 let _draggingColId = null;
+let _tlRowOrder = [];
+let _tlDraggingRow = null;
 
 function resLoadColOrder() {
   try { _resColOrder = JSON.parse(localStorage.getItem('dgc_resource_col_order') || '[]'); } catch { _resColOrder = []; }
@@ -1267,6 +1312,20 @@ function renderResourcePlanner() {
   jobs = orderedJobs;
   const alloc = resGetAlloc();
 
+  // Build conflict set: 'name|weekStart' pairs allocated in 2+ jobs
+  const _wpj = {};
+  for (const [jId, weeks] of Object.entries(alloc)) {
+    for (const [wkStart, names] of Object.entries(weeks)) {
+      for (const n of (names || [])) {
+        const k = n + '|' + wkStart;
+        if (!_wpj[k]) _wpj[k] = [];
+        _wpj[k].push(jId);
+      }
+    }
+  }
+  const conflictSet = new Set(Object.entries(_wpj).filter(([,ids]) => ids.length > 1).map(([k]) => k));
+  const totalConflicts = conflictSet.size;
+
   const chipHtml = (s, onLeave) => {
     const badge = onLeave ? '<span class="res-leave-badge">(leave)</span>' : '';
     return `<div class="res-chip" draggable="true" data-name="${esc(s.name)}" title="${esc(s.role || '')}">${esc(s.name)}${badge}</div>`;
@@ -1280,15 +1339,18 @@ function renderResourcePlanner() {
     const collapsed = _resCollapsed.has(j.id);
     const weeksHtml = weeks.map(w => {
       const placed = ((alloc[j.id] || {})[w.startIso] || []);
-      const placedHtml = placed.map(name =>
-        `<div class="res-placed-chip">${esc(name)}<button class="res-remove-btn" data-job="${esc(j.id)}" data-week="${w.startIso}" data-name="${esc(name)}" title="Remove">×</button></div>`
-      ).join('');
+      const placedHtml = placed.map(name => {
+        const isClash = conflictSet.has(name + '|' + w.startIso);
+        return `<div class="res-placed-chip${isClash ? ' res-placed-chip--conflict' : ''}" ${isClash ? 'title="Double-booked this week"' : ''}>${esc(name)}<button class="res-remove-btn" data-job="${esc(j.id)}" data-week="${w.startIso}" data-name="${esc(name)}" title="Remove">×</button></div>`;
+      }).join('');
+      const cellConflict = placed.some(name => conflictSet.has(name + '|' + w.startIso));
       const pastCls = w.isPast ? ' res-week-cell--past' : '';
+      const conflictCellCls = cellConflict ? ' res-week-cell--conflict' : '';
       const clearBtn = placed.length > 0
         ? `<button class="res-clear-week-btn" data-job="${esc(j.id)}" data-week="${w.startIso}" title="Remove all staff from this week">Clear</button>`
         : '';
-      return `<div class="res-week-cell${pastCls}">
-        <div class="res-week-cell-hdr">${w.label} <span class="res-wk-num">Wk&nbsp;${w.wkNum}</span>${clearBtn}</div>
+      return `<div class="res-week-cell${pastCls}${conflictCellCls}">
+        <div class="res-week-cell-hdr">${w.label} <span class="res-wk-num">Wk&nbsp;${w.wkNum}</span>${cellConflict ? '<span style="color:#ef4444;font-size:10px;font-weight:800;margin-left:4px">⚠ clash</span>' : ''}${clearBtn}</div>
         <div class="res-week-zone" data-job="${esc(j.id)}" data-week="${w.startIso}">${placedHtml}</div>
       </div>`;
     }).join('');
@@ -1325,6 +1387,16 @@ function renderResourcePlanner() {
   }
   document.getElementById('res-jobs-body').innerHTML = colsHtml ||
     '<p style="color:var(--muted);padding:20px">No active jobs — add some in the Timeline tab.</p>';
+
+  const badgeEl = document.getElementById('resConflictBadge');
+  if (badgeEl) {
+    if (totalConflicts > 0) {
+      badgeEl.textContent = totalConflicts + (totalConflicts === 1 ? ' conflict' : ' conflicts');
+      badgeEl.hidden = false;
+    } else {
+      badgeEl.hidden = true;
+    }
+  }
 
   bindResDragDrop();
 }
@@ -1574,6 +1646,147 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Timeline row order ─────────────────────────────────────
+function tlLoadRowOrder() {
+  try { _tlRowOrder = JSON.parse(localStorage.getItem('dgc_timeline_row_order') || '[]'); } catch { _tlRowOrder = []; }
+}
+function tlSaveRowOrder(ids) {
+  _tlRowOrder = ids;
+  try { localStorage.setItem('dgc_timeline_row_order', JSON.stringify(ids)); } catch {}
+}
+function applyTlRowOrder(jobs) {
+  tlLoadRowOrder();
+  if (!_tlRowOrder.length) return jobs;
+  const ordered = [];
+  const remaining = [...jobs];
+  _tlRowOrder.forEach(id => {
+    const idx = remaining.findIndex(j => String(j.id) === String(id));
+    if (idx >= 0) ordered.push(...remaining.splice(idx, 1));
+  });
+  return [...ordered, ...remaining];
+}
+function bindTableRowDrag() {
+  const tbody = document.getElementById('jobs-body');
+  if (!tbody) return;
+  tbody.querySelectorAll('tr[data-jobid]').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      if (e.target.tagName === 'BUTTON') { e.preventDefault(); return; }
+      _tlDraggingRow = row.dataset.jobid;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+      setTimeout(() => row.classList.add('tl-row-dragging'), 0);
+    });
+    row.addEventListener('dragend', () => {
+      _tlDraggingRow = null;
+      row.classList.remove('tl-row-dragging');
+      tbody.querySelectorAll('tr').forEach(r => r.classList.remove('tl-row-drop-above','tl-row-drop-below'));
+    });
+    row.addEventListener('dragover', e => {
+      if (!_tlDraggingRow || _tlDraggingRow === row.dataset.jobid) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const rect = row.getBoundingClientRect();
+      tbody.querySelectorAll('tr').forEach(r => r.classList.remove('tl-row-drop-above','tl-row-drop-below'));
+      row.classList.add(e.clientY < rect.top + rect.height / 2 ? 'tl-row-drop-above' : 'tl-row-drop-below');
+    });
+    row.addEventListener('dragleave', e => {
+      if (!row.contains(e.relatedTarget)) row.classList.remove('tl-row-drop-above','tl-row-drop-below');
+    });
+    row.addEventListener('drop', e => {
+      tbody.querySelectorAll('tr').forEach(r => r.classList.remove('tl-row-drop-above','tl-row-drop-below'));
+      if (!_tlDraggingRow || _tlDraggingRow === row.dataset.jobid) return;
+      e.preventDefault();
+      const rect = row.getBoundingClientRect();
+      const isAbove = e.clientY < rect.top + rect.height / 2;
+      const currentIds = Array.from(tbody.querySelectorAll('tr[data-jobid]')).map(r => r.dataset.jobid);
+      const fromIdx = currentIds.indexOf(_tlDraggingRow);
+      if (fromIdx < 0) return;
+      currentIds.splice(fromIdx, 1);
+      let toIdx = currentIds.indexOf(row.dataset.jobid);
+      if (toIdx < 0) return;
+      if (!isAbove) toIdx += 1;
+      currentIds.splice(toIdx, 0, _tlDraggingRow);
+      tlSaveRowOrder(currentIds);
+      refresh();
+    });
+  });
+}
+
+// ── Deployment clash detection ─────────────────────────────
+function checkDeploymentClashes() {
+  const alloc = resGetAlloc();
+  const weekPersonJobs = {};
+  for (const [jId, weeks] of Object.entries(alloc)) {
+    for (const [wkStart, names] of Object.entries(weeks)) {
+      for (const name of (names || [])) {
+        const k = name + '|' + wkStart;
+        if (!weekPersonJobs[k]) weekPersonJobs[k] = [];
+        weekPersonJobs[k].push(jId);
+      }
+    }
+  }
+  const clashes = [];
+  for (const [k, jobIds] of Object.entries(weekPersonJobs)) {
+    if (jobIds.length > 1) {
+      const [name, weekStart] = k.split('|');
+      clashes.push({ name, weekStart });
+    }
+  }
+  return clashes;
+}
+function showClashToast(clashes) {
+  const existing = document.getElementById('clashToast');
+  if (existing) existing.remove();
+  if (!clashes.length) return;
+  const names = [...new Set(clashes.map(c => c.name))];
+  const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? ` +${names.length - 3} more` : '');
+  const toast = document.createElement('div');
+  toast.id = 'clashToast';
+  toast.className = 'res-clash-toast';
+  toast.innerHTML = `<div class="res-clash-toast-title">⚠ Deployment conflicts created</div>
+    <div style="font-size:12px">${shown} now double-booked across jobs</div>
+    <a class="res-clash-toast-link" onclick="document.querySelector('.nav button:nth-child(4)').click();document.getElementById('clashToast')?.remove()">Review in Deployment →</a>`;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.remove?.(); }, 8000);
+}
+
+// ── Job split ──────────────────────────────────────────────
+function openSplitSection() {
+  const id = document.getElementById('m-id').value;
+  if (!id) return;
+  const j = _jobs.find(x => String(x.id) === String(id));
+  if (!j) return;
+  const endDate = jobEndDate(j);
+  const totalDays = weekdaysBetween(j.start_date, endDate);
+  document.getElementById('split-date').value = addWeekdays(j.start_date, Math.max(1, Math.ceil(totalDays / 2)));
+  document.getElementById('split-section').style.display = '';
+}
+async function confirmSplit() {
+  const id = document.getElementById('m-id').value;
+  const splitDate = document.getElementById('split-date').value;
+  if (!id || !splitDate) return;
+  const j = _jobs.find(x => String(x.id) === String(id));
+  if (!j) return;
+  if (splitDate <= j.start_date) { alert('Split date must be after the job start date.'); return; }
+  const endDate = jobEndDate(j);
+  if (splitDate >= endDate) { alert('Split date must be before the job end date.'); return; }
+  const p1Days = weekdaysBetween(j.start_date, splitDate);
+  const p2Start = addWeekdays(splitDate, 1);
+  const p2Days = weekdaysBetween(p2Start, endDate);
+  const rem1 = p1Days % 5, rem2 = p2Days % 5;
+  const base = { people_needed: j.people_needed, people_on_site: j.people_on_site, status: j.status, note: j.note, on_timeline: true, archived: false };
+  const part1 = { ...base, name: j.name + ' (1)', base_weeks: Math.floor(p1Days / 5), start_date: j.start_date };
+  const part2 = { ...base, name: j.name + ' (2)', base_weeks: Math.max(1, Math.floor(p2Days / 5)), start_date: p2Start };
+  closeModal();
+  j.archived = true;
+  await upsertJob(j);
+  const id1 = await upsertJob(part1);
+  const id2 = await upsertJob(part2);
+  if (id1 && rem1) saveBaseDays(id1, rem1);
+  if (id2 && rem2) saveBaseDays(id2, rem2);
+  if (rem1 || rem2) await refresh();
+}
+
 // ── Init — called by login gate after authentication ──────
 async function initPlanner() {
   _sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
@@ -1674,6 +1887,7 @@ window.addEventListener('mouseup', async e => {
       // Snap to nearest working day (Mon-Fri, skip BH) — no Monday forcing
       j.start_date = snapToWorkingDay(addDays(dragAnchor, deltaDays));
       await upsertJob(j);
+      { const cl = checkDeploymentClashes(); if (cl.length) showClashToast(cl); }
     } else {
       j.start_date = origStart;
       renderTimeline(_jobs.filter(x => x.on_timeline && !x.archived));
@@ -1693,6 +1907,7 @@ window.addEventListener('mouseup', async e => {
       j.base_weeks = Math.floor(newTotal / 5);
       saveBaseDays(j.id, newTotal % 5);
       await upsertJob(j);
+      { const cl = checkDeploymentClashes(); if (cl.length) showClashToast(cl); }
     } else {
       j.base_weeks = origWeeks;
       saveBaseDays(j.id, origDays || 0);
@@ -2214,6 +2429,7 @@ window.addEventListener('touchend', async e => {
       // Snap to nearest working day (Mon-Fri, skip BH) — no Monday forcing
       j.start_date = snapToWorkingDay(addDays(dragAnchor, deltaDays));
       await upsertJob(j);
+      { const cl = checkDeploymentClashes(); if (cl.length) showClashToast(cl); }
     } else {
       j.start_date = origStart;
       renderTimeline(_jobs.filter(x => x.on_timeline && !x.archived));
@@ -2233,6 +2449,7 @@ window.addEventListener('touchend', async e => {
       j.base_weeks = Math.floor(newTotal / 5);
       saveBaseDays(j.id, newTotal % 5);
       await upsertJob(j);
+      { const cl = checkDeploymentClashes(); if (cl.length) showClashToast(cl); }
     } else {
       j.base_weeks = origWeeks;
       saveBaseDays(j.id, origDays || 0);
