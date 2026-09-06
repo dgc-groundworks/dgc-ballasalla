@@ -317,6 +317,7 @@ a{color:var(--accent);text-decoration:none}
       <button onclick="showSV('sttimesheets',this)">Timesheets</button>
       <button onclick="showSV('staddstaff',this)">Add Staff</button>
       <button onclick="showSV('stfuel',this)">Fuel Usage</button>
+      <button onclick="showSV('stholidays',this)">Holidays</button>
     </div>
     <div id="sv-sthours" class="sv active">
       <iframe src="../staff/" style="width:100%;height:calc(100vh - 150px);border:none;display:block" title="Staff Hours"></iframe>
@@ -329,6 +330,9 @@ a{color:var(--accent);text-decoration:none}
     </div>
     <div id="sv-stfuel" class="sv">
       <iframe data-src="../staff/fuel.html" style="width:100%;height:calc(100vh - 150px);border:none;display:block" title="Fuel Usage"></iframe>
+    </div>
+    <div id="sv-stholidays" class="sv">
+      <iframe data-src="../staff/holiday-tracker.html" style="width:100%;height:calc(100vh - 150px);border:none;display:block" title="Holidays"></iframe>
     </div>
   </div>
 
@@ -448,7 +452,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.37';
+const VERSION = 'v2.39';
 const BUILD   = 'Aug 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
