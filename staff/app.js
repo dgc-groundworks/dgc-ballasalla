@@ -13,6 +13,25 @@ const BANK_HOLIDAYS = new Set([
 const ANCHOR_VAL = Date.UTC(2026, 7, 1); // Sat 1 Aug 2026 — fortnight grid anchor
 const PERIOD_DAYS = 14;
 
+// The staff-facing Timesheet app runs its own Monday-anchored fortnight
+// (2026-08-31) — 2 days offset from this Saturday-anchored admin grid.
+// That's deliberate on both sides (staff get a Mon-Sun window with a
+// weekend grace period; this grid follows the actual Sat-Fri pay cycle) —
+// don't try to make them match. To find whether someone's pressed "Send"
+// for whatever's showing here, find which staff-side period(s) overlap
+// the admin period currently on screen.
+const STAFF_FORTNIGHT_ANCHOR = Date.UTC(2026, 7, 31); // Mon 31 Aug 2026
+function staffPeriodsOverlapping(adminFromVal, adminToVal) {
+  const starts = [];
+  const roughN = Math.floor((adminFromVal - STAFF_FORTNIGHT_ANCHOR) / 86400000 / 14);
+  for (let n = roughN - 1; n <= roughN + 1; n++) {
+    const start = STAFF_FORTNIGHT_ANCHOR + n * 14 * 86400000;
+    const end = start + 13 * 86400000;
+    if (start <= adminToVal && end >= adminFromVal) starts.push(isoFromVal(start));
+  }
+  return starts;
+}
+
 function sbHeaders(extra) {
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, extra || {});
 }
@@ -69,6 +88,7 @@ let staffById = {};
 let hoursCache = {}; // `${staff_id}_${date}` -> {id, hours}
 let leaveCache = [];
 let advancesCache = [];
+let confirmedNames = new Set(); // staff who've pressed "Send" on the Timesheet app for a period overlapping this one
 let fillActive = false;
 let fillSnapshot = null;
 let rowFillSnapshots = {}; // staffId -> {date: originalValue}, per-row fill undo
@@ -86,7 +106,8 @@ async function loadAll() {
     fmtShort(from) + ' — ' + fmtShort(to) + ' ' + String(new Date(valFromIso(to)).getUTCFullYear()).slice(2);
 
   const week2Start = periodDates[7];
-  const [staffRows, hourRows, leaveRows, advRows, approval1Rows, approval2Rows, tsRows] = await Promise.all([
+  const overlappingStaffPeriods = staffPeriodsOverlapping(valFromIso(from), valFromIso(to));
+  const [staffRows, hourRows, leaveRows, advRows, approval1Rows, approval2Rows, tsRows, confirmRows] = await Promise.all([
     sbGet('/dgc_staff?select=id,name,role,rate,active&order=name'),
     sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours&work_date=gte.' + from + '&work_date=lte.' + to),
     sbGet('/dgc_staff_leave?select=*&from_date=lte.' + to + '&to_date=gte.' + from),
@@ -99,7 +120,13 @@ async function loadAll() {
         { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token } })
         .then(r => r.ok ? r.json() : []).catch(() => []);
     }).catch(() => []),
+    (overlappingStaffPeriods.length
+      ? sbGet('/dgc_timesheet_confirmations?select=staff_name&period_start=in.(' + overlappingStaffPeriods.join(',') + ')')
+      : Promise.resolve([])
+    ).catch(() => []),
   ]);
+
+  confirmedNames = new Set((Array.isArray(confirmRows) ? confirmRows : []).map(r => r.staff_name));
 
   staffById = {};
   staffRows.forEach(s => staffById[s.id] = s);
@@ -142,6 +169,65 @@ async function loadAll() {
   renderAdvances();
   renderHolidays();
   renderApprovalState();
+  renderWagesBroughtForward();
+}
+
+// Flags hours entered AFTER a week was already approved/locked for pay —
+// those hours never made that pay run, so they need a manual backpay
+// adjustment. This never auto-adds anything to the current grid; it's a
+// read-only heads-up so the PM doesn't forget who's owed a top-up.
+// Caveat: only catches a brand-new day being logged late (created_at is set
+// on INSERT only) — editing an hours row that already existed before
+// approval won't be flagged, since created_at doesn't change on a PATCH.
+async function renderWagesBroughtForward() {
+  const section = document.getElementById('wagesForwardSection');
+  const list = document.getElementById('wagesForwardList');
+  section.hidden = true;
+  list.innerHTML = '';
+
+  const prevPeriodStart = periodStartVal - PERIOD_DAYS * 86400000;
+  const prevDates = [];
+  for (let i = 0; i < PERIOD_DAYS; i++) prevDates.push(isoFromVal(addDaysVal(prevPeriodStart, i)));
+  const prevWeek1Start = prevDates[0], prevWeek2Start = prevDates[7];
+
+  let approvals;
+  try {
+    approvals = await sbGet('/dgc_payroll_approval?select=*&period_start=in.(' + prevWeek1Start + ',' + prevWeek2Start + ')');
+  } catch (e) { return; }
+  if (!Array.isArray(approvals) || !approvals.length) return; // last fortnight was never approved — nothing to flag yet
+
+  const approvalByStart = {};
+  approvals.forEach(a => approvalByStart[a.period_start] = a);
+
+  const ranges = [];
+  if (approvalByStart[prevWeek1Start]) ranges.push({ from: prevDates[0], to: prevDates[6], approvedAt: approvalByStart[prevWeek1Start].approved_at });
+  if (approvalByStart[prevWeek2Start]) ranges.push({ from: prevDates[7], to: prevDates[13], approvedAt: approvalByStart[prevWeek2Start].approved_at });
+  if (!ranges.length) return;
+
+  let lateRows;
+  try {
+    const results = await Promise.all(ranges.map(r =>
+      sbGet('/dgc_staff_hours?select=staff_id,work_date,hours,created_at&work_date=gte.' + r.from + '&work_date=lte.' + r.to)
+        .then(rows => rows.filter(row => row.created_at && row.created_at > r.approvedAt))
+    ));
+    lateRows = results.flat();
+  } catch (e) { return; }
+  if (!lateRows.length) return;
+
+  lateRows.sort((a, b) => a.work_date < b.work_date ? -1 : 1);
+  list.innerHTML = lateRows.map(r => {
+    const name = (staffById[r.staff_id] && staffById[r.staff_id].name) || 'Unknown staff';
+    const when = new Date(r.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return `<div class="advance-row">
+      <div class="row-fields">
+        <span class="advance-date">${fmtShort(r.work_date)}</span>
+        <span class="advance-name">${name}</span>
+        <span class="advance-type">${Number(r.hours).toFixed(1)}h</span>
+        <span class="advance-notes">Added ${when}, after that week was approved</span>
+      </div>
+    </div>`;
+  }).join('');
+  section.hidden = false;
 }
 
 function renderStaffSelects() {
@@ -209,7 +295,8 @@ function renderHours() {
     const total = rowTotal(s.id, s.name);
     footOT += ot; footTotal += total; footAdv += moneyFor(s.id, 'Advance'); footBonus += moneyFor(s.id, 'Bonus');
 
-    body += `<tr data-staff="${s.id}"><td class="hours-name">${s.name}${salaryHrs ? ' <span style="font-size:0.7em;color:var(--muted);font-weight:400">(salary)</span>' : ''}</td>`;
+    const sentTick = confirmedNames.has(s.name) ? ' <span class="send-tick" title="Sent their hours — happy with this fortnight">&#10003;</span>' : '';
+    body += `<tr data-staff="${s.id}"><td class="hours-name">${s.name}${sentTick}${salaryHrs ? ' <span style="font-size:0.7em;color:var(--muted);font-weight:400">(salary)</span>' : ''}</td>`;
     periodDates.forEach((date, i) => {
       const c = cellFor(s.id, date);
       const todayCls = date === todayIso ? 'today-col' : '';

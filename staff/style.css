@@ -92,6 +92,7 @@ body {
 .week-approve-btn:disabled { opacity: 0.6; cursor: default; }
 .week-approve-btn.unapproved { background: var(--panel2); color: var(--muted); border: 1px solid var(--border); }
 .week-approve-btn.approved   { background: #16a34a; color: #fff; border: none; }
+.send-tick { color: #16a34a; font-weight: 800; }
 
 main { max-width: 1100px; margin: 0 auto; padding: 20px; }
 
@@ -422,8 +423,8 @@ th.today-col, .hours-cell.today-col {
   border-color: var(--accent) !important;
 }
 
-.advances-section, .holiday-section { margin-top: 24px; }
-.advances-section h3, .holiday-section h3 {
+.advances-section, .holiday-section, .wages-forward-section { margin-top: 24px; }
+.advances-section h3, .holiday-section h3, .wages-forward-section h3 {
   font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
   color: var(--accent); margin: 0 0 10px;
   display: flex; align-items: center; gap: 8px;
