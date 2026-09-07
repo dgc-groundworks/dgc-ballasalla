@@ -139,7 +139,7 @@ function render() {
       <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden">
         <div class="ts-person-hdr" data-name="${name.replace(/"/g,'&quot;')}"
           style="display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--panel2);cursor:pointer;user-select:none">
-          <span style="width:38px;height:38px;border-radius:50%;background:var(--accent);color:#1a1a1a;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0">${inits}</span>
+          <span style="width:38px;height:38px;border-radius:50%;background:#1b2a3b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0">${inits}</span>
           <span style="font-weight:600;font-size:1rem;flex:1">${name}</span>
           <span style="color:var(--accent);font-weight:700;font-size:0.9rem">${fmtHours(totalHours)}</span>
           <span class="ts-chevron" style="color:var(--muted);font-size:0.9rem;transition:transform 0.2s;transform:rotate(${isCollapsed ? '0deg' : '90deg'})">&rsaquo;</span>
@@ -198,13 +198,18 @@ function bindCollapse() {
 }
 
 async function refresh() {
+  // Re-check session on every refresh — access token expires after 1 hour
+  const fresh = await ensureLoggedIn();
+  if (!fresh) { window.location.replace('index.html'); return; }
+  session = fresh;
   try {
     await loadData();
     render();
     bindCollapse();
   } catch (err) {
     const app = document.getElementById('app');
-    app.innerHTML += `<p style="color:var(--danger);padding:16px">Error: ${err.message}</p>`;
+    // Replace content rather than appending so errors don't stack up
+    app.innerHTML = `<p style="color:var(--danger);padding:16px">Error loading timesheets — try refreshing the page.<br><small style="opacity:.6">${err.message}</small></p>`;
   }
 }
 
