@@ -75,8 +75,6 @@ function fmtShort(iso) {
 const SALARIED = new Map([
   ['Andy Wynne-Smythe', 8],
   ['Andrew Wynne-Smythe', 8],
-  ['John McLoughlin', 8],
-  ['John Mcloughlin', 8],
 ]);
 
 let periodStartVal = periodStartValFor(todayVal());
