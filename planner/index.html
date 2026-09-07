@@ -52,12 +52,11 @@
 [data-theme="light"] .theme-toggle-btn{color:#cde0f5;border-color:rgba(255,255,255,.2)}
 [data-theme="light"] .theme-toggle-btn:hover{background:rgba(255,255,255,.1)}
 [data-theme="light"] .nav button:hover{color:#ffffff}
-[data-theme="light"] .snav button:hover{color:var(--text)}
 [data-theme="light"] .hrs-tbl td.bh-td{background:#c8d8ea;color:var(--muted)}
 [data-theme="light"] .hrs-tbl td.leave-td{background:#dcfce7;color:#166534}
 [data-theme="light"] .hrs-tbl td.leave-td.unpaid{background:#fef3c7;color:#92400e}
-[data-theme="light"] #tab-resources .res-placed-chip{background:#a8c8e0;border:1px solid #7aaac8;color:#0d1a26;box-shadow:0 1px 3px rgba(0,0,0,.15)}
-[data-theme="light"] #tab-resources .res-placed-chip .res-remove-btn{color:#4a7a9a}
+[data-theme="light"] #tab-resources .res-placed-chip{background:#1b2a3b;border:1px solid #0d1a26;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+[data-theme="light"] #tab-resources .res-placed-chip .res-remove-btn{color:rgba(255,255,255,.5)}
 [data-theme="light"] #tab-resources .res-week-cell-hdr{color:#2a5070}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh}
@@ -177,7 +176,7 @@ a{color:var(--accent);text-decoration:none}
 /* ── Staff Tab ───────────────────────────────────────────── */
 .snav{background:var(--surf);border-bottom:1px solid var(--bord);display:flex;overflow-x:auto;padding:0 8px}
 .snav button{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:700;padding:9px 14px;cursor:pointer;white-space:nowrap;font-family:inherit}
-.snav button:hover{color:var(--text)}
+.snav button:hover{color:#ffffff}
 .snav button.active{color:var(--accent);border-bottom-color:var(--accent)}
 .sv{display:none}.sv.active{display:block}
 
@@ -350,6 +349,19 @@ a{color:var(--accent);text-decoration:none}
 /* Conflict — red sits clearly on top */
 #tab-resources .res-placed-chip--conflict{background:rgba(239,68,68,.25) !important;border-color:rgba(239,68,68,.4) !important;color:#fca5a5 !important;box-shadow:0 1px 3px rgba(239,68,68,.2) !important}
 #tab-resources .res-week-cell--conflict{background:rgba(239,68,68,.07)}
+/* PM slot */
+.res-pm-zone{display:flex;align-items:center;gap:7px;margin-top:8px;padding:6px 10px;border-radius:7px;border:1px dashed rgba(150,185,220,.3);background:rgba(255,255,255,.05);min-height:32px;cursor:default}
+.res-pm-zone--filled{border-style:solid;border-color:rgba(150,185,220,.25);background:rgba(255,255,255,.09)}
+.res-pm-zone--drag-over{border-color:var(--accent);background:rgba(245,158,11,.12)}
+.res-pm-label{font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;flex-shrink:0}
+.res-pm-placeholder{font-size:11px;color:rgba(150,185,220,.4);font-style:italic}
+.res-pm-name{font-size:11px;font-weight:700;color:#cce0f5;flex:1}
+.res-pm-remove-btn{background:none;border:none;color:rgba(150,185,220,.4);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin-left:auto}
+.res-pm-remove-btn:hover{color:#ef4444}
+[data-theme="light"] .res-pm-zone{border-color:rgba(27,42,59,.2);background:rgba(27,42,59,.04)}
+[data-theme="light"] .res-pm-zone--filled{background:rgba(27,42,59,.08);border-color:rgba(27,42,59,.2)}
+[data-theme="light"] .res-pm-name{color:#0d1a26}
+[data-theme="light"] .res-pm-remove-btn{color:rgba(27,42,59,.35)}
 /* Sidebar chips */
 #tab-resources .res-chip{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.11);border-radius:9px;color:#b8d0ea;padding:9px 12px;font-size:12px;font-weight:600;transition:all .15s}
 #tab-resources .res-chip:hover{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.5);color:var(--accent)}
@@ -1562,6 +1574,10 @@ function renderResourcePlanner() {
     const jBd = getBaseDays(j.id);
     const jTotalDays = (j.base_weeks || 0) * 5 + jBd;
     const durationLabel = j.base_weeks > 0 ? `${j.base_weeks}w` : `${jTotalDays || '< 1'}d`;
+    const pmName = ((alloc[j.id] || {})['pm'] || [])[0] || null;
+    const pmSlot = pmName
+      ? `<div class="res-pm-zone res-pm-zone--filled" data-job="${esc(j.id)}" ondragstart="event.stopPropagation()"><span class="res-pm-label">PM</span><span class="res-pm-name">${esc(pmName)}</span><button class="res-pm-remove-btn" data-job="${esc(j.id)}" ondragstart="event.stopPropagation()">×</button></div>`
+      : `<div class="res-pm-zone" data-job="${esc(j.id)}" ondragstart="event.stopPropagation()"><span class="res-pm-label">PM</span><span class="res-pm-placeholder">Drag to assign</span></div>`;
     return `<div class="res-col${collapsed ? ' res-col--collapsed' : ''}" data-jobid="${esc(j.id)}">
       <div class="res-col-hdr" draggable="true" style="border-top:3px solid ${col};cursor:grab">
         <div class="res-col-hdr-row">
@@ -1572,6 +1588,7 @@ function renderResourcePlanner() {
           </div>
           <button class="res-col-toggle" data-toggle-job="${esc(j.id)}" ondragstart="event.stopPropagation()">${collapsed ? '▼' : '▲'}</button>
         </div>
+        ${pmSlot}
         ${clearJobBtn}
       </div>
       ${weeksHtml}
@@ -1732,6 +1749,38 @@ function bindResDragDrop() {
         if (!alloc[jobId][w.startIso].includes(name)) { alloc[jobId][w.startIso].push(name); added++; }
       }
       if (added) { resSaveAlloc(alloc); renderResourcePlanner(); }
+    });
+  });
+
+  // PM slot — drag to assign a single Project Manager per job
+  tab.querySelectorAll('.res-pm-zone').forEach(zone => {
+    zone.addEventListener('dragover', e => {
+      if (_draggingColId) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+      zone.classList.add('res-pm-zone--drag-over');
+    });
+    zone.addEventListener('dragleave', e => {
+      if (!zone.contains(e.relatedTarget)) zone.classList.remove('res-pm-zone--drag-over');
+    });
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('res-pm-zone--drag-over');
+      if (_draggingColId) return;
+      const name = e.dataTransfer.getData('text/plain');
+      if (!name) return;
+      const jobId = zone.dataset.job;
+      const alloc = resGetAlloc();
+      if (!alloc[jobId]) alloc[jobId] = {};
+      alloc[jobId]['pm'] = [name];
+      resSaveAlloc(alloc);
+      renderResourcePlanner();
+    });
+  });
+  tab.querySelectorAll('.res-pm-remove-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const jobId = btn.dataset.job;
+      const alloc = resGetAlloc();
+      if (alloc[jobId]) { delete alloc[jobId]['pm']; resSaveAlloc(alloc); renderResourcePlanner(); }
     });
   });
 
