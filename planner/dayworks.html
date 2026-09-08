@@ -242,6 +242,15 @@ function baseJob(site) {
   if (/quay west/i.test(s)) return 'Quay West';
   return s;
 }
+// Ash, 9 Sep 2026: some people genuinely work two jobs in the same
+// week ("Ballasalla + Quay West" on one sheet) — baseJob() above would
+// silently pick just one and hide the other's hours. Never let that
+// happen quietly: a site naming more than one real job must be split
+// into one entry per job/day before it can be confirmed.
+function siteNamesMultipleJobs(site) {
+  const s = (site || '');
+  return /ballasalla/i.test(s) && /quay west/i.test(s);
+}
 function jobDescription(site) {
   let s = (site || '').trim();
   s = s.replace(/ballasalla/gi, '').replace(/quay west/gi, '');
@@ -356,7 +365,7 @@ function renderJobsLevel(main) {
 
   const dates = pool.map(e => e.date).filter(Boolean).sort();
   const from = dates[0], to = dates[dates.length - 1];
-  const anyUnready = pool.some(e => e.flagged || !e.confirmed);
+  const anyUnready = pool.some(e => e.flagged || !e.confirmed || siteNamesMultipleJobs(e.site));
   const totalHours = pool.reduce((s, e) => s + (e.hours || 0), 0);
 
   let html = `
@@ -515,12 +524,17 @@ function wireDayRow(e) {
   row.querySelector('[data-save]').addEventListener('click', async () => {
     const btn = row.querySelector('[data-save]');
     const status = row.querySelector('[data-status]');
+    const siteVal = row.querySelector('[data-f=site]').value.trim();
+    if (siteNamesMultipleJobs(siteVal)) {
+      status.textContent = 'This names more than one job (e.g. "Ballasalla + Quay West") — split it into a separate entry per job/day first, don\'t leave it combined.';
+      return;
+    }
     btn.disabled = true; status.textContent = 'Saving…';
     const updated = Object.assign({}, e, {
       name: row.querySelector('.dr-name').value.trim(),
       date: dateEl.value,
       start: startEl.value, finish: finishEl.value,
-      site: row.querySelector('[data-f=site]').value.trim(),
+      site: siteVal,
       description: descEl.value.trim(),
       confirmed: true, flagged: false, note: ''
     });
