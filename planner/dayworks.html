@@ -92,17 +92,6 @@ input:focus{border-color:var(--accent)}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);color:var(--accent);background:rgba(245,158,11,.06)}
 .upload-zone input{display:none}
 
-/* Hours Summary */
-.summary-wrap{overflow-x:auto}
-.summary-table{border-collapse:collapse;width:100%;min-width:600px;font-size:0.82rem}
-.summary-table th,.summary-table td{padding:8px 12px;border:1px solid var(--bord);text-align:right;white-space:nowrap}
-.summary-table th{background:var(--surf2);text-align:right;font-weight:800}
-.summary-table th:first-child,.summary-table td:first-child{text-align:left;position:sticky;left:0;background:var(--surf);font-weight:700}
-.summary-table th:first-child{background:var(--surf2)}
-.summary-table tr.total-row td{font-weight:800;background:rgba(245,158,11,.08);border-top:2px solid var(--accent)}
-.summary-table td.total-col{font-weight:800;background:rgba(255,255,255,.03)}
-.summary-note{font-size:0.78rem;color:var(--muted);margin-bottom:14px}
-
 /* Historic */
 .hist-batch{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:16px 18px;margin-bottom:12px;cursor:pointer}
 .hist-batch:hover{border-color:var(--accent)}
@@ -159,7 +148,6 @@ input:focus{border-color:var(--accent)}
   <button class="dw-navbtn active" data-tab="current">Current</button>
   <button class="dw-navbtn" data-tab="upload">Upload</button>
   <button class="dw-navbtn" data-tab="historic">Historic</button>
-  <button class="dw-navbtn" data-tab="summary">Hours Summary</button>
 </nav>
 <main class="dw-main" id="mainArea"><p class="empty-state">Loading…</p></main>
 
@@ -347,7 +335,6 @@ function render() {
   document.querySelectorAll('.dw-navbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
   if (state.tab === 'upload') renderUpload();
   else if (state.tab === 'historic') renderHistoric();
-  else if (state.tab === 'summary') renderSummary();
   else renderCurrent();
 }
 
@@ -665,43 +652,6 @@ async function handleFiles(files) {
   }
   state.tab = 'current'; state.job = NO_JOB; state.name = null;
   render();
-}
-
-// ---------------------------------------------------------------
-// Hours Summary — total hours per job, per week, across EVERYTHING
-// (both current/unsent and historic/sent entries), not just one
-// send-batch. Ash, 8 Sep 2026: "total hours tallied up per job per
-// week, all jobs and all weeks."
-// ---------------------------------------------------------------
-function renderSummary() {
-  const main = document.getElementById('mainArea');
-  const dated = entries.filter(e => e.date);
-  if (!dated.length) { main.innerHTML = '<p class="empty-state">No dated entries yet to summarise.</p>'; return; }
-
-  const byJobWeek = {}; // job -> weekMonday -> hours
-  const jobs = new Set(), weeks = new Set();
-  dated.forEach(e => {
-    const job = baseJob(e.site), wk = getMonday(e.date);
-    jobs.add(job); weeks.add(wk);
-    byJobWeek[job] = byJobWeek[job] || {};
-    byJobWeek[job][wk] = (byJobWeek[job][wk] || 0) + (e.hours || 0);
-  });
-  const jobList = [...jobs].sort();
-  const weekList = [...weeks].sort();
-
-  const jobTotals = {}; jobList.forEach(j => jobTotals[j] = weekList.reduce((s, wk) => s + (byJobWeek[j][wk] || 0), 0));
-  const weekTotals = {}; weekList.forEach(wk => weekTotals[wk] = jobList.reduce((s, j) => s + (byJobWeek[j][wk] || 0), 0));
-  const grandTotal = jobList.reduce((s, j) => s + jobTotals[j], 0);
-
-  let html = `
-    <p class="summary-note">Every dated entry on file — current + historic combined, both confirmed and still-to-check — so this is a running total, not just what's ready to send. ${dated.length} dated entries across ${jobList.length} job${jobList.length===1?'':'s'} and ${weekList.length} week${weekList.length===1?'':'s'}.</p>
-    <div class="summary-wrap"><table class="summary-table"><thead><tr><th>Week commencing</th>${jobList.map(j => `<th>${esc(j)}</th>`).join('')}<th class="total-col">Week total</th></tr></thead><tbody>`;
-  weekList.forEach(wk => {
-    html += `<tr><td>${fmtDate(wk)}</td>${jobList.map(j => `<td>${(byJobWeek[j][wk] || 0) || '—'}</td>`).join('')}<td class="total-col">${weekTotals[wk]}</td></tr>`;
-  });
-  html += `<tr class="total-row"><td>All weeks total</td>${jobList.map(j => `<td>${jobTotals[j]}</td>`).join('')}<td class="total-col">${grandTotal}</td></tr>`;
-  html += `</tbody></table></div>`;
-  main.innerHTML = html;
 }
 
 // ---------------------------------------------------------------

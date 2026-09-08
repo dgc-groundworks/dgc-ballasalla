@@ -7,6 +7,8 @@ let session = null;
 let records = [];
 let weekOffset = 0; // 0 = this week, -1 = last week, etc.
 let refreshTimer = null;
+let viewMode = 'person'; // 'person' (existing single-week view) or 'jobs' (all jobs, all weeks tally)
+let summaryRecords = []; // loaded separately for the 'jobs' view — not week-limited
 
 function ah(extra) {
   return Object.assign({
@@ -56,6 +58,89 @@ async function loadData() {
   records = await r.json();
 }
 
+// All-time load for the "all jobs, all weeks" summary — not limited to
+// one week like loadData() above. Ash, 8/9 Sep 2026: wants a standing
+// total-hours-per-job-per-week view across everything, not per-person
+// single-week — this belongs here (internal Staff Hours), not on the
+// client-facing Dayworks pack.
+async function loadSummaryData() {
+  const r = await fetch(
+    REST + '/dgc_timesheets?select=staff_name,work_date,site,hours&order=work_date.asc',
+    { headers: ah() }
+  );
+  if (!r.ok) throw new Error(await r.text());
+  summaryRecords = await r.json();
+}
+
+function getMonday(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  const day = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - day);
+  return d.toISOString().slice(0, 10);
+}
+function fmtWeekOf(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  return 'w/c ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function renderJobSummary() {
+  const app = document.getElementById('app');
+  const headerHtml = `
+    <header class="topbar" style="position:sticky;top:0">
+      <h1 style="margin:0;font-size:1rem">Timesheets</h1>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="viewPersonBtn" class="secondary-btn">By person</button>
+        <button id="viewJobsBtn" class="secondary-btn" style="border-color:var(--accent);color:var(--accent)">By job, all weeks</button>
+        <button id="refreshBtn" class="secondary-btn">Refresh</button>
+        ${window.self !== window.top ? '' : '<button id="logoutBtn" class="secondary-btn">Sign out</button>'}
+      </div>
+    </header>`;
+
+  const dated = summaryRecords.filter(r => r.work_date && r.site);
+  if (!dated.length) {
+    app.innerHTML = headerHtml + '<p style="padding:32px;text-align:center;color:var(--muted)">No dated, job-tagged timesheet entries yet.</p>';
+    bindControls();
+    return;
+  }
+
+  const byJobWeek = {}, jobs = new Set(), weeks = new Set();
+  dated.forEach(r => {
+    const job = r.site.trim(), wk = getMonday(r.work_date);
+    jobs.add(job); weeks.add(wk);
+    byJobWeek[job] = byJobWeek[job] || {};
+    byJobWeek[job][wk] = (byJobWeek[job][wk] || 0) + parseFloat(r.hours || 0);
+  });
+  const jobList = [...jobs].sort();
+  const weekList = [...weeks].sort();
+  const jobTotals = {}; jobList.forEach(j => jobTotals[j] = weekList.reduce((s, wk) => s + (byJobWeek[j][wk] || 0), 0));
+  const weekTotals = {}; weekList.forEach(wk => weekTotals[wk] = jobList.reduce((s, j) => s + (byJobWeek[j][wk] || 0), 0));
+  const grandTotal = jobList.reduce((s, j) => s + jobTotals[j], 0);
+
+  let table = `<div style="padding:16px;overflow-x:auto">
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px">Every dated, job-tagged timesheet entry on file — all staff, all weeks. ${dated.length} entries across ${jobList.length} job${jobList.length===1?'':'s'} and ${weekList.length} week${weekList.length===1?'':'s'}.</p>
+    <table style="border-collapse:collapse;width:100%;min-width:560px;font-size:0.85rem">
+      <thead><tr>
+        <th style="text-align:left;padding:8px 12px;background:var(--panel2);border:1px solid var(--border);position:sticky;left:0">Week</th>
+        ${jobList.map(j => `<th style="text-align:right;padding:8px 12px;background:var(--panel2);border:1px solid var(--border)">${j}</th>`).join('')}
+        <th style="text-align:right;padding:8px 12px;background:var(--panel2);border:1px solid var(--border);font-weight:800">Week total</th>
+      </tr></thead><tbody>`;
+  weekList.forEach(wk => {
+    table += `<tr>
+      <td style="padding:8px 12px;border:1px solid var(--border);font-weight:600;position:sticky;left:0;background:var(--panel)">${fmtWeekOf(wk)}</td>
+      ${jobList.map(j => `<td style="text-align:right;padding:8px 12px;border:1px solid var(--border)">${fmtHours(byJobWeek[j][wk] || 0) === '0h' ? '—' : fmtHours(byJobWeek[j][wk] || 0)}</td>`).join('')}
+      <td style="text-align:right;padding:8px 12px;border:1px solid var(--border);font-weight:700">${fmtHours(weekTotals[wk])}</td>
+    </tr>`;
+  });
+  table += `<tr style="background:rgba(245,158,11,.08)">
+    <td style="padding:8px 12px;border:1px solid var(--border);font-weight:800;position:sticky;left:0;background:rgba(245,158,11,.12)">All weeks total</td>
+    ${jobList.map(j => `<td style="text-align:right;padding:8px 12px;border:1px solid var(--border);font-weight:800">${fmtHours(jobTotals[j])}</td>`).join('')}
+    <td style="text-align:right;padding:8px 12px;border:1px solid var(--border);font-weight:800">${fmtHours(grandTotal)}</td>
+  </tr></tbody></table></div>`;
+
+  app.innerHTML = headerHtml + table;
+  bindControls();
+}
+
 // ── Formatting ────────────────────────────────────────────────────────────────
 function fmtDate(iso) {
   const d = new Date(iso + 'T12:00:00Z');
@@ -85,6 +170,8 @@ function render() {
     <header class="topbar" style="position:sticky;top:0">
       <h1 style="margin:0;font-size:1rem">Timesheets</h1>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="viewPersonBtn" class="secondary-btn" style="border-color:var(--accent);color:var(--accent)">By person</button>
+        <button id="viewJobsBtn" class="secondary-btn">By job, all weeks</button>
         <button id="prevWeekBtn" class="secondary-btn" style="padding:7px 12px;font-size:1rem">&#8249;</button>
         <span id="weekLabel" style="font-size:0.9rem;color:var(--text);white-space:nowrap;min-width:180px;text-align:center">${label}</span>
         <button id="nextWeekBtn" class="secondary-btn" style="padding:7px 12px;font-size:1rem" ${weekOffset >= 0 ? 'disabled style="opacity:0.4;cursor:default;padding:7px 12px;font-size:1rem"' : ''}>&#8250;</button>
@@ -162,10 +249,17 @@ function bindControls() {
 
   document.getElementById('refreshBtn').addEventListener('click', () => refresh());
 
-  document.getElementById('prevWeekBtn').addEventListener('click', () => {
-    weekOffset--;
-    refresh();
+  document.getElementById('viewPersonBtn').addEventListener('click', () => {
+    if (viewMode === 'person') return;
+    viewMode = 'person'; refresh();
   });
+  document.getElementById('viewJobsBtn').addEventListener('click', () => {
+    if (viewMode === 'jobs') return;
+    viewMode = 'jobs'; refresh();
+  });
+
+  const prevBtn = document.getElementById('prevWeekBtn');
+  if (prevBtn) prevBtn.addEventListener('click', () => { weekOffset--; refresh(); });
   const nextBtn = document.getElementById('nextWeekBtn');
   if (nextBtn && weekOffset < 0) {
     nextBtn.addEventListener('click', () => {
@@ -173,7 +267,6 @@ function bindControls() {
       refresh();
     });
   }
-
 }
 
 // Fix: event delegation needs to persist across renders without accumulating
@@ -203,9 +296,14 @@ async function refresh() {
   if (!fresh) { window.location.replace('index.html'); return; }
   session = fresh;
   try {
-    await loadData();
-    render();
-    bindCollapse();
+    if (viewMode === 'jobs') {
+      await loadSummaryData();
+      renderJobSummary();
+    } else {
+      await loadData();
+      render();
+      bindCollapse();
+    }
   } catch (err) {
     const app = document.getElementById('app');
     // Replace content rather than appending so errors don't stack up
