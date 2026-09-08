@@ -358,6 +358,7 @@ a{color:var(--accent);text-decoration:none}
 .res-pm-name{font-size:11px;font-weight:700;color:#cce0f5;flex:1}
 .res-pm-remove-btn{background:none;border:none;color:rgba(150,185,220,.4);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin-left:auto}
 .res-pm-remove-btn:hover{color:#ef4444}
+.res-pm-divider{height:1px;background:rgba(150,185,220,.18);margin:5px 0 7px}
 [data-theme="light"] .res-pm-zone{border-color:rgba(27,42,59,.2);background:rgba(27,42,59,.04)}
 [data-theme="light"] .res-pm-zone--filled{background:rgba(27,42,59,.08);border-color:rgba(27,42,59,.2)}
 [data-theme="light"] .res-pm-name{color:#0d1a26}
@@ -1450,7 +1451,26 @@ async function initResourcePlanner() {
       _sb.from('dgc_staff').select('id,name,role,active').order('name'),
       _sb.from('dgc_staff_leave').select('staff_id,from_date,to_date').lte('from_date', future).gte('to_date', today),
     ]);
-    _resStaff = (staffData || []).filter(s => s.active); // only employed staff
+    const RES_STAFF_ORDER = [
+      'andrew wynne-smythe','andy wynne-smythe',
+      'john mcloughlin',
+      'david smith',
+      // ── separator ──
+      'james cosgrove',
+      'dean aaron kearsley',
+      'dean garrett',
+      'gareth boik',
+      'bradley john mckevitt',
+    ];
+    function resSortKey(name) {
+      const n = name.trim().toLowerCase();
+      const i = RES_STAFF_ORDER.indexOf(n);
+      return i >= 0 ? i : RES_STAFF_ORDER.length + n;
+    }
+    _resStaff = (staffData || []).filter(s => s.active).sort((a, b) => {
+      const ka = resSortKey(a.name), kb = resSortKey(b.name);
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
     _resLeave = leaveData || [];
   } catch (e) {
     console.error('Resource planner load failed', e);
@@ -1595,7 +1615,13 @@ function renderResourcePlanner() {
     </div>`;
   }).join('');
 
-  document.getElementById('res-staff-active').innerHTML = activeStaff.map(s => chipHtml(s, false)).join('') ||
+  const PM_LOWER = new Set(['andrew wynne-smythe','andy wynne-smythe','john mcloughlin','david smith']);
+  const lastPmIdx = activeStaff.reduce((acc, s, i) => PM_LOWER.has(s.name.toLowerCase()) ? i : acc, -1);
+  const activeChips = activeStaff.map((s, i) =>
+    chipHtml(s, false) + (i === lastPmIdx && lastPmIdx >= 0 && lastPmIdx < activeStaff.length - 1
+      ? '<div class="res-pm-divider"></div>' : '')
+  ).join('');
+  document.getElementById('res-staff-active').innerHTML = activeChips ||
     '<p style="color:var(--muted);font-size:12px;padding:4px">No active staff</p>';
   const leaveHdr = document.getElementById('res-leave-hdr');
   if (onLeaveStaff.length) {

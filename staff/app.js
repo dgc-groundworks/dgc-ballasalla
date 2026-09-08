@@ -77,6 +77,12 @@ const SALARIED = new Map([
   ['Andrew Wynne-Smythe', 8],
 ]);
 
+// Salaried staff excluded from the hours grid entirely (PMs — tracked separately)
+const EXCLUDED_FROM_HOURS = new Set([
+  'John McLoughlin', 'John Mcloughlin',
+  'Andy Wynne-Smythe', 'Andrew Wynne-Smythe',
+]);
+
 let periodStartVal = periodStartValFor(todayVal());
 let week1Approved = false;
 let week2Approved = false;
@@ -136,7 +142,7 @@ async function loadAll() {
   hourRows.forEach(h => activeIds.add(h.staff_id));
   leaveRows.forEach(b => activeIds.add(b.staff_id));
   advRows.forEach(a => activeIds.add(a.staff_id));
-  staff = staffRows.filter(s => s.active || activeIds.has(s.id));
+  staff = staffRows.filter(s => (s.active || activeIds.has(s.id)) && !EXCLUDED_FROM_HOURS.has(s.name));
 
   hoursCache = {};
   // Load manual entries first
@@ -350,10 +356,10 @@ async function flushCell(staffId, date, input) {
   const existing = hoursCache[key];
   document.getElementById('hoursStatus').textContent = 'Saving…';
   try {
-    if (raw === '') {
+    const hours = raw === '' ? null : Number(raw);
+    if (raw === '' || hours === 0) {
       if (existing) { await sbDelete('dgc_staff_hours', 'id=eq.' + existing.id); delete hoursCache[key]; }
     } else {
-      const hours = Number(raw);
       if (existing) {
         await sbPatch('dgc_staff_hours', 'id=eq.' + existing.id, { hours });
         hoursCache[key] = { id: existing.id, hours };
