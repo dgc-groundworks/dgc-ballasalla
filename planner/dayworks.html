@@ -92,6 +92,17 @@ input:focus{border-color:var(--accent)}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);color:var(--accent);background:rgba(245,158,11,.06)}
 .upload-zone input{display:none}
 
+/* Hours Summary */
+.summary-wrap{overflow-x:auto}
+.summary-table{border-collapse:collapse;width:100%;min-width:600px;font-size:0.82rem}
+.summary-table th,.summary-table td{padding:8px 12px;border:1px solid var(--bord);text-align:right;white-space:nowrap}
+.summary-table th{background:var(--surf2);text-align:right;font-weight:800}
+.summary-table th:first-child,.summary-table td:first-child{text-align:left;position:sticky;left:0;background:var(--surf);font-weight:700}
+.summary-table th:first-child{background:var(--surf2)}
+.summary-table tr.total-row td{font-weight:800;background:rgba(245,158,11,.08);border-top:2px solid var(--accent)}
+.summary-table td.total-col{font-weight:800;background:rgba(255,255,255,.03)}
+.summary-note{font-size:0.78rem;color:var(--muted);margin-bottom:14px}
+
 /* Historic */
 .hist-batch{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:16px 18px;margin-bottom:12px;cursor:pointer}
 .hist-batch:hover{border-color:var(--accent)}
@@ -148,6 +159,7 @@ input:focus{border-color:var(--accent)}
   <button class="dw-navbtn active" data-tab="current">Current</button>
   <button class="dw-navbtn" data-tab="upload">Upload</button>
   <button class="dw-navbtn" data-tab="historic">Historic</button>
+  <button class="dw-navbtn" data-tab="summary">Hours Summary</button>
 </nav>
 <main class="dw-main" id="mainArea"><p class="empty-state">Loading…</p></main>
 
@@ -178,13 +190,38 @@ function sbHeaders(extra) {
 }
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtDate(iso) { return iso ? iso.split('-').reverse().join('/') : '—'; }
+// Ash, 8 Sep 2026: "usually 30 mins for a 7+ hour day and none for a
+// 4 hour day" — matches how the subcontractors write their own Hours
+// column (they've already deducted lunch when the shift's long enough
+// to need one). No stated cutoff between 4h and 7h, so 6h is used as
+// the threshold (standard "over 6 hours needs a break" convention) —
+// flagged to Ash as a judgment call, not something he specified exactly.
+const LUNCH_THRESHOLD_HOURS = 6;
+const LUNCH_MINS = 30;
+function lunchMinsFor(start, finish) {
+  if (!start || !finish) return 0;
+  const [sh, sm] = start.split(':').map(Number);
+  const [fh, fm] = finish.split(':').map(Number);
+  let mins = (fh * 60 + fm) - (sh * 60 + sm);
+  if (mins < 0) mins += 24 * 60;
+  return (mins / 60) >= LUNCH_THRESHOLD_HOURS ? LUNCH_MINS : 0;
+}
 function calcHours(start, finish) {
   if (!start || !finish) return null;
   const [sh, sm] = start.split(':').map(Number);
   const [fh, fm] = finish.split(':').map(Number);
   let mins = (fh * 60 + fm) - (sh * 60 + sm);
   if (mins < 0) mins += 24 * 60;
-  return Math.round((mins / 60) * 100) / 100;
+  return Math.round(((mins - lunchMinsFor(start, finish)) / 60) * 100) / 100;
+}
+function daySummaryLine(e) {
+  const d = e.date ? new Date(e.date + 'T12:00:00') : null;
+  const dayLabel = d ? d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : 'No date set';
+  const timeStr = (e.start && e.finish) ? `${e.start} to ${e.finish}` : 'time not set';
+  const lunch = lunchMinsFor(e.start, e.finish);
+  const lunchStr = (e.start && e.finish) ? `, ${lunch} min lunch` : '';
+  const hoursStr = e.hours == null ? '—' : e.hours;
+  return `${dayLabel} — ${timeStr}${lunchStr} — ${hoursStr} hours${e.description ? ' — ' + esc(e.description) : ''}`;
 }
 function getMonday(iso) {
   const d = new Date(iso + 'T12:00:00');
@@ -193,13 +230,33 @@ function getMonday(iso) {
   return d.toISOString().slice(0, 10);
 }
 
+// The "site" field on old data is really free text ("Ballasalla - Main
+// Road", "Ballasalla (BS4)", "Ballasalla + Quay West") that mixes the
+// actual job with a description of the work area. Ash, 8 Sep 2026:
+// there are only two real jobs (Ballasalla, Quay West) — the rest is
+// description and should show as that, not create phantom extra jobs.
+function baseJob(site) {
+  const s = (site || '').trim();
+  if (!s) return NO_JOB;
+  if (/ballasalla/i.test(s)) return 'Ballasalla';
+  if (/quay west/i.test(s)) return 'Quay West';
+  return s;
+}
+function jobDescription(site) {
+  let s = (site || '').trim();
+  s = s.replace(/ballasalla/gi, '').replace(/quay west/gi, '');
+  s = s.replace(/^[\s\-+()]+|[\s\-+()]+$/g, '').trim();
+  return s;
+}
+
 function rowToEntry(r) {
   return {
     id: r.id, image: STORAGE_PUBLIC + encodeURIComponent(r.image_path), imagePath: r.image_path,
     name: r.staff_name || '', date: r.work_date || '', weekEnding: r.week_ending || '',
     site: r.site || '', start: r.start_time || '', finish: r.finish_time || '',
     hours: r.hours == null ? null : Number(r.hours), confirmed: !!r.confirmed, flagged: !!r.flagged,
-    note: r.note || '', sentAt: r.sent_at || null, sentBatchRef: r.sent_batch_ref || null
+    note: r.note || '', description: r.description || '',
+    sentAt: r.sent_at || null, sentBatchRef: r.sent_batch_ref || null
   };
 }
 // sent_at/sent_batch_ref were added after this table's first version —
@@ -208,11 +265,16 @@ function rowToEntry(r) {
 // error. PostgREST rejects an insert/select naming a column that
 // doesn't exist yet, even as null, so these can't just always be sent.
 let sentColumnsExist = true;
+let descriptionColumnExists = true;
 async function detectSentColumns() {
   try {
     const r = await fetch(REST + '?select=sent_at&limit=1', { headers: sbHeaders() });
     sentColumnsExist = r.ok;
   } catch (e) { sentColumnsExist = false; }
+  try {
+    const r2 = await fetch(REST + '?select=description&limit=1', { headers: sbHeaders() });
+    descriptionColumnExists = r2.ok;
+  } catch (e) { descriptionColumnExists = false; }
 }
 
 function entryToRow(e) {
@@ -222,6 +284,7 @@ function entryToRow(e) {
     hours: e.hours, confirmed: e.confirmed, flagged: e.flagged, note: e.note || ''
   };
   if (sentColumnsExist) { row.sent_at = e.sentAt || null; row.sent_batch_ref = e.sentBatchRef || null; }
+  if (descriptionColumnExists) { row.description = e.description || ''; }
   return row;
 }
 
@@ -275,6 +338,7 @@ function render() {
   document.querySelectorAll('.dw-navbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
   if (state.tab === 'upload') renderUpload();
   else if (state.tab === 'historic') renderHistoric();
+  else if (state.tab === 'summary') renderSummary();
   else renderCurrent();
 }
 
@@ -288,7 +352,7 @@ function renderCurrent() {
 function renderJobsLevel(main) {
   const pool = unsent();
   const byJob = {};
-  pool.forEach(e => { (byJob[e.site || NO_JOB] = byJob[e.site || NO_JOB] || []).push(e); });
+  pool.forEach(e => { (byJob[baseJob(e.site)] = byJob[baseJob(e.site)] || []).push(e); });
 
   const dates = pool.map(e => e.date).filter(Boolean).sort();
   const from = dates[0], to = dates[dates.length - 1];
@@ -333,7 +397,7 @@ function renderJobsLevel(main) {
 }
 
 function renderNamesLevel(main) {
-  const rows = unsent().filter(e => (e.site || NO_JOB) === state.job);
+  const rows = unsent().filter(e => baseJob(e.site) === state.job);
   const byName = {};
   rows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
 
@@ -365,7 +429,7 @@ function renderNamesLevel(main) {
 }
 
 function renderWeeksLevel(main) {
-  const rows = unsent().filter(e => (e.site || NO_JOB) === state.job && (e.name || NO_NAME) === state.name);
+  const rows = unsent().filter(e => baseJob(e.site) === state.job && (e.name || NO_NAME) === state.name);
   const byWeek = {};
   rows.forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date yet)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
   const weekKeys = Object.keys(byWeek).sort();
@@ -407,20 +471,26 @@ function renderWeeksLevel(main) {
 }
 
 function dayRowHtml(e) {
+  const area = jobDescription(e.site);
   return `
     <div class="day-row ${e.flagged ? 'flagged' : ''}" data-id="${e.id}">
       ${e.flagged ? `<div class="flag-note">&#9888; ${esc(e.note || 'Check this against the photo.')}</div>` : ''}
       <div class="dr-date">
-        <input type="text" class="dr-name" value="${esc(e.name)}" placeholder="Staff name" style="font-weight:800;border:none;background:none;padding:0;margin-bottom:6px;font-size:0.9rem">
+        <input type="text" class="dr-name" value="${esc(e.name)}" placeholder="Staff name" style="font-weight:800;border:none;background:none;padding:0;margin-bottom:2px;font-size:0.9rem">
       </div>
+      <p data-summary style="font-size:0.82rem;color:var(--muted);margin-bottom:8px">${daySummaryLine(e)}</p>
       <div class="dr-fields">
         <label>Date<input type="date" class="dr-input" data-f="date" value="${esc(e.date)}"></label>
         <label>Start<input type="time" class="dr-input" data-f="start" value="${esc(e.start)}"></label>
         <label>Finish<input type="time" class="dr-input" data-f="finish" value="${esc(e.finish)}"></label>
         <span class="dr-hours" data-hours>${e.hours == null ? '—' : e.hours}h</span>
       </div>
-      <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+      <label style="margin-top:8px">Description of work<input type="text" class="dr-input" data-f="description" value="${esc(e.description)}" placeholder="e.g. Slab prep, pour, drainage…"></label>
+      <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <input type="text" class="dr-input" data-f="site" value="${esc(e.site)}" placeholder="Job/site" style="max-width:220px">
+        ${area ? `<span style="font-size:0.75rem;color:var(--muted)">Area: ${esc(area)}</span>` : ''}
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
         <button class="btn-save" data-save>${e.confirmed && !e.flagged ? '&#10003; Confirmed' : 'Confirm & save'}</button>
         <button class="btn-danger" data-remove>Remove</button>
         <span class="form-status" data-status style="font-size:0.76rem;color:var(--muted)"></span>
@@ -432,9 +502,15 @@ function wireDayRow(e) {
   const row = document.querySelector(`.day-row[data-id="${e.id}"]`);
   if (!row) return;
   const startEl = row.querySelector('[data-f=start]'), finishEl = row.querySelector('[data-f=finish]');
-  const recalc = () => { row.querySelector('[data-hours]').textContent = (calcHours(startEl.value, finishEl.value) ?? '—') + 'h'; };
-  startEl.addEventListener('change', recalc);
-  finishEl.addEventListener('change', recalc);
+  const dateEl = row.querySelector('[data-f=date]'), descEl = row.querySelector('[data-f=description]');
+  const recalc = () => {
+    row.querySelector('[data-hours]').textContent = (calcHours(startEl.value, finishEl.value) ?? '—') + 'h';
+    row.querySelector('[data-summary]').textContent = daySummaryLine({
+      date: dateEl.value, start: startEl.value, finish: finishEl.value,
+      hours: calcHours(startEl.value, finishEl.value), description: descEl.value
+    });
+  };
+  [startEl, finishEl, dateEl, descEl].forEach(el => el.addEventListener('change', recalc));
 
   row.querySelector('[data-save]').addEventListener('click', async () => {
     const btn = row.querySelector('[data-save]');
@@ -442,9 +518,10 @@ function wireDayRow(e) {
     btn.disabled = true; status.textContent = 'Saving…';
     const updated = Object.assign({}, e, {
       name: row.querySelector('.dr-name').value.trim(),
-      date: row.querySelector('[data-f=date]').value,
+      date: dateEl.value,
       start: startEl.value, finish: finishEl.value,
       site: row.querySelector('[data-f=site]').value.trim(),
+      description: descEl.value.trim(),
       confirmed: true, flagged: false, note: ''
     });
     updated.hours = calcHours(updated.start, updated.finish);
@@ -469,7 +546,7 @@ function wireDayRow(e) {
 // ---------------------------------------------------------------
 function buildPackHtml(rows, from, to, refNum) {
   const bySite = {};
-  rows.forEach(e => { (bySite[e.site || NO_JOB] = bySite[e.site || NO_JOB] || []).push(e); });
+  rows.forEach(e => { (bySite[baseJob(e.site)] = bySite[baseJob(e.site)] || []).push(e); });
   let body = '', grandTotal = 0;
   Object.keys(bySite).sort().forEach(site => {
     body += `<div class="site-block"><div class="site-hdr">${esc(site)}</div>`;
@@ -574,6 +651,43 @@ async function handleFiles(files) {
   }
   state.tab = 'current'; state.job = NO_JOB; state.name = null;
   render();
+}
+
+// ---------------------------------------------------------------
+// Hours Summary — total hours per job, per week, across EVERYTHING
+// (both current/unsent and historic/sent entries), not just one
+// send-batch. Ash, 8 Sep 2026: "total hours tallied up per job per
+// week, all jobs and all weeks."
+// ---------------------------------------------------------------
+function renderSummary() {
+  const main = document.getElementById('mainArea');
+  const dated = entries.filter(e => e.date);
+  if (!dated.length) { main.innerHTML = '<p class="empty-state">No dated entries yet to summarise.</p>'; return; }
+
+  const byJobWeek = {}; // job -> weekMonday -> hours
+  const jobs = new Set(), weeks = new Set();
+  dated.forEach(e => {
+    const job = baseJob(e.site), wk = getMonday(e.date);
+    jobs.add(job); weeks.add(wk);
+    byJobWeek[job] = byJobWeek[job] || {};
+    byJobWeek[job][wk] = (byJobWeek[job][wk] || 0) + (e.hours || 0);
+  });
+  const jobList = [...jobs].sort();
+  const weekList = [...weeks].sort();
+
+  const jobTotals = {}; jobList.forEach(j => jobTotals[j] = weekList.reduce((s, wk) => s + (byJobWeek[j][wk] || 0), 0));
+  const weekTotals = {}; weekList.forEach(wk => weekTotals[wk] = jobList.reduce((s, j) => s + (byJobWeek[j][wk] || 0), 0));
+  const grandTotal = jobList.reduce((s, j) => s + jobTotals[j], 0);
+
+  let html = `
+    <p class="summary-note">Every dated entry on file — current + historic combined, both confirmed and still-to-check — so this is a running total, not just what's ready to send. ${dated.length} dated entries across ${jobList.length} job${jobList.length===1?'':'s'} and ${weekList.length} week${weekList.length===1?'':'s'}.</p>
+    <div class="summary-wrap"><table class="summary-table"><thead><tr><th>Week commencing</th>${jobList.map(j => `<th>${esc(j)}</th>`).join('')}<th class="total-col">Week total</th></tr></thead><tbody>`;
+  weekList.forEach(wk => {
+    html += `<tr><td>${fmtDate(wk)}</td>${jobList.map(j => `<td>${(byJobWeek[j][wk] || 0) || '—'}</td>`).join('')}<td class="total-col">${weekTotals[wk]}</td></tr>`;
+  });
+  html += `<tr class="total-row"><td>All weeks total</td>${jobList.map(j => `<td>${jobTotals[j]}</td>`).join('')}<td class="total-col">${grandTotal}</td></tr>`;
+  html += `</tbody></table></div>`;
+  main.innerHTML = html;
 }
 
 // ---------------------------------------------------------------

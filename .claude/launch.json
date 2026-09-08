@@ -4,7 +4,7 @@
     {
       "name": "dgc-app",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "7891", "--directory", "/tmp/dgc-fresh"],
+      "runtimeArgs": ["-m", "http.server", "7891", "--directory", "/Users/bba/Library/CloudStorage/OneDrive-Personal/WEBSITE/dgc-ballasalla"],
       "port": 7891
     }
   ]
