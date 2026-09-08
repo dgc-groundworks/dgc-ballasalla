@@ -24,58 +24,82 @@
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
 
 .topbar{background:var(--surf);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
-.topbar h1{font-size:1rem;font-weight:700;color:var(--accent);flex:1}
+.topbar h1{font-size:1rem;font-weight:700;color:var(--accent)}
 .test-banner{background:#dc2626;color:#fff;font-size:0.68rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:4px}
 .back-btn{display:flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bord);border-radius:7px;padding:6px 12px;color:var(--muted);font-size:0.82rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:all .15s;font-family:inherit}
 .back-btn:hover{border-color:var(--accent);color:var(--accent)}
-.theme-toggle-btn{background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em}
+.theme-toggle-btn{background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em;margin-left:auto}
 
-.layout{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 49px)}
-@media(max-width:800px){.layout{grid-template-columns:1fr;grid-template-rows:auto 1fr}}
+.dw-nav{background:var(--surf);border-bottom:1px solid var(--bord);padding:0 16px;display:flex;gap:4px;position:sticky;top:45px;z-index:9}
+.dw-navbtn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:0.85rem;font-weight:700;padding:10px 14px;cursor:pointer;font-family:inherit}
+.dw-navbtn:hover{color:var(--text)}
+.dw-navbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-/* ── Left panel ── */
-.list-panel{border-right:1px solid var(--bord);display:flex;flex-direction:column;overflow-y:auto}
-.upload-zone{margin:14px;padding:22px 14px;border:2px dashed var(--bord);border-radius:10px;text-align:center;color:var(--muted);font-size:0.85rem;cursor:pointer;transition:all .15s}
+.dw-main{padding:20px 24px;max-width:1100px;margin:0 auto}
+.empty-state{padding:60px 20px;text-align:center;color:var(--muted);font-size:0.9rem}
+.crumb{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:0.85rem;color:var(--muted)}
+.crumb button{background:none;border:none;color:var(--accent);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.85rem;padding:0}
+.crumb .sep{color:var(--muted)}
+
+/* Send bar */
+.send-bar{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.send-bar .sb-info{flex:1;min-width:200px}
+.send-bar .sb-range{font-weight:800;font-size:1rem}
+.send-bar .sb-sub{font-size:0.78rem;color:var(--muted);margin-top:2px}
+
+/* Job cards */
+.job-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.job-card{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s}
+.job-card:hover{border-color:var(--accent)}
+.job-card .jc-name{font-weight:800;font-size:1rem;display:flex;align-items:center;gap:8px}
+.job-card .jc-meta{font-size:0.78rem;color:var(--muted);margin-top:6px}
+.alert-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex-shrink:0;box-shadow:0 0 0 3px rgba(245,158,11,.25)}
+
+/* Name list */
+.name-list{display:flex;flex-direction:column;gap:8px}
+.name-row{background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s}
+.name-row:hover{border-color:var(--accent)}
+.name-row .nr-name{font-weight:700;flex:1}
+.name-row .nr-hours{color:var(--accent);font-weight:800;font-size:0.9rem}
+.name-row .nr-arrow{color:var(--muted)}
+
+/* Week view */
+.week-nav{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.week-nav button{background:var(--surf2);border:1px solid var(--bord);border-radius:7px;color:var(--text);padding:6px 12px;cursor:pointer;font-family:inherit;font-weight:700}
+.week-nav button:disabled{opacity:.35;cursor:default}
+.week-nav .wn-label{font-weight:800;flex:1;text-align:center}
+.week-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media(max-width:800px){.week-grid{grid-template-columns:1fr}}
+.week-photos img{width:100%;border-radius:8px;border:1px solid var(--bord);margin-bottom:10px}
+.day-row{background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px 14px;margin-bottom:8px}
+.day-row.flagged{border-color:var(--accent);background:rgba(245,158,11,.06)}
+.day-row .dr-date{font-weight:800;margin-bottom:8px}
+.day-row .dr-fields{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end}
+.day-row label{display:flex;flex-direction:column;gap:3px;font-size:0.7rem;color:var(--muted)}
+input[type=text],input[type=date],input[type=time]{background:var(--bg);border:1px solid var(--bord);border-radius:6px;padding:7px 9px;color:var(--text);font-size:0.85rem;font-family:inherit;outline:none;width:100%}
+input:focus{border-color:var(--accent)}
+.day-row .dr-hours{font-weight:800;color:var(--accent);white-space:nowrap;padding-bottom:7px}
+.flag-note{background:rgba(245,158,11,.1);border:1px solid var(--accent);border-radius:6px;padding:7px 10px;font-size:0.76rem;color:var(--accent);margin-bottom:8px}
+
+.btn-save{background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-primary{background:var(--accent);color:#1a1d27;border:none;padding:10px 22px;border-radius:6px;font-size:0.9rem;font-weight:800;cursor:pointer;font-family:inherit}
+.btn-primary:disabled{opacity:.4;cursor:default}
+.btn-secondary{background:var(--surf2);color:var(--muted);border:1px solid var(--bord);padding:8px 16px;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit}
+.btn-danger{background:none;border:1px solid rgba(239,68,68,.4);color:var(--red);padding:7px 12px;border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit}
+
+/* Upload tab */
+.upload-zone{padding:40px 20px;border:2px dashed var(--bord);border-radius:10px;text-align:center;color:var(--muted);font-size:0.95rem;cursor:pointer;transition:all .15s}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);color:var(--accent);background:rgba(245,158,11,.06)}
 .upload-zone input{display:none}
 
-.list-header{padding:0 14px 10px;display:flex;gap:8px;flex-wrap:wrap}
-.list-header input,.list-header select{background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:6px 10px;color:var(--text);font-size:0.8rem;font-family:inherit}
-.list-header input{flex:1;min-width:100px}
+/* Historic */
+.hist-batch{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:16px 18px;margin-bottom:12px;cursor:pointer}
+.hist-batch:hover{border-color:var(--accent)}
+.hist-batch .hb-ref{font-weight:800}
+.hist-batch .hb-meta{font-size:0.8rem;color:var(--muted);margin-top:4px}
 
-.entry-card{padding:11px 14px;border-bottom:1px solid var(--bord);cursor:pointer;transition:background .1s;display:flex;gap:10px;align-items:center}
-.entry-card:hover,.entry-card.selected{background:var(--surf2)}
-.entry-card img{width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--bord);flex-shrink:0}
-.ec-body{min-width:0;flex:1}
-.ec-name{font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ec-meta{font-size:0.75rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ec-flag{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.ec-flag.ok{background:var(--green)}
-.ec-flag.review{background:var(--accent)}
-
-.pack-bar{padding:12px 14px;border-top:1px solid var(--bord);display:flex;flex-direction:column;gap:8px}
-.pack-bar input[type=date]{background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:6px 8px;color:var(--text);font-size:0.8rem;font-family:inherit;flex:1}
-.pack-row{display:flex;gap:6px;align-items:center;font-size:0.78rem;color:var(--muted)}
-
-/* ── Right panel ── */
-.form-panel{padding:20px 24px;overflow-y:auto}
-.empty-state{padding:60px 20px;text-align:center;color:var(--muted);font-size:0.9rem}
-
-.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
-@media(max-width:900px){.review-grid{grid-template-columns:1fr}}
-.review-photo img{width:100%;border-radius:8px;border:1px solid var(--bord)}
-label{display:flex;flex-direction:column;gap:4px;font-size:0.78rem;color:var(--muted);margin-bottom:10px}
-input[type=text],input[type=date],input[type=time],select{background:var(--surf);border:1px solid var(--bord);border-radius:6px;padding:9px 11px;color:var(--text);font-size:0.9rem;font-family:inherit;outline:none;width:100%}
-input:focus,select:focus{border-color:var(--accent)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.hours-readout{font-weight:800;color:var(--accent);font-size:1rem}
-.flag-note{background:rgba(245,158,11,.1);border:1px solid var(--accent);border-radius:6px;padding:8px 10px;font-size:0.8rem;color:var(--accent);margin-bottom:12px}
-.btn-save{background:var(--green);color:#fff;border:none;padding:9px 22px;border-radius:6px;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:inherit}
-.btn-primary{background:var(--accent);color:#1a1d27;border:none;padding:9px 22px;border-radius:6px;font-size:0.88rem;font-weight:800;cursor:pointer;font-family:inherit}
-.btn-secondary{background:var(--surf2);color:var(--muted);border:1px solid var(--bord);padding:9px 16px;border-radius:6px;font-size:0.85rem;cursor:pointer;font-family:inherit}
-
-/* ── Report / document view (matches Site Diary) ── */
-.report-doc{background:#fff;color:#1a2a3f;border-radius:10px;padding:36px 40px;max-width:900px;box-shadow:0 4px 32px rgba(0,0,0,.45);font-family:'Segoe UI',Calibri,Arial,sans-serif}
+/* ── Branded document (matches Site Diary) ── */
+.report-doc{background:#fff;color:#1a2a3f;border-radius:10px;padding:36px 40px;max-width:900px;box-shadow:0 4px 32px rgba(0,0,0,.45);font-family:'Segoe UI',Calibri,Arial,sans-serif;margin:0 auto}
 .lh-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:16px}
 .lh-logo{height:62px;width:auto}
 .lh-right{text-align:right}
@@ -100,15 +124,14 @@ input:focus,select:focus{border-color:var(--accent)}
 .week-total-row td{font-weight:800;background:#f7fafc;border-top:1.5px solid #c8d4e0}
 .grand-total{margin-top:8px;text-align:right;font-size:1rem;font-weight:900;color:#1a2a3f}
 .report-footer{margin-top:18px;padding-top:14px;border-top:1px solid #c8d4e0;font-size:0.7rem;color:#8a9ab0;line-height:1.5;text-align:center}
-.report-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.report-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;max-width:900px;margin-left:auto;margin-right:auto}
 .btn-print{background:#1a2a3f;color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
 .btn-print:hover{background:#243552}
 
 @media print {
-  .topbar,.list-panel,.report-actions{display:none!important}
+  .topbar,.dw-nav,.report-actions{display:none!important}
   body{background:#fff}
-  .layout{display:block}
-  .form-panel{padding:0;overflow:visible}
+  .dw-main{padding:0;max-width:100%}
   .report-doc{box-shadow:none;border-radius:0;padding:20mm 18mm;max-width:100%;margin:0}
   @page{margin:0}
 }
@@ -121,106 +144,95 @@ input:focus,select:focus{border-color:var(--accent)}
   <span class="test-banner">Test build — not live</span>
   <button class="theme-toggle-btn" onclick="toggleTheme()">Light Mode</button>
 </header>
-
-<div class="layout">
-  <aside class="list-panel">
-    <div class="upload-zone" id="uploadZone">
-      <span id="uploadZoneLabel">&#128247; Drop timesheet photos here, or click to choose<br>
-      <span style="font-size:0.72rem">(AI reading needs Ash's Claude API key set up first — new uploads go into the review list unread)</span></span>
-      <input type="file" id="fileInput" accept="image/*" multiple>
-    </div>
-    <div class="list-header">
-      <input type="text" id="searchInput" placeholder="Search name or site…">
-      <select id="siteFilter"><option value="">All sites</option></select>
-    </div>
-    <div id="entryList" style="flex:1;overflow-y:auto"></div>
-    <div class="pack-bar">
-      <div class="pack-row">
-        <input type="date" id="packFrom"> to <input type="date" id="packTo">
-      </div>
-      <button class="btn-primary" id="genPackBtn" style="width:100%">Generate client pack</button>
-    </div>
-  </aside>
-
-  <main class="form-panel" id="formPanel">
-    <p class="empty-state">Select an entry on the left to review it, or click "Generate client pack" once everything in a date range is confirmed.</p>
-  </main>
-</div>
+<nav class="dw-nav">
+  <button class="dw-navbtn active" data-tab="current">Current</button>
+  <button class="dw-navbtn" data-tab="upload">Upload</button>
+  <button class="dw-navbtn" data-tab="historic">Historic</button>
+</nav>
+<main class="dw-main" id="mainArea"><p class="empty-state">Loading…</p></main>
 
 <script>
 // ---------------------------------------------------------------
-// Dayworks — real Supabase persistence (Job Planner project).
+// Dayworks — Job -> Name -> Week drill-down, real Supabase persistence.
 // Table: public.dgc_dayworks_entries · Bucket: dayworks-timesheets (public)
-// Uses the anon key directly, no login gate (matches the Timesheet
-// app's own shared-data tables, e.g. timesheet_sites) — deliberately
-// lighter security for this test/early phase; can be locked down to
-// authenticated-only later like staff/fuel.html if this becomes the
-// real production tool.
+// Anon key directly, no login gate (matches Timesheet app's shared
+// tables) — lighter security for this test/early phase.
 //
-// IMPORTANT anon-key platform quirk (confirmed elsewhere this
-// project): UPDATE requests silently no-op regardless of RLS policy.
-// So there is NO update path here — "confirm & save" deletes the old
-// row and inserts a fresh corrected one instead. Never add a PATCH
-// call against this table without re-testing that quirk first.
+// Anon-key UPDATE silently no-ops regardless of RLS (confirmed
+// elsewhere this project) — there is NO update policy on this table.
+// Every "save" here deletes the old row and inserts a corrected one.
 //
 // AI vision extraction is still stubbed — needs Ash's own Anthropic
-// API key + a Supabase Edge Function first (see the Obsidian spec:
-// DGC Brain/Prompts/DGC Dayworks — Build Spec & Prompt.md).
+// API key + a Supabase Edge Function (see the Obsidian spec: DGC
+// Brain/Prompts/DGC Dayworks — Build Spec & Prompt.md).
 // ---------------------------------------------------------------
 
 const REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_entries';
 const STORAGE_UPLOAD = SUPABASE_URL + '/storage/v1/object/dayworks-timesheets/';
 const STORAGE_PUBLIC = SUPABASE_URL + '/storage/v1/object/public/dayworks-timesheets/';
+const NO_JOB = '(Needs a job assigned)';
+const NO_NAME = '(Needs a name)';
 
 function sbHeaders(extra) {
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, extra || {});
 }
-
-// Hours = finish minus start. NO lunch deduction (Ash, 8 Sep 2026:
-// "not sure how they calculate lunch, just ignore that for now").
+function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtDate(iso) { return iso ? iso.split('-').reverse().join('/') : '—'; }
 function calcHours(start, finish) {
+  if (!start || !finish) return null;
   const [sh, sm] = start.split(':').map(Number);
   const [fh, fm] = finish.split(':').map(Number);
   let mins = (fh * 60 + fm) - (sh * 60 + sm);
   if (mins < 0) mins += 24 * 60;
   return Math.round((mins / 60) * 100) / 100;
 }
+function getMonday(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  const day = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - day);
+  return d.toISOString().slice(0, 10);
+}
 
-// DB row <-> UI entry shape
 function rowToEntry(r) {
   return {
-    id: r.id, image: STORAGE_PUBLIC + encodeURIComponent(r.image_path),
-    imagePath: r.image_path, name: r.staff_name || '', date: r.work_date || '',
-    weekEnding: r.week_ending || '', site: r.site || '', start: r.start_time || '',
-    finish: r.finish_time || '', hours: r.hours == null ? null : Number(r.hours),
-    confirmed: !!r.confirmed, flagged: !!r.flagged, note: r.note || ''
+    id: r.id, image: STORAGE_PUBLIC + encodeURIComponent(r.image_path), imagePath: r.image_path,
+    name: r.staff_name || '', date: r.work_date || '', weekEnding: r.week_ending || '',
+    site: r.site || '', start: r.start_time || '', finish: r.finish_time || '',
+    hours: r.hours == null ? null : Number(r.hours), confirmed: !!r.confirmed, flagged: !!r.flagged,
+    note: r.note || '', sentAt: r.sent_at || null, sentBatchRef: r.sent_batch_ref || null
   };
 }
+// sent_at/sent_batch_ref were added after this table's first version —
+// detected once at boot so this still works before Ash runs that ALTER
+// TABLE, instead of every save silently failing with an unknown-column
+// error. PostgREST rejects an insert/select naming a column that
+// doesn't exist yet, even as null, so these can't just always be sent.
+let sentColumnsExist = true;
+async function detectSentColumns() {
+  try {
+    const r = await fetch(REST + '?select=sent_at&limit=1', { headers: sbHeaders() });
+    sentColumnsExist = r.ok;
+  } catch (e) { sentColumnsExist = false; }
+}
+
 function entryToRow(e) {
-  return {
+  const row = {
     image_path: e.imagePath, staff_name: e.name, work_date: e.date || null,
-    week_ending: e.weekEnding || null, site: e.site, start_time: e.start,
-    finish_time: e.finish, hours: e.hours, confirmed: e.confirmed,
-    flagged: e.flagged, note: e.note || ''
+    week_ending: e.weekEnding || null, site: e.site, start_time: e.start, finish_time: e.finish,
+    hours: e.hours, confirmed: e.confirmed, flagged: e.flagged, note: e.note || ''
   };
+  if (sentColumnsExist) { row.sent_at = e.sentAt || null; row.sent_batch_ref = e.sentBatchRef || null; }
+  return row;
 }
 
 let entries = [];
-let selectedId = null;
+let state = { tab: 'current', job: null, name: null, weekIndex: 0 };
 
 async function loadEntries() {
-  try {
-    const r = await fetch(REST + '?select=*&order=work_date.desc.nullslast', { headers: sbHeaders() });
-    if (!r.ok) throw new Error(await r.text());
-    entries = (await r.json()).map(rowToEntry);
-  } catch (err) {
-    document.getElementById('entryList').innerHTML =
-      `<p class="empty-state">Couldn't load entries — has the dgc_dayworks_entries table been created yet?<br><span style="font-size:0.72rem;color:var(--red)">${esc(err.message)}</span></p>`;
-    return false;
-  }
-  return true;
+  const r = await fetch(REST + '?select=*&order=work_date.desc.nullslast', { headers: sbHeaders() });
+  if (!r.ok) throw new Error(await r.text());
+  entries = (await r.json()).map(rowToEntry);
 }
-
 async function insertRow(entryLike) {
   const r = await fetch(REST, {
     method: 'POST',
@@ -231,242 +243,252 @@ async function insertRow(entryLike) {
   const [row] = await r.json();
   return rowToEntry(row);
 }
-
 async function deleteRow(id) {
   const r = await fetch(REST + '?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: sbHeaders() });
   if (!r.ok) throw new Error(await r.text());
 }
-
-async function uploadImageFile(file, pathHint) {
+// No UPDATE path exists (anon UPDATE is silently blocked) — this is
+// delete-then-reinsert dressed up as a save.
+async function saveEntry(oldId, updated) {
+  await deleteRow(oldId);
+  const saved = await insertRow(updated);
+  entries = entries.filter(x => x.id !== oldId);
+  entries.push(saved);
+  return saved;
+}
+async function uploadImageFile(file) {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  const path = pathHint || (crypto.randomUUID() + '.' + ext);
+  const path = crypto.randomUUID() + '.' + ext;
   const r = await fetch(STORAGE_UPLOAD + encodeURIComponent(path), {
-    method: 'POST',
-    headers: sbHeaders({ 'Content-Type': file.type || 'image/jpeg' }),
-    body: file
+    method: 'POST', headers: sbHeaders({ 'Content-Type': file.type || 'image/jpeg' }), body: file
   });
   if (!r.ok) throw new Error(await r.text());
   return path;
 }
 
-function fmtDate(iso) { return iso ? iso.split('-').reverse().join('/') : '—'; }
-function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function unsent() { return entries.filter(e => !e.sentAt); }
 
-function populateSiteFilter() {
-  const sel = document.getElementById('siteFilter');
-  const sites = [...new Set(entries.map(e => e.site).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">All sites</option>' + sites.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+// ---------------------------------------------------------------
+// Rendering — one dispatcher into #mainArea based on `state`.
+// ---------------------------------------------------------------
+function render() {
+  document.querySelectorAll('.dw-navbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
+  if (state.tab === 'upload') renderUpload();
+  else if (state.tab === 'historic') renderHistoric();
+  else renderCurrent();
 }
 
-function renderList() {
-  const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  const siteQ = document.getElementById('siteFilter').value;
-  const list = document.getElementById('entryList');
-  const filtered = entries
-    .filter(e => !q || e.name.toLowerCase().includes(q) || (e.site || '').toLowerCase().includes(q))
-    .filter(e => !siteQ || e.site === siteQ)
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+function renderCurrent() {
+  const main = document.getElementById('mainArea');
+  if (!state.job) { renderJobsLevel(main); return; }
+  if (!state.name) { renderNamesLevel(main); return; }
+  renderWeeksLevel(main);
+}
 
-  if (!filtered.length) { list.innerHTML = '<p class="empty-state">No entries match.</p>'; return; }
+function renderJobsLevel(main) {
+  const pool = unsent();
+  const byJob = {};
+  pool.forEach(e => { (byJob[e.site || NO_JOB] = byJob[e.site || NO_JOB] || []).push(e); });
 
-  list.innerHTML = filtered.map(e => `
-    <div class="entry-card ${e.id === selectedId ? 'selected' : ''}" data-id="${e.id}">
-      <img src="${e.image}" alt="">
-      <div class="ec-body">
-        <div class="ec-name">${esc(e.name || '(unnamed)')}</div>
-        <div class="ec-meta">${esc(e.site || 'No site')} — ${fmtDate(e.date)}</div>
+  const dates = pool.map(e => e.date).filter(Boolean).sort();
+  const from = dates[0], to = dates[dates.length - 1];
+  const anyUnready = pool.some(e => e.flagged || !e.confirmed);
+  const totalHours = pool.reduce((s, e) => s + (e.hours || 0), 0);
+
+  let html = `
+    <div class="send-bar">
+      <div class="sb-info">
+        <div class="sb-range">${from ? fmtDate(from) + ' – ' + fmtDate(to) : 'No dated entries yet'}</div>
+        <div class="sb-sub">${pool.length} entr${pool.length === 1 ? 'y' : 'ies'} since the last send · ${totalHours} hours so far${anyUnready ? ' · some still need checking' : ' · all clear'}${!sentColumnsExist ? ' · Historic filing needs a database update first, see below' : ''}</div>
       </div>
-      <div class="ec-flag ${e.flagged ? 'review' : 'ok'}" title="${e.flagged ? 'Needs review' : 'Confirmed'}"></div>
+      <button class="btn-primary" id="sendBtn" ${anyUnready || !pool.length || !sentColumnsExist ? 'disabled' : ''}>Send to client</button>
     </div>
-  `).join('');
+    ${!sentColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Can't file sent packs into Historic yet — run this in the Job Planner's SQL Editor first:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists sent_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists sent_batch_ref text;</code></p>` : ''}
+  `;
 
-  list.querySelectorAll('.entry-card').forEach(card => {
-    card.addEventListener('click', () => { selectedId = card.dataset.id; renderList(); showReview(selectedId); });
+  if (!Object.keys(byJob).length) {
+    html += '<p class="empty-state">Nothing to review — upload some timesheets to get started.</p>';
+  } else {
+    html += '<div class="job-grid">';
+    Object.keys(byJob).sort().forEach(job => {
+      const rows = byJob[job];
+      const names = new Set(rows.map(r => r.name || NO_NAME));
+      const flagged = rows.some(r => r.flagged || !r.confirmed);
+      const hrs = rows.reduce((s, r) => s + (r.hours || 0), 0);
+      html += `
+        <div class="job-card" data-job="${esc(job)}">
+          <div class="jc-name">${flagged ? '<span class="alert-dot" title="Needs checking"></span>' : ''}${esc(job)}</div>
+          <div class="jc-meta">${names.size} ${names.size === 1 ? 'person' : 'people'} · ${hrs} hours</div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+  main.innerHTML = html;
+
+  main.querySelectorAll('.job-card').forEach(card => {
+    card.addEventListener('click', () => { state.job = card.dataset.job; state.name = null; render(); });
+  });
+  const sendBtn = document.getElementById('sendBtn');
+  if (sendBtn) sendBtn.addEventListener('click', () => showSendPreview(pool, from, to));
+}
+
+function renderNamesLevel(main) {
+  const rows = unsent().filter(e => (e.site || NO_JOB) === state.job);
+  const byName = {};
+  rows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
+
+  let html = `
+    <div class="crumb">
+      <button id="crumbJobs">Jobs</button><span class="sep">/</span><span>${esc(state.job)}</span>
+    </div>
+    <div class="name-list">
+  `;
+  Object.keys(byName).sort().forEach(name => {
+    const rs = byName[name];
+    const flagged = rs.some(r => r.flagged || !r.confirmed);
+    const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
+    html += `
+      <div class="name-row" data-name="${esc(name)}">
+        ${flagged ? '<span class="alert-dot" title="Needs checking"></span>' : ''}
+        <span class="nr-name">${esc(name)}</span>
+        <span class="nr-hours">${hrs}h</span>
+        <span class="nr-arrow">&rsaquo;</span>
+      </div>`;
+  });
+  html += '</div>';
+  main.innerHTML = html;
+
+  document.getElementById('crumbJobs').addEventListener('click', () => { state.job = null; render(); });
+  main.querySelectorAll('.name-row').forEach(row => {
+    row.addEventListener('click', () => { state.name = row.dataset.name; state.weekIndex = 0; render(); });
   });
 }
 
-function showReview(id) {
-  const e = entries.find(x => x.id === id);
-  const panel = document.getElementById('formPanel');
-  if (!e) { panel.innerHTML = '<p class="empty-state">Entry not found.</p>'; return; }
+function renderWeeksLevel(main) {
+  const rows = unsent().filter(e => (e.site || NO_JOB) === state.job && (e.name || NO_NAME) === state.name);
+  const byWeek = {};
+  rows.forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date yet)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
+  const weekKeys = Object.keys(byWeek).sort();
+  if (state.weekIndex >= weekKeys.length) state.weekIndex = weekKeys.length - 1;
+  if (state.weekIndex < 0) state.weekIndex = 0;
+  const wk = weekKeys[state.weekIndex];
+  const weekRows = (byWeek[wk] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const weekTotal = weekRows.reduce((s, r) => s + (r.hours || 0), 0);
+  const images = [...new Set(weekRows.map(r => r.image))];
 
-  panel.innerHTML = `
-    <div class="review-grid">
-      <div class="review-photo">
-        <img src="${e.image}" alt="Timesheet photo">
-      </div>
+  let html = `
+    <div class="crumb">
+      <button id="crumbJobs">Jobs</button><span class="sep">/</span>
+      <button id="crumbNames">${esc(state.job)}</button><span class="sep">/</span>
+      <span>${esc(state.name)}</span>
+    </div>
+    <div class="week-nav">
+      <button id="wkPrev" ${state.weekIndex <= 0 ? 'disabled' : ''}>&lsaquo; Previous week</button>
+      <div class="wn-label">${wk === '(no date yet)' ? 'No date set' : 'Week of ' + fmtDate(wk)} (${state.weekIndex + 1} of ${weekKeys.length}) — ${weekTotal}h</div>
+      <button id="wkNext" ${state.weekIndex >= weekKeys.length - 1 ? 'disabled' : ''}>Next week &rsaquo;</button>
+    </div>
+    <div class="week-grid">
       <div>
-        ${e.flagged ? `<div class="flag-note">&#9888; ${esc(e.note || 'Flagged for review — check against the original photo.')}</div>` : ''}
-        <label>Staff name<input type="text" id="rvName" value="${esc(e.name)}"></label>
-        <div class="grid2">
-          <label>Work date<input type="date" id="rvDate" value="${esc(e.date)}"></label>
-          <label>Week ending<input type="date" id="rvWeekEnding" value="${esc(e.weekEnding)}"></label>
-        </div>
-        <label>Site<input type="text" id="rvSite" value="${esc(e.site)}"></label>
-        <div class="grid2">
-          <label>Start<input type="time" id="rvStart" value="${esc(e.start)}"></label>
-          <label>Finish<input type="time" id="rvFinish" value="${esc(e.finish)}"></label>
-        </div>
-        <p style="margin-bottom:14px">Hours (no lunch deducted): <span class="hours-readout" id="rvHours">${e.hours == null ? '—' : e.hours}</span></p>
-        <p class="form-status" id="rvStatus" style="font-size:0.8rem;color:var(--muted);min-height:1.2em"></p>
-        <div style="display:flex;gap:8px">
-          <button class="btn-save" id="rvConfirm">${e.confirmed ? '&#10003; Confirmed' : 'Confirm & save'}</button>
-          <button class="btn-secondary" id="rvDelete">Remove entry</button>
-        </div>
+        ${weekRows.map(e => dayRowHtml(e)).join('')}
+      </div>
+      <div class="week-photos">
+        ${images.map(img => `<img src="${img}" alt="Timesheet photo">`).join('')}
       </div>
     </div>
   `;
+  main.innerHTML = html;
 
-  const recalc = () => {
-    const s = document.getElementById('rvStart').value, f = document.getElementById('rvFinish').value;
-    if (s && f) document.getElementById('rvHours').textContent = calcHours(s, f);
-  };
-  document.getElementById('rvStart').addEventListener('change', recalc);
-  document.getElementById('rvFinish').addEventListener('change', recalc);
+  document.getElementById('crumbJobs').addEventListener('click', () => { state.job = null; state.name = null; render(); });
+  document.getElementById('crumbNames').addEventListener('click', () => { state.name = null; render(); });
+  document.getElementById('wkPrev').addEventListener('click', () => { state.weekIndex--; render(); });
+  document.getElementById('wkNext').addEventListener('click', () => { state.weekIndex++; render(); });
 
-  document.getElementById('rvConfirm').addEventListener('click', async () => {
-    const btn = document.getElementById('rvConfirm');
-    const status = document.getElementById('rvStatus');
+  weekRows.forEach(e => wireDayRow(e));
+}
+
+function dayRowHtml(e) {
+  return `
+    <div class="day-row ${e.flagged ? 'flagged' : ''}" data-id="${e.id}">
+      ${e.flagged ? `<div class="flag-note">&#9888; ${esc(e.note || 'Check this against the photo.')}</div>` : ''}
+      <div class="dr-date">
+        <input type="text" class="dr-name" value="${esc(e.name)}" placeholder="Staff name" style="font-weight:800;border:none;background:none;padding:0;margin-bottom:6px;font-size:0.9rem">
+      </div>
+      <div class="dr-fields">
+        <label>Date<input type="date" class="dr-input" data-f="date" value="${esc(e.date)}"></label>
+        <label>Start<input type="time" class="dr-input" data-f="start" value="${esc(e.start)}"></label>
+        <label>Finish<input type="time" class="dr-input" data-f="finish" value="${esc(e.finish)}"></label>
+        <span class="dr-hours" data-hours>${e.hours == null ? '—' : e.hours}h</span>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+        <input type="text" class="dr-input" data-f="site" value="${esc(e.site)}" placeholder="Job/site" style="max-width:220px">
+        <button class="btn-save" data-save>${e.confirmed && !e.flagged ? '&#10003; Confirmed' : 'Confirm & save'}</button>
+        <button class="btn-danger" data-remove>Remove</button>
+        <span class="form-status" data-status style="font-size:0.76rem;color:var(--muted)"></span>
+      </div>
+    </div>`;
+}
+
+function wireDayRow(e) {
+  const row = document.querySelector(`.day-row[data-id="${e.id}"]`);
+  if (!row) return;
+  const startEl = row.querySelector('[data-f=start]'), finishEl = row.querySelector('[data-f=finish]');
+  const recalc = () => { row.querySelector('[data-hours]').textContent = (calcHours(startEl.value, finishEl.value) ?? '—') + 'h'; };
+  startEl.addEventListener('change', recalc);
+  finishEl.addEventListener('change', recalc);
+
+  row.querySelector('[data-save]').addEventListener('click', async () => {
+    const btn = row.querySelector('[data-save]');
+    const status = row.querySelector('[data-status]');
     btn.disabled = true; status.textContent = 'Saving…';
     const updated = Object.assign({}, e, {
-      name: document.getElementById('rvName').value.trim(),
-      date: document.getElementById('rvDate').value,
-      weekEnding: document.getElementById('rvWeekEnding').value,
-      site: document.getElementById('rvSite').value.trim(),
-      start: document.getElementById('rvStart').value,
-      finish: document.getElementById('rvFinish').value,
+      name: row.querySelector('.dr-name').value.trim(),
+      date: row.querySelector('[data-f=date]').value,
+      start: startEl.value, finish: finishEl.value,
+      site: row.querySelector('[data-f=site]').value.trim(),
       confirmed: true, flagged: false, note: ''
     });
     updated.hours = calcHours(updated.start, updated.finish);
     try {
-      // No UPDATE path for anon key on this table — delete + re-insert instead.
-      await deleteRow(e.id);
-      const saved = await insertRow(updated);
-      entries = entries.filter(x => x.id !== e.id);
-      entries.push(saved);
-      selectedId = saved.id;
-      populateSiteFilter();
-      renderList();
-      showReview(saved.id);
+      await saveEntry(e.id, updated);
+      render();
     } catch (err) {
-      btn.disabled = false;
-      status.textContent = 'Save failed: ' + err.message;
+      btn.disabled = false; status.textContent = 'Save failed: ' + err.message;
     }
   });
 
-  document.getElementById('rvDelete').addEventListener('click', async () => {
-    if (!confirm('Remove this entry? This deletes it permanently.')) return;
-    try {
-      await deleteRow(e.id);
-      entries = entries.filter(x => x.id !== e.id);
-      selectedId = null;
-      renderList();
-      document.getElementById('formPanel').innerHTML = '<p class="empty-state">Entry removed.</p>';
-    } catch (err) {
-      alert('Could not remove: ' + err.message);
-    }
+  row.querySelector('[data-remove]').addEventListener('click', async () => {
+    if (!confirm('Remove this entry permanently?')) return;
+    try { await deleteRow(e.id); entries = entries.filter(x => x.id !== e.id); render(); }
+    catch (err) { alert('Could not remove: ' + err.message); }
   });
 }
 
-// ---- Upload: real image goes to Supabase Storage + a real DB row is
-// created immediately (unconfirmed/flagged). AI reading is still stubbed
-// — needs Ash's Claude API key + an Edge Function first. ----
-const UPLOAD_ZONE_DEFAULT_LABEL =
-  '&#128247; Drop timesheet photos here, or click to choose<br>' +
-  '<span style="font-size:0.72rem">(AI reading needs Ash\'s Claude API key set up first — new uploads go into the review list unread)</span>';
-
-async function handleFiles(files) {
-  const imgFiles = [...files].filter(f => f.type.startsWith('image/'));
-  if (!imgFiles.length) return;
-  const label = document.getElementById('uploadZoneLabel');
-  let done = 0;
-  label.textContent = `Uploading 1 of ${imgFiles.length}…`;
-  for (const file of imgFiles) {
-    try {
-      const path = await uploadImageFile(file);
-      const saved = await insertRow({
-        imagePath: path, name: '', date: '', weekEnding: '', site: '',
-        start: '08:00', finish: '16:30', hours: null, confirmed: false, flagged: true,
-        note: 'Just uploaded — AI reading is not wired up yet. Type in what the sheet says.'
-      });
-      entries.push(saved);
-    } catch (err) {
-      alert('Upload failed for ' + file.name + ': ' + err.message);
-    }
-    done++;
-    if (done < imgFiles.length) label.textContent = `Uploading ${done + 1} of ${imgFiles.length}…`;
-  }
-  label.innerHTML = UPLOAD_ZONE_DEFAULT_LABEL;
-  populateSiteFilter();
-  renderList();
-}
-const uploadZone = document.getElementById('uploadZone');
-uploadZone.addEventListener('click', () => document.getElementById('fileInput').click());
-document.getElementById('fileInput').addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
-['dragover', 'dragleave', 'drop'].forEach(evt => uploadZone.addEventListener(evt, e => e.preventDefault()));
-uploadZone.addEventListener('dragover', () => uploadZone.classList.add('drag'));
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
-uploadZone.addEventListener('drop', e => { uploadZone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
-
-document.getElementById('searchInput').addEventListener('input', renderList);
-document.getElementById('siteFilter').addEventListener('change', renderList);
-
-// ---- ISO week helpers (Mon-Sun) for the weekly tally grouping ----
-function getMonday(iso) {
-  const d = new Date(iso + 'T12:00:00');
-  const day = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - day);
-  return d.toISOString().slice(0, 10);
-}
-
-function buildPack(from, to) {
-  const inRange = entries.filter(e => e.confirmed && e.date && e.date >= from && e.date <= to);
-  if (!inRange.length) return null;
-
+// ---------------------------------------------------------------
+// Send to client — builds the branded pack from everything unsent,
+// then on confirmation marks it all sent and files it into Historic.
+// ---------------------------------------------------------------
+function buildPackHtml(rows, from, to, refNum) {
   const bySite = {};
-  inRange.forEach(e => { (bySite[e.site] = bySite[e.site] || []).push(e); });
-
-  let bodyHtml = '';
-  let grandTotal = 0;
-
+  rows.forEach(e => { (bySite[e.site || NO_JOB] = bySite[e.site || NO_JOB] || []).push(e); });
+  let body = '', grandTotal = 0;
   Object.keys(bySite).sort().forEach(site => {
-    bodyHtml += `<div class="site-block"><div class="site-hdr">${esc(site)}</div>`;
+    body += `<div class="site-block"><div class="site-hdr">${esc(site)}</div>`;
     const byWeek = {};
-    bySite[site].forEach(e => { (byWeek[getMonday(e.date)] = byWeek[getMonday(e.date)] || []).push(e); });
-
+    bySite[site].forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
     Object.keys(byWeek).sort().forEach((wkStart, i) => {
-      const rows = byWeek[wkStart].sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
-      const weekTotal = rows.reduce((s, r) => s + r.hours, 0);
+      const wrows = byWeek[wkStart].sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.name.localeCompare(b.name));
+      const weekTotal = wrows.reduce((s, r) => s + (r.hours || 0), 0);
       grandTotal += weekTotal;
-      bodyHtml += `<div class="week-hdr">Week ${i + 1} — w/c ${fmtDate(wkStart)}</div>
+      body += `<div class="week-hdr">Week ${i + 1} — w/c ${fmtDate(wkStart)}</div>
         <table class="dw-table"><thead><tr><th>Date</th><th>Name</th><th>Start</th><th>Finish</th><th>Hours</th><th>Role</th></tr></thead><tbody>`;
-      rows.forEach(r => {
-        bodyHtml += `<tr><td>${fmtDate(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.start)}</td><td>${esc(r.finish)}</td><td>${r.hours}</td><td>Ground Worker</td></tr>`;
+      wrows.forEach(r => {
+        body += `<tr><td>${fmtDate(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.start)}</td><td>${esc(r.finish)}</td><td>${r.hours}</td><td>Ground Worker</td></tr>`;
       });
-      bodyHtml += `<tr class="week-total-row"><td colspan="4">Week ${i + 1} total</td><td>${weekTotal}</td><td></td></tr></tbody></table>`;
+      body += `<tr class="week-total-row"><td colspan="4">Week ${i + 1} total</td><td>${weekTotal}</td><td></td></tr></tbody></table>`;
     });
-    bodyHtml += `</div>`;
+    body += `</div>`;
   });
-
-  return { bodyHtml, grandTotal, count: inRange.length, from, to };
-}
-
-document.getElementById('genPackBtn').addEventListener('click', () => {
-  const from = document.getElementById('packFrom').value;
-  const to = document.getElementById('packTo').value;
-  if (!from || !to) { alert('Pick a from and to date first.'); return; }
-
-  const unconfirmedInRange = entries.filter(e => !e.confirmed && e.date && e.date >= from && e.date <= to);
-  if (unconfirmedInRange.length) {
-    alert(unconfirmedInRange.length + ' entr' + (unconfirmedInRange.length === 1 ? 'y' : 'ies') + ' in this range still need reviewing/confirming before they can go in a pack.');
-    return;
-  }
-
-  const pack = buildPack(from, to);
-  if (!pack) { alert('No confirmed entries in that date range.'); return; }
-
-  const refNum = `DW-${from.replace(/-/g,'')}-${to.replace(/-/g,'')}`;
-  document.getElementById('formPanel').innerHTML = `
+  return `
     <div class="report-doc" id="printArea">
       <div class="lh-bar">
         <img src="../dgc-logo-dark.png" alt="DGC" class="lh-logo">
@@ -476,32 +498,139 @@ document.getElementById('genPackBtn').addEventListener('click', () => {
         </div>
       </div>
       <hr class="lh-rule">
-      <div class="report-title">
-        <h2>Dayworks Timesheet Summary</h2>
-        <span class="report-ref">Ref: ${esc(refNum)}</span>
-      </div>
+      <div class="report-title"><h2>Dayworks Timesheet Summary</h2><span class="report-ref">Ref: ${esc(refNum)}</span></div>
       <div class="report-meta">
-        <div class="rm-cell"><div class="rmc-label">Period</div><div class="rmc-val">${fmtDate(pack.from)} &ndash; ${fmtDate(pack.to)}</div></div>
-        <div class="rm-cell"><div class="rmc-label">Entries</div><div class="rmc-val">${pack.count}</div></div>
+        <div class="rm-cell"><div class="rmc-label">Period</div><div class="rmc-val">${fmtDate(from)} &ndash; ${fmtDate(to)}</div></div>
+        <div class="rm-cell"><div class="rmc-label">Entries</div><div class="rmc-val">${rows.length}</div></div>
         <div class="rm-cell"><div class="rmc-label">Prepared</div><div class="rmc-val">${fmtDate(new Date().toISOString().slice(0,10))}</div></div>
       </div>
-      ${pack.bodyHtml}
-      <div class="grand-total">Total hours, all sites: ${pack.grandTotal}</div>
-      <div class="report-footer">
-        This document summarises dayworks hours recorded by Drainage &amp; Groundwork Contractors Limited operatives, evidenced by the original signed timesheets. Ref: ${esc(refNum)}
-      </div>
-    </div>
+      ${body}
+      <div class="grand-total">Total hours, all sites: ${grandTotal}</div>
+      <div class="report-footer">This document summarises dayworks hours recorded by Drainage &amp; Groundwork Contractors Limited operatives, evidenced by the original signed timesheets. Ref: ${esc(refNum)}</div>
+    </div>`;
+}
+
+function showSendPreview(pool, from, to) {
+  const refNum = `DW-${from.replace(/-/g,'')}-${to.replace(/-/g,'')}`;
+  const main = document.getElementById('mainArea');
+  main.innerHTML = buildPackHtml(pool, from, to, refNum) + `
     <div class="report-actions">
       <button class="btn-print" onclick="window.print()">&#128438; Print / Save PDF</button>
-      <button class="btn-secondary" onclick="renderList(); document.getElementById('formPanel').innerHTML='<p class=\\'empty-state\\'>Select an entry.</p>'">&larr; Back to list</button>
-    </div>
-  `;
+      <button class="btn-primary" id="confirmSendBtn">&#10003; Confirm &amp; send — file this away</button>
+      <button class="btn-secondary" id="cancelSendBtn">Cancel</button>
+    </div>`;
+  document.getElementById('cancelSendBtn').addEventListener('click', render);
+  document.getElementById('confirmSendBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('confirmSendBtn');
+    btn.disabled = true; btn.textContent = 'Filing away…';
+    try {
+      for (const e of pool) {
+        await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: refNum }));
+      }
+      state.job = null; state.name = null; state.tab = 'current';
+      render();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = '✓ Confirm & send — file this away';
+      alert('Send failed partway through: ' + err.message + ' — check Historic/Current for what went through before retrying the rest.');
+    }
+  });
+}
+
+// ---------------------------------------------------------------
+// Upload tab
+// ---------------------------------------------------------------
+function renderUpload() {
+  document.getElementById('mainArea').innerHTML = `
+    <div class="upload-zone" id="uploadZone">
+      <span id="uploadZoneLabel">&#128247; Drop timesheet photos here, or click to choose<br>
+      <span style="font-size:0.78rem">(AI reading needs Ash's Claude API key set up first — new uploads land in Current under "${NO_JOB}" for you to categorise)</span></span>
+      <input type="file" id="fileInput" accept="image/*" multiple>
+    </div>`;
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('fileInput').addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
+  ['dragover', 'dragleave', 'drop'].forEach(evt => zone.addEventListener(evt, e => e.preventDefault()));
+  zone.addEventListener('dragover', () => zone.classList.add('drag'));
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => { zone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+}
+async function handleFiles(files) {
+  const imgFiles = [...files].filter(f => f.type.startsWith('image/'));
+  if (!imgFiles.length) return;
+  const label = document.getElementById('uploadZoneLabel');
+  let done = 0;
+  for (const file of imgFiles) {
+    label.textContent = `Uploading ${done + 1} of ${imgFiles.length}…`;
+    try {
+      const path = await uploadImageFile(file);
+      const saved = await insertRow({
+        imagePath: path, name: '', date: '', weekEnding: '', site: '',
+        start: '08:00', finish: '16:30', hours: null, confirmed: false, flagged: true,
+        note: 'Just uploaded — AI reading is not wired up yet. Type in what the sheet says.'
+      });
+      entries.push(saved);
+    } catch (err) { alert('Upload failed for ' + file.name + ': ' + err.message); }
+    done++;
+  }
+  state.tab = 'current'; state.job = NO_JOB; state.name = null;
+  render();
+}
+
+// ---------------------------------------------------------------
+// Historic tab
+// ---------------------------------------------------------------
+function renderHistoric() {
+  const sent = entries.filter(e => e.sentAt);
+  const byBatch = {};
+  sent.forEach(e => { (byBatch[e.sentBatchRef || '(unknown batch)'] = byBatch[e.sentBatchRef || '(unknown batch)'] || []).push(e); });
+  const refs = Object.keys(byBatch).sort().reverse();
+
+  const main = document.getElementById('mainArea');
+  if (!refs.length) { main.innerHTML = '<p class="empty-state">Nothing sent yet — sent packs will show up here.</p>'; return; }
+
+  if (state.historicRef && byBatch[state.historicRef]) {
+    const rows = byBatch[state.historicRef];
+    const dates = rows.map(r => r.date).filter(Boolean).sort();
+    main.innerHTML = `
+      <div class="crumb"><button id="crumbHist">Historic</button><span class="sep">/</span><span>${esc(state.historicRef)}</span></div>
+      ${buildPackHtml(rows, dates[0], dates[dates.length - 1], state.historicRef)}
+      <div class="report-actions"><button class="btn-print" onclick="window.print()">&#128438; Print / Save PDF</button></div>`;
+    document.getElementById('crumbHist').addEventListener('click', () => { state.historicRef = null; render(); });
+    return;
+  }
+
+  main.innerHTML = refs.map(ref => {
+    const rows = byBatch[ref];
+    const dates = rows.map(r => r.date).filter(Boolean).sort();
+    const hrs = rows.reduce((s, r) => s + (r.hours || 0), 0);
+    const sentWhen = rows[0].sentAt ? new Date(rows[0].sentAt).toLocaleDateString('en-GB') : '—';
+    return `<div class="hist-batch" data-ref="${esc(ref)}">
+      <div class="hb-ref">${esc(ref)}</div>
+      <div class="hb-meta">${fmtDate(dates[0])} – ${fmtDate(dates[dates.length-1])} · ${rows.length} entries · ${hrs} hours · sent ${sentWhen}</div>
+    </div>`;
+  }).join('');
+  main.querySelectorAll('.hist-batch').forEach(el => {
+    el.addEventListener('click', () => { state.historicRef = el.dataset.ref; render(); });
+  });
+}
+
+// ---------------------------------------------------------------
+document.querySelectorAll('.dw-navbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.tab = btn.dataset.tab; state.job = null; state.name = null; state.historicRef = null;
+    render();
+  });
 });
 
 (async function boot() {
-  document.getElementById('entryList').innerHTML = '<p class="empty-state">Loading…</p>';
-  const ok = await loadEntries();
-  if (ok) { populateSiteFilter(); renderList(); }
+  try {
+    await detectSentColumns();
+    await loadEntries();
+    render();
+  } catch (err) {
+    document.getElementById('mainArea').innerHTML =
+      `<p class="empty-state">Couldn't load entries — has the dgc_dayworks_entries table been created yet?<br><span style="font-size:0.72rem;color:var(--red)">${esc(err.message)}</span></p>`;
+  }
 })();
 </script>
 </body>
