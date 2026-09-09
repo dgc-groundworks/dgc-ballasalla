@@ -9,7 +9,8 @@ let staffList = [];
 let showLeft = false;
 
 const SKILLS = [
-  'Groundworker', 'Digger Driver (Competent)', 'Digger Driver (Not Confident)',
+  'Groundworker', 'Skilled Labourer', 'Unskilled Labourer',
+  'Digger Driver (Competent)', 'Digger Driver (Not Confident)',
   'Building Works', 'Concrete', 'Drainage', 'Management', 'NRV',
 ];
 
