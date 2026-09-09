@@ -1502,6 +1502,7 @@ function resWeeks(job) {
     const e = new Date(s);    e.setDate(s.getDate() + 4);
     const fmt = d => d.getDate() + ' ' + d.toLocaleString('en-GB', { month: 'short' });
     const startIso = s.toISOString().slice(0, 10);
+    const endIso = e.toISOString().slice(0, 10);
     const dayLabel = subWeek
       ? (totalDays > 0 ? `${totalDays}d · ` : '') + fmt(s) + '–' + fmt(e)
       : 'W' + (i + 1) + ' · ' + fmt(s) + '–' + fmt(e);
@@ -1510,7 +1511,7 @@ function resWeeks(job) {
       startIso,
       wkNum: isoWeekNum(startIso),
       label: dayLabel,
-      isPast: startIso < today,
+      isPast: endIso < today, // past only when the Friday end date is before today
       subWeek,
     });
   }
