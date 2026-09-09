@@ -28,6 +28,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .test-banner{background:#dc2626;color:#fff;font-size:0.68rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:4px}
 .back-btn{display:flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bord);border-radius:7px;padding:6px 12px;color:var(--muted);font-size:0.82rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:all .15s;font-family:inherit}
 .back-btn:hover{border-color:var(--accent);color:var(--accent)}
+.back-inline{display:inline-flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bord);border-radius:7px;padding:8px 16px;color:var(--text);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px}
+.back-inline:hover{border-color:var(--accent);color:var(--accent)}
 .theme-toggle-btn{background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em;margin-left:auto}
 
 .dw-nav{background:var(--surf);border-bottom:1px solid var(--bord);padding:0 16px;display:flex;gap:4px;position:sticky;top:45px;z-index:9}
@@ -74,12 +76,26 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .day-row{background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px 14px;margin-bottom:8px}
 .day-row.flagged{border-color:var(--accent);background:rgba(245,158,11,.06)}
 .day-row .dr-date{font-weight:800;margin-bottom:8px}
-.day-row .dr-fields{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end}
+.day-row .dr-fields{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end}
 .day-row label{display:flex;flex-direction:column;gap:3px;font-size:0.7rem;color:var(--muted)}
-input[type=text],input[type=date],input[type=time]{background:var(--bg);border:1px solid var(--bord);border-radius:6px;padding:7px 9px;color:var(--text);font-size:0.85rem;font-family:inherit;outline:none;width:100%}
+input[type=text],input[type=date],input[type=time],input[type=number]{background:var(--bg);border:1px solid var(--bord);border-radius:6px;padding:7px 9px;color:var(--text);font-size:0.85rem;font-family:inherit;outline:none;width:100%}
 input:focus{border-color:var(--accent)}
 .day-row .dr-hours{font-weight:800;color:var(--accent);white-space:nowrap;padding-bottom:7px}
 .flag-note{background:rgba(245,158,11,.1);border:1px solid var(--accent);border-radius:6px;padding:7px 10px;font-size:0.76rem;color:var(--accent);margin-bottom:8px}
+
+/* Person summary (top of the week/photo view) */
+.person-summary{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:18px 20px;margin-bottom:22px}
+.ps-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.ps-head h2{font-size:1.1rem;font-weight:800}
+.ps-range{color:var(--muted);font-size:0.85rem}
+.ps-week{margin-bottom:14px}
+.ps-week-label{font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:6px}
+.ps-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.ps-table th{text-align:left;padding:5px 8px;font-size:0.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--bord)}
+.ps-table td{padding:5px 8px;border-bottom:1px solid var(--bord)}
+.ps-table tr:last-child td{border-bottom:none}
+.ps-total-row td{font-weight:800;background:var(--surf2)}
+.ps-grand{text-align:right;font-weight:900;font-size:0.95rem;margin-top:8px;color:var(--accent)}
 
 .btn-save{background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit}
 .btn-primary{background:var(--accent);color:#1a1d27;border:none;padding:10px 22px;border-radius:6px;font-size:0.9rem;font-weight:800;cursor:pointer;font-family:inherit}
@@ -178,35 +194,36 @@ function sbHeaders(extra) {
 }
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtDate(iso) { return iso ? iso.split('-').reverse().join('/') : '—'; }
-// Ash, 8 Sep 2026: "usually 30 mins for a 7+ hour day and none for a
-// 4 hour day" — matches how the subcontractors write their own Hours
-// column (they've already deducted lunch when the shift's long enough
-// to need one). No stated cutoff between 4h and 7h, so 6h is used as
-// the threshold (standard "over 6 hours needs a break" convention) —
-// flagged to Ash as a judgment call, not something he specified exactly.
-const LUNCH_THRESHOLD_HOURS = 6;
-const LUNCH_MINS = 30;
-function lunchMinsFor(start, finish) {
+// Ash, 9 Sep 2026: lunch is now a field the PM can see and change on
+// every entry, not just a silent guess. This function is only the
+// DEFAULT shown before anyone touches it — "30 mins for a 7+ hour day
+// and none for a 4 hour day." Nothing was stated for the gap between 4h
+// and 7h, so it defaults to 0 there rather than inventing an assumed
+// break. Once staff are writing their own hours on the sheet, or the PM
+// can see what was actually taken, the field gets edited to match —
+// that's the whole point of making it editable instead of fixed.
+function rawMins(start, finish) {
   if (!start || !finish) return 0;
   const [sh, sm] = start.split(':').map(Number);
   const [fh, fm] = finish.split(':').map(Number);
   let mins = (fh * 60 + fm) - (sh * 60 + sm);
   if (mins < 0) mins += 24 * 60;
-  return (mins / 60) >= LUNCH_THRESHOLD_HOURS ? LUNCH_MINS : 0;
+  return mins;
 }
-function calcHours(start, finish) {
+function defaultLunchMins(start, finish) {
+  if (!start || !finish) return 0;
+  return (rawMins(start, finish) / 60) >= 7 ? 30 : 0;
+}
+function calcHours(start, finish, lunchMins) {
   if (!start || !finish) return null;
-  const [sh, sm] = start.split(':').map(Number);
-  const [fh, fm] = finish.split(':').map(Number);
-  let mins = (fh * 60 + fm) - (sh * 60 + sm);
-  if (mins < 0) mins += 24 * 60;
-  return Math.round(((mins - lunchMinsFor(start, finish)) / 60) * 100) / 100;
+  const lunch = (lunchMins === null || lunchMins === undefined || lunchMins === '') ? defaultLunchMins(start, finish) : Number(lunchMins);
+  return Math.round(((rawMins(start, finish) - lunch) / 60) * 100) / 100;
 }
 function daySummaryLine(e) {
   const d = e.date ? new Date(e.date + 'T12:00:00') : null;
   const dayLabel = d ? d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : 'No date set';
   const timeStr = (e.start && e.finish) ? `${e.start} to ${e.finish}` : 'time not set';
-  const lunch = lunchMinsFor(e.start, e.finish);
+  const lunch = e.lunch == null ? defaultLunchMins(e.start, e.finish) : e.lunch;
   const lunchStr = (e.start && e.finish) ? `, ${lunch} min lunch` : '';
   const hoursStr = e.hours == null ? '—' : e.hours;
   return `${dayLabel} — ${timeStr}${lunchStr} — ${hoursStr} hours${e.description ? ' — ' + esc(e.description) : ''}`;
@@ -253,16 +270,19 @@ function rowToEntry(r) {
     site: r.site || '', start: r.start_time || '', finish: r.finish_time || '',
     hours: r.hours == null ? null : Number(r.hours), confirmed: !!r.confirmed, flagged: !!r.flagged,
     note: r.note || '', description: r.description || '',
+    lunch: r.lunch_mins == null ? null : Number(r.lunch_mins),
     sentAt: r.sent_at || null, sentBatchRef: r.sent_batch_ref || null
   };
 }
-// sent_at/sent_batch_ref were added after this table's first version —
-// detected once at boot so this still works before Ash runs that ALTER
-// TABLE, instead of every save silently failing with an unknown-column
-// error. PostgREST rejects an insert/select naming a column that
-// doesn't exist yet, even as null, so these can't just always be sent.
+// sent_at/sent_batch_ref/lunch_mins were each added after this table's
+// first version — detected once at boot so this still works before Ash
+// runs the matching ALTER TABLE, instead of every save silently failing
+// with an unknown-column error. PostgREST rejects an insert/select
+// naming a column that doesn't exist yet, even as null, so these can't
+// just always be sent.
 let sentColumnsExist = true;
 let descriptionColumnExists = true;
+let lunchColumnExists = true;
 async function detectSentColumns() {
   try {
     const r = await fetch(REST + '?select=sent_at&limit=1', { headers: sbHeaders() });
@@ -272,6 +292,10 @@ async function detectSentColumns() {
     const r2 = await fetch(REST + '?select=description&limit=1', { headers: sbHeaders() });
     descriptionColumnExists = r2.ok;
   } catch (e) { descriptionColumnExists = false; }
+  try {
+    const r3 = await fetch(REST + '?select=lunch_mins&limit=1', { headers: sbHeaders() });
+    lunchColumnExists = r3.ok;
+  } catch (e) { lunchColumnExists = false; }
 }
 
 function entryToRow(e) {
@@ -282,6 +306,7 @@ function entryToRow(e) {
   };
   if (sentColumnsExist) { row.sent_at = e.sentAt || null; row.sent_batch_ref = e.sentBatchRef || null; }
   if (descriptionColumnExists) { row.description = e.description || ''; }
+  if (lunchColumnExists) { row.lunch_mins = e.lunch == null ? null : e.lunch; }
   return row;
 }
 
@@ -364,6 +389,7 @@ function renderJobsLevel(main) {
       <button class="btn-primary" id="sendBtn" ${anyUnready || !pool.length || !sentColumnsExist ? 'disabled' : ''}>Send to client</button>
     </div>
     ${!sentColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Can't file sent packs into Historic yet — run this in the Job Planner's SQL Editor first:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists sent_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists sent_batch_ref text;</code></p>` : ''}
+    ${!lunchColumnExists ? `<p class="flag-note" style="max-width:none">&#9888; The editable lunch field won't save yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists lunch_mins integer;</code></p>` : ''}
   `;
 
   if (!Object.keys(byJob).length) {
@@ -398,6 +424,7 @@ function renderNamesLevel(main) {
   rows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
 
   let html = `
+    <button class="back-inline" id="backToJobs">&#8592; Back</button>
     <div class="crumb">
       <button id="crumbJobs">Jobs</button><span class="sep">/</span><span>${esc(state.job)}</span>
     </div>
@@ -418,6 +445,7 @@ function renderNamesLevel(main) {
   html += '</div>';
   main.innerHTML = html;
 
+  document.getElementById('backToJobs').addEventListener('click', () => { state.job = null; render(); });
   document.getElementById('crumbJobs').addEventListener('click', () => { state.job = null; render(); });
   main.querySelectorAll('.name-row').forEach(row => {
     row.addEventListener('click', () => { state.name = row.dataset.name; state.weekIndex = 0; render(); });
@@ -437,11 +465,13 @@ function renderWeeksLevel(main) {
   const images = [...new Set(weekRows.map(r => r.image))];
 
   let html = `
+    <button class="back-inline" id="backToNames">&#8592; Back</button>
     <div class="crumb">
       <button id="crumbJobs">Jobs</button><span class="sep">/</span>
       <button id="crumbNames">${esc(state.job)}</button><span class="sep">/</span>
       <span>${esc(state.name)}</span>
     </div>
+    ${personSummaryHtml(rows, state.name)}
     <div class="week-nav">
       <button id="wkPrev" ${state.weekIndex <= 0 ? 'disabled' : ''}>&lsaquo; Previous week</button>
       <div class="wn-label">${wk === '(no date yet)' ? 'No date set' : 'Week of ' + fmtDate(wk)} (${state.weekIndex + 1} of ${weekKeys.length}) — ${weekTotal}h</div>
@@ -458,12 +488,58 @@ function renderWeeksLevel(main) {
   `;
   main.innerHTML = html;
 
+  document.getElementById('backToNames').addEventListener('click', () => { state.name = null; render(); });
   document.getElementById('crumbJobs').addEventListener('click', () => { state.job = null; state.name = null; render(); });
   document.getElementById('crumbNames').addEventListener('click', () => { state.name = null; render(); });
   document.getElementById('wkPrev').addEventListener('click', () => { state.weekIndex--; render(); });
   document.getElementById('wkNext').addEventListener('click', () => { state.weekIndex++; render(); });
 
   weekRows.forEach(e => wireDayRow(e));
+}
+
+// Summary block at the top of a person's page: name + overall date
+// range, then every week (1, 2, 3…) as its own Mon-Fri style table
+// (start/finish/lunch/hours/jobsite), a total per week, then one grand
+// total for the whole payment cycle — before the week-by-week photo
+// editor underneath. Always covers ALL of this person's unsent weeks,
+// not just whichever week the editor below is currently showing.
+function personSummaryHtml(rows, name) {
+  const dated = rows.filter(r => r.date).map(r => r.date).sort();
+  const from = dated[0] || null, to = dated.length ? dated[dated.length - 1] : null;
+  const byWeek = {};
+  rows.forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date yet)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
+  const weekKeys = Object.keys(byWeek).sort();
+  let body = '', grand = 0;
+  weekKeys.forEach((wkKey, i) => {
+    const wrows = byWeek[wkKey].slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const total = wrows.reduce((s, r) => s + (r.hours || 0), 0);
+    grand += total;
+    body += `
+      <div class="ps-week">
+        <div class="ps-week-label">Week ${i + 1}${wkKey === '(no date yet)' ? ' — no date set' : ' — w/c ' + fmtDate(wkKey)}</div>
+        <table class="ps-table">
+          <thead><tr><th>Day</th><th>Start</th><th>Finish</th><th>Lunch</th><th>Hours</th><th>Jobsite</th></tr></thead>
+          <tbody>
+            ${wrows.map(r => {
+              const d = r.date ? new Date(r.date + 'T12:00:00') : null;
+              const dayLabel = d ? d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }) : 'No date';
+              const lunch = r.lunch == null ? defaultLunchMins(r.start, r.finish) : r.lunch;
+              return `<tr><td>${esc(dayLabel)}</td><td>${esc(r.start) || '—'}</td><td>${esc(r.finish) || '—'}</td><td>${(r.start && r.finish) ? lunch + ' min' : '—'}</td><td>${r.hours == null ? '—' : r.hours}</td><td>${esc(r.site) || '—'}</td></tr>`;
+            }).join('')}
+            <tr class="ps-total-row"><td colspan="4">Week ${i + 1} total</td><td colspan="2">${total}h</td></tr>
+          </tbody>
+        </table>
+      </div>`;
+  });
+  return `
+    <div class="person-summary">
+      <div class="ps-head">
+        <h2>${esc(name)}</h2>
+        <span class="ps-range">${from ? fmtDate(from) + ' – ' + fmtDate(to) : 'No dates set yet'}</span>
+      </div>
+      ${body || '<p class="empty-state" style="padding:20px 0">No entries yet.</p>'}
+      <div class="ps-grand">Total hours this payment cycle: ${grand}</div>
+    </div>`;
 }
 
 function dayRowHtml(e) {
@@ -479,6 +555,7 @@ function dayRowHtml(e) {
         <label>Date<input type="date" class="dr-input" data-f="date" value="${esc(e.date)}"></label>
         <label>Start<input type="time" class="dr-input" data-f="start" value="${esc(e.start)}"></label>
         <label>Finish<input type="time" class="dr-input" data-f="finish" value="${esc(e.finish)}"></label>
+        <label>Lunch (mins)<input type="number" min="0" step="5" class="dr-input" data-f="lunch" data-manual="${e.lunch != null ? '1' : '0'}" value="${e.lunch == null ? defaultLunchMins(e.start, e.finish) : e.lunch}"></label>
         <span class="dr-hours" data-hours>${e.hours == null ? '—' : e.hours}h</span>
       </div>
       <label style="margin-top:8px">Description of work<input type="text" class="dr-input" data-f="description" value="${esc(e.description)}" placeholder="e.g. Slab prep, pour, drainage…"></label>
@@ -499,14 +576,24 @@ function wireDayRow(e) {
   if (!row) return;
   const startEl = row.querySelector('[data-f=start]'), finishEl = row.querySelector('[data-f=finish]');
   const dateEl = row.querySelector('[data-f=date]'), descEl = row.querySelector('[data-f=description]');
+  const lunchEl = row.querySelector('[data-f=lunch]');
   const recalc = () => {
-    row.querySelector('[data-hours]').textContent = (calcHours(startEl.value, finishEl.value) ?? '—') + 'h';
+    row.querySelector('[data-hours]').textContent = (calcHours(startEl.value, finishEl.value, lunchEl.value) ?? '—') + 'h';
     row.querySelector('[data-summary]').textContent = daySummaryLine({
       date: dateEl.value, start: startEl.value, finish: finishEl.value,
-      hours: calcHours(startEl.value, finishEl.value), description: descEl.value
+      lunch: lunchEl.value === '' ? null : Number(lunchEl.value),
+      hours: calcHours(startEl.value, finishEl.value, lunchEl.value), description: descEl.value
     });
   };
-  [startEl, finishEl, dateEl, descEl].forEach(el => el.addEventListener('change', recalc));
+  // Lunch auto-fills from the 7+/4hr presumption whenever start/finish
+  // change — but only until the PM types into the lunch field directly.
+  // Once they've touched it, their figure sticks even if times change.
+  lunchEl.addEventListener('input', () => { lunchEl.dataset.manual = '1'; recalc(); });
+  [startEl, finishEl].forEach(el => el.addEventListener('change', () => {
+    if (lunchEl.dataset.manual !== '1') lunchEl.value = defaultLunchMins(startEl.value, finishEl.value);
+    recalc();
+  }));
+  [dateEl, descEl].forEach(el => el.addEventListener('change', recalc));
 
   row.querySelector('[data-save]').addEventListener('click', async () => {
     const btn = row.querySelector('[data-save]');
@@ -521,11 +608,12 @@ function wireDayRow(e) {
       name: row.querySelector('.dr-name').value.trim(),
       date: dateEl.value,
       start: startEl.value, finish: finishEl.value,
+      lunch: lunchEl.value === '' ? 0 : Number(lunchEl.value),
       site: siteVal,
       description: descEl.value.trim(),
       confirmed: true, flagged: false, note: ''
     });
-    updated.hours = calcHours(updated.start, updated.finish);
+    updated.hours = calcHours(updated.start, updated.finish, updated.lunch);
     try {
       await saveEntry(e.id, updated);
       render();
