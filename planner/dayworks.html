@@ -99,9 +99,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .day-row.conflict{border-color:var(--red)}
 .conflict-note{background:rgba(239,68,68,.1);border:1px solid var(--red);border-radius:6px;padding:10px 12px;font-size:0.8rem;color:var(--red);margin-bottom:10px;line-height:1.5}
 .conflict-compare{display:flex;flex-direction:column;gap:10px;margin-top:10px}
-.conflict-item{background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:8px;color:var(--text)}
+.conflict-item{background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:8px;color:var(--text);max-width:360px}
 .conflict-item-label{font-size:0.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:800;margin-bottom:6px}
-.conflict-item img{width:100%;max-height:220px;object-fit:contain;background:#000;border-radius:4px;margin-bottom:6px;display:block}
+.conflict-item img{width:100%;height:auto;max-height:400px;object-fit:contain;border-radius:4px;margin-bottom:6px;display:block}
 .conflict-item-text{font-size:0.78rem;line-height:1.4}
 /* Plain "1fr" grid tracks don't actually shrink below their content's
    natural width (a well-known CSS Grid default) — native date/time
