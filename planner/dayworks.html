@@ -47,23 +47,22 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .send-bar .sb-range{font-weight:800;font-size:1rem}
 .send-bar .sb-sub{font-size:0.78rem;color:var(--muted);margin-top:2px}
 
-.alert-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex-shrink:0;box-shadow:0 0 0 3px rgba(245,158,11,.25)}
+.alert-dot{display:inline-block;vertical-align:middle;width:9px;height:9px;border-radius:50%;background:var(--accent);flex-shrink:0;box-shadow:0 0 0 3px rgba(245,158,11,.25)}
 
-/* Sidebar: Job -> Names, always visible, no drill-down pages */
-.dw-layout{display:flex;gap:20px;align-items:flex-start}
-.dw-sidebar{width:250px;flex-shrink:0;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:14px;position:sticky;top:100px;max-height:calc(100vh - 120px);overflow-y:auto}
-.dw-content{flex:1;min-width:0}
-@media(max-width:800px){.dw-layout{flex-direction:column}.dw-sidebar{width:100%;position:static;max-height:none}}
-.sb-job{margin-bottom:16px}
-.sb-job:last-child{margin-bottom:0}
-.sb-job-hdr{display:flex;align-items:center;gap:6px;font-weight:800;font-size:0.85rem;text-transform:uppercase;letter-spacing:.03em;color:var(--text);padding:4px 6px;margin-bottom:6px}
-.sb-job-hdr .sb-job-hours{margin-left:auto;font-weight:700;color:var(--muted);font-size:0.75rem;text-transform:none;letter-spacing:0}
-.sb-names{display:flex;flex-direction:column;gap:2px}
-.sb-name-btn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:none;border-radius:6px;padding:8px 10px;color:var(--text);font-size:0.85rem;font-family:inherit;cursor:pointer}
-.sb-name-btn:hover{background:var(--surf2)}
-.sb-name-btn.active{background:var(--accent);color:#1a1d27;font-weight:700}
-.sb-name-btn .nr-hours{margin-left:auto;font-size:0.75rem;color:var(--muted)}
-.sb-name-btn.active .nr-hours{color:#1a1d27;opacity:.75}
+/* Overview: one wide table per job (Name / Date range / Ground Workers /
+   Total hours), spanning the page — replaces the old narrow sidebar list. */
+.overview-section{margin-bottom:24px}
+.overview-hdr{display:flex;align-items:center;gap:8px;font-weight:800;font-size:0.95rem;text-transform:uppercase;letter-spacing:.03em;color:var(--text);margin-bottom:10px}
+.overview-hdr .oh-hours{margin-left:auto;color:var(--muted);font-size:0.8rem;font-weight:700;text-transform:none;letter-spacing:0}
+.overview-table{width:100%;border-collapse:collapse;background:var(--surf);border:1px solid var(--bord);border-radius:10px;overflow:hidden;table-layout:fixed}
+.overview-table th{text-align:left;padding:10px 16px;font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--bord);background:var(--surf2)}
+.overview-table td{padding:12px 16px;border-bottom:1px solid var(--bord);font-size:0.9rem}
+.overview-table tr:last-child td{border-bottom:none}
+.overview-row{cursor:pointer;transition:background .15s}
+.overview-row:hover td{background:var(--surf2)}
+.overview-row.active td{background:var(--accent);color:#1a1d27}
+.overview-row .or-hours{font-weight:800;color:var(--accent)}
+.overview-row.active .or-hours{color:#1a1d27}
 
 /* Week view */
 .week-nav{display:flex;align-items:center;gap:10px;margin-bottom:16px}
@@ -90,9 +89,9 @@ input:focus{border-color:var(--accent)}
 .ps-range{color:var(--muted);font-size:0.85rem}
 .ps-week{margin-bottom:14px}
 .ps-week-label{font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:6px}
-.ps-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.ps-table{width:100%;border-collapse:collapse;font-size:0.82rem;table-layout:fixed}
 .ps-table th{text-align:left;padding:5px 8px;font-size:0.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--bord)}
-.ps-table td{padding:5px 8px;border-bottom:1px solid var(--bord)}
+.ps-table td{padding:5px 8px;border-bottom:1px solid var(--bord);word-wrap:break-word}
 .ps-table tr:last-child td{border-bottom:none}
 .ps-total-row td{font-weight:800;background:var(--surf2)}
 .ps-grand{text-align:right;font-weight:900;font-size:0.95rem;margin-top:8px;color:var(--accent)}
@@ -154,7 +153,7 @@ input:focus{border-color:var(--accent)}
 .photo-page img{max-width:100%;border:1px solid var(--bord);border-radius:6px}
 
 @media print {
-  .topbar,.dw-nav,.report-actions,.dw-sidebar{display:none!important}
+  .topbar,.dw-nav,.report-actions{display:none!important}
   body{background:#fff}
   .dw-main{padding:0;max-width:100%}
   .report-doc{box-shadow:none;border-radius:0;padding:20mm 18mm;max-width:100%;margin:0}
@@ -375,10 +374,10 @@ function render() {
   else renderCurrent();
 }
 
-// Ash, 9 Sep 2026: no more click-through "Jobs" page then "Names" page —
-// Ballasalla/Quay West and everyone under them sit as one list down the
-// left side at all times, and clicking a name loads their hours on the
-// right. Nothing to navigate "back" out of any more.
+// Ash, 9 Sep 2026: replaced the narrow left-hand list with one wide
+// table per job — Name / Date range / Ground Workers / Total hours —
+// running most of the page width. Clicking a row loads that person's
+// detail below, same as before.
 function renderCurrent() {
   const main = document.getElementById('mainArea');
   const pool = unsent();
@@ -398,38 +397,7 @@ function renderCurrent() {
     state.name = null;
   }
 
-  let sidebarHtml = '<div class="dw-sidebar">';
-  if (!Object.keys(byJob).length) {
-    sidebarHtml += '<p class="empty-state" style="padding:20px 10px">Nothing to review yet.</p>';
-  } else {
-    Object.keys(byJob).sort().forEach(job => {
-      const rows = byJob[job];
-      const byName = {};
-      rows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
-      const jobFlagged = rows.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site));
-      const jobHours = rows.reduce((s, r) => s + (r.hours || 0), 0);
-      sidebarHtml += `
-        <div class="sb-job">
-          <div class="sb-job-hdr">${jobFlagged ? '<span class="alert-dot" title="Needs checking"></span>' : ''}${esc(job)}<span class="sb-job-hours">${jobHours}h</span></div>
-          <div class="sb-names">`;
-      Object.keys(byName).sort().forEach(name => {
-        const rs = byName[name];
-        const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site));
-        const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
-        const active = state.job === job && state.name === name;
-        sidebarHtml += `
-            <button class="sb-name-btn ${active ? 'active' : ''}" data-job="${esc(job)}" data-name="${esc(name)}">
-              ${flagged ? '<span class="alert-dot" title="Needs checking"></span>' : ''}
-              <span>${esc(name)}</span>
-              <span class="nr-hours">${hrs}h</span>
-            </button>`;
-      });
-      sidebarHtml += `</div></div>`;
-    });
-  }
-  sidebarHtml += '</div>';
-
-  let contentHtml = `
+  let html = `
     <div class="send-bar">
       <div class="sb-info">
         <div class="sb-range">${from ? fmtDate(from) + ' – ' + fmtDate(to) : 'No dated entries yet'}</div>
@@ -441,21 +409,53 @@ function renderCurrent() {
     ${!lunchColumnExists ? `<p class="flag-note" style="max-width:none">&#9888; The editable lunch field won't save yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists lunch_mins integer;</code></p>` : ''}
   `;
 
+  if (!Object.keys(byJob).length) {
+    html += '<p class="empty-state">Upload some timesheets to get started.</p>';
+  } else {
+    Object.keys(byJob).sort().forEach(job => {
+      const rows = byJob[job];
+      const byName = {};
+      rows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
+      const jobHours = rows.reduce((s, r) => s + (r.hours || 0), 0);
+      html += `
+        <div class="overview-section">
+          <div class="overview-hdr">${esc(job)}<span class="oh-hours">${jobHours} hours</span></div>
+          <table class="overview-table">
+            <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
+            <thead><tr><th>Name</th><th>Date range</th><th>Ground Workers</th><th>Total hours</th></tr></thead>
+            <tbody>`;
+      Object.keys(byName).sort().forEach(name => {
+        const rs = byName[name];
+        const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site));
+        const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
+        const nDates = rs.map(r => r.date).filter(Boolean).sort();
+        const range = nDates.length ? fmtDate(nDates[0]) + ' – ' + fmtDate(nDates[nDates.length - 1]) : 'No dates yet';
+        const active = state.job === job && state.name === name;
+        html += `
+              <tr class="overview-row ${active ? 'active' : ''}" data-job="${esc(job)}" data-name="${esc(name)}">
+                <td>${flagged ? '<span class="alert-dot" title="Needs checking"></span> ' : ''}${esc(name)}</td>
+                <td>${range}</td>
+                <td>Ground Worker</td>
+                <td class="or-hours">${hrs}h</td>
+              </tr>`;
+      });
+      html += `</tbody></table></div>`;
+    });
+  }
+
   let selectedRows = null;
   if (state.job && state.name) {
     selectedRows = byJob[state.job].filter(e => (e.name || NO_NAME) === state.name);
-    contentHtml += personDetailHtml(selectedRows);
-  } else if (!Object.keys(byJob).length) {
-    contentHtml += '<p class="empty-state">Upload some timesheets to get started.</p>';
-  } else {
-    contentHtml += '<p class="empty-state">Pick a name on the left to review their timesheets.</p>';
+    html += personDetailHtml(selectedRows);
   }
 
-  main.innerHTML = `<div class="dw-layout">${sidebarHtml}<div class="dw-content">${contentHtml}</div></div>`;
+  main.innerHTML = html;
 
-  main.querySelectorAll('.sb-name-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      state.job = btn.dataset.job; state.name = btn.dataset.name; state.weekIndex = 0; render();
+  main.querySelectorAll('.overview-row').forEach(row => {
+    row.addEventListener('click', () => {
+      state.job = row.dataset.job; state.name = row.dataset.name; state.weekIndex = 0; render();
+      const detail = document.querySelector('.person-summary');
+      if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
   const sendBtn = document.getElementById('sendBtn');
@@ -524,6 +524,7 @@ function personSummaryHtml(rows, name) {
       <div class="ps-week">
         <div class="ps-week-label">Week ${i + 1}${wkKey === '(no date yet)' ? ' — no date set' : ' — w/c ' + fmtDate(wkKey)}</div>
         <table class="ps-table">
+          <colgroup><col style="width:24%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:10%"><col style="width:33%"></colgroup>
           <thead><tr><th>Day</th><th>Start</th><th>Finish</th><th>Lunch</th><th>Hours</th><th>Jobsite</th></tr></thead>
           <tbody>
             ${wrows.map(r => {
