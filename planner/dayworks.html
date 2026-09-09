@@ -24,7 +24,7 @@
 [data-theme="light"] .topbar h1{color:#f59e0b}
 [data-theme="light"] .back-btn{color:#8ab0cc;border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.08)}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;overflow-x:hidden}
 
 .topbar{background:var(--surf);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
 .topbar h1{font-size:1rem;font-weight:700;color:var(--accent)}
@@ -92,15 +92,23 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .day-row .dr-task-hdr{font-size:1rem;font-weight:800;color:var(--accent);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bord)}
 
 /* Same-person date clash — two different photos both claiming one real
-   day. Shown side by side so it can be resolved by eye, never guessed. */
+   day. Stacked (not side by side) so it's never pushed off-screen on a
+   phone — a flex row here was overflowing past the edge of the screen
+   instead of wrapping, because the day-row's own grid below was forcing
+   the whole row wider than the viewport (see the dr-fields fix). */
 .day-row.conflict{border-color:var(--red)}
 .conflict-note{background:rgba(239,68,68,.1);border:1px solid var(--red);border-radius:6px;padding:10px 12px;font-size:0.8rem;color:var(--red);margin-bottom:10px;line-height:1.5}
-.conflict-compare{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
-.conflict-item{flex:1;min-width:160px;background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:8px;color:var(--text)}
+.conflict-compare{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.conflict-item{background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:8px;color:var(--text)}
 .conflict-item-label{font-size:0.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:800;margin-bottom:6px}
-.conflict-item img{width:100%;height:90px;object-fit:cover;border-radius:4px;margin-bottom:6px;display:block}
+.conflict-item img{width:100%;max-height:220px;object-fit:contain;background:#000;border-radius:4px;margin-bottom:6px;display:block}
 .conflict-item-text{font-size:0.78rem;line-height:1.4}
-.day-row .dr-fields{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end}
+/* Plain "1fr" grid tracks don't actually shrink below their content's
+   natural width (a well-known CSS Grid default) — native date/time
+   inputs resist shrinking on mobile, so this was quietly forcing the
+   entire day-row, and everything inside it, wider than the screen.
+   minmax(0,1fr) lets the columns actually compress instead. */
+.day-row .dr-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:8px;align-items:end}
 .day-row label{display:flex;flex-direction:column;gap:3px;font-size:0.7rem;color:var(--muted)}
 input[type=text],input[type=date],input[type=time],input[type=number]{background:var(--bg);border:1px solid var(--bord);border-radius:6px;padding:7px 9px;color:var(--text);font-size:0.85rem;font-family:inherit;outline:none;width:100%}
 input:focus{border-color:var(--accent)}
