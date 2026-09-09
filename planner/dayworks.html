@@ -28,8 +28,6 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .test-banner{background:#dc2626;color:#fff;font-size:0.68rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:4px}
 .back-btn{display:flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bord);border-radius:7px;padding:6px 12px;color:var(--muted);font-size:0.82rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:all .15s;font-family:inherit}
 .back-btn:hover{border-color:var(--accent);color:var(--accent)}
-.back-inline{display:inline-flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bord);border-radius:7px;padding:8px 16px;color:var(--text);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px}
-.back-inline:hover{border-color:var(--accent);color:var(--accent)}
 .theme-toggle-btn{background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em;margin-left:auto}
 
 .dw-nav{background:var(--surf);border-bottom:1px solid var(--bord);padding:0 16px;display:flex;gap:4px;position:sticky;top:45px;z-index:9}
@@ -37,7 +35,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .dw-navbtn:hover{color:var(--text)}
 .dw-navbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-.dw-main{padding:20px 24px;max-width:1100px;margin:0 auto}
+.dw-main{padding:20px 24px;max-width:1300px;margin:0 auto}
 .empty-state{padding:60px 20px;text-align:center;color:var(--muted);font-size:0.9rem}
 .crumb{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:0.85rem;color:var(--muted)}
 .crumb button{background:none;border:none;color:var(--accent);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.85rem;padding:0}
@@ -49,21 +47,23 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .send-bar .sb-range{font-weight:800;font-size:1rem}
 .send-bar .sb-sub{font-size:0.78rem;color:var(--muted);margin-top:2px}
 
-/* Job cards */
-.job-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-.job-card{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s}
-.job-card:hover{border-color:var(--accent)}
-.job-card .jc-name{font-weight:800;font-size:1rem;display:flex;align-items:center;gap:8px}
-.job-card .jc-meta{font-size:0.78rem;color:var(--muted);margin-top:6px}
 .alert-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex-shrink:0;box-shadow:0 0 0 3px rgba(245,158,11,.25)}
 
-/* Name list */
-.name-list{display:flex;flex-direction:column;gap:8px}
-.name-row{background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s}
-.name-row:hover{border-color:var(--accent)}
-.name-row .nr-name{font-weight:700;flex:1}
-.name-row .nr-hours{color:var(--accent);font-weight:800;font-size:0.9rem}
-.name-row .nr-arrow{color:var(--muted)}
+/* Sidebar: Job -> Names, always visible, no drill-down pages */
+.dw-layout{display:flex;gap:20px;align-items:flex-start}
+.dw-sidebar{width:250px;flex-shrink:0;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:14px;position:sticky;top:100px;max-height:calc(100vh - 120px);overflow-y:auto}
+.dw-content{flex:1;min-width:0}
+@media(max-width:800px){.dw-layout{flex-direction:column}.dw-sidebar{width:100%;position:static;max-height:none}}
+.sb-job{margin-bottom:16px}
+.sb-job:last-child{margin-bottom:0}
+.sb-job-hdr{display:flex;align-items:center;gap:6px;font-weight:800;font-size:0.85rem;text-transform:uppercase;letter-spacing:.03em;color:var(--text);padding:4px 6px;margin-bottom:6px}
+.sb-job-hdr .sb-job-hours{margin-left:auto;font-weight:700;color:var(--muted);font-size:0.75rem;text-transform:none;letter-spacing:0}
+.sb-names{display:flex;flex-direction:column;gap:2px}
+.sb-name-btn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:none;border-radius:6px;padding:8px 10px;color:var(--text);font-size:0.85rem;font-family:inherit;cursor:pointer}
+.sb-name-btn:hover{background:var(--surf2)}
+.sb-name-btn.active{background:var(--accent);color:#1a1d27;font-weight:700}
+.sb-name-btn .nr-hours{margin-left:auto;font-size:0.75rem;color:var(--muted)}
+.sb-name-btn.active .nr-hours{color:#1a1d27;opacity:.75}
 
 /* Week view */
 .week-nav{display:flex;align-items:center;gap:10px;margin-bottom:16px}
@@ -98,8 +98,10 @@ input:focus{border-color:var(--accent)}
 .ps-grand{text-align:right;font-weight:900;font-size:0.95rem;margin-top:8px;color:var(--accent)}
 
 .btn-save{background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit}
-.btn-primary{background:var(--accent);color:#1a1d27;border:none;padding:10px 22px;border-radius:6px;font-size:0.9rem;font-weight:800;cursor:pointer;font-family:inherit}
-.btn-primary:disabled{opacity:.4;cursor:default}
+/* Highlighted (glowing) only when actually actionable — flat and dim
+   otherwise, so it's obvious at a glance whether there's anything to send. */
+.btn-primary{background:var(--accent);color:#1a1d27;border:none;padding:10px 22px;border-radius:6px;font-size:0.9rem;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 0 0 3px rgba(245,158,11,.3);transition:opacity .15s,box-shadow .15s}
+.btn-primary:disabled{opacity:.35;cursor:default;box-shadow:none}
 .btn-secondary{background:var(--surf2);color:var(--muted);border:1px solid var(--bord);padding:8px 16px;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit}
 .btn-danger{background:none;border:1px solid rgba(239,68,68,.4);color:var(--red);padding:7px 12px;border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit}
 
@@ -144,11 +146,21 @@ input:focus{border-color:var(--accent)}
 .btn-print{background:#1a2a3f;color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
 .btn-print:hover{background:#243552}
 
+/* Original timesheet photos, appended after the branded summary so the
+   whole thing — figures AND the handwriting they came from — prints/
+   saves as ONE PDF. */
+.photo-page{max-width:900px;margin:24px auto;text-align:center}
+.photo-page-hdr{font-size:0.78rem;color:var(--muted);margin-bottom:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.photo-page img{max-width:100%;border:1px solid var(--bord);border-radius:6px}
+
 @media print {
-  .topbar,.dw-nav,.report-actions{display:none!important}
+  .topbar,.dw-nav,.report-actions,.dw-sidebar{display:none!important}
   body{background:#fff}
   .dw-main{padding:0;max-width:100%}
   .report-doc{box-shadow:none;border-radius:0;padding:20mm 18mm;max-width:100%;margin:0}
+  .photo-page{page-break-before:always;padding:14mm 10mm;max-width:100%;margin:0}
+  .photo-page-hdr{color:#4a6080}
+  .photo-page img{border:1px solid #c8d4e0;max-height:230mm}
   @page{margin:0}
 }
 </style>
@@ -363,14 +375,12 @@ function render() {
   else renderCurrent();
 }
 
+// Ash, 9 Sep 2026: no more click-through "Jobs" page then "Names" page —
+// Ballasalla/Quay West and everyone under them sit as one list down the
+// left side at all times, and clicking a name loads their hours on the
+// right. Nothing to navigate "back" out of any more.
 function renderCurrent() {
   const main = document.getElementById('mainArea');
-  if (!state.job) { renderJobsLevel(main); return; }
-  if (!state.name) { renderNamesLevel(main); return; }
-  renderWeeksLevel(main);
-}
-
-function renderJobsLevel(main) {
   const pool = unsent();
   const byJob = {};
   pool.forEach(e => { (byJob[baseJob(e.site)] = byJob[baseJob(e.site)] || []).push(e); });
@@ -379,81 +389,82 @@ function renderJobsLevel(main) {
   const from = dates[0], to = dates[dates.length - 1];
   const anyUnready = pool.some(e => e.flagged || !e.confirmed || siteNamesMultipleJobs(e.site));
   const totalHours = pool.reduce((s, e) => s + (e.hours || 0), 0);
+  const canSend = pool.length > 0 && !anyUnready && sentColumnsExist;
 
-  let html = `
+  // If whatever was selected has since been sent/removed, drop back to
+  // the picker rather than showing an empty detail pane.
+  if (state.job && !byJob[state.job]) { state.job = null; state.name = null; }
+  if (state.job && state.name && !byJob[state.job].some(e => (e.name || NO_NAME) === state.name)) {
+    state.name = null;
+  }
+
+  let sidebarHtml = '<div class="dw-sidebar">';
+  if (!Object.keys(byJob).length) {
+    sidebarHtml += '<p class="empty-state" style="padding:20px 10px">Nothing to review yet.</p>';
+  } else {
+    Object.keys(byJob).sort().forEach(job => {
+      const rows = byJob[job];
+      const byName = {};
+      rows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
+      const jobFlagged = rows.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site));
+      const jobHours = rows.reduce((s, r) => s + (r.hours || 0), 0);
+      sidebarHtml += `
+        <div class="sb-job">
+          <div class="sb-job-hdr">${jobFlagged ? '<span class="alert-dot" title="Needs checking"></span>' : ''}${esc(job)}<span class="sb-job-hours">${jobHours}h</span></div>
+          <div class="sb-names">`;
+      Object.keys(byName).sort().forEach(name => {
+        const rs = byName[name];
+        const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site));
+        const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
+        const active = state.job === job && state.name === name;
+        sidebarHtml += `
+            <button class="sb-name-btn ${active ? 'active' : ''}" data-job="${esc(job)}" data-name="${esc(name)}">
+              ${flagged ? '<span class="alert-dot" title="Needs checking"></span>' : ''}
+              <span>${esc(name)}</span>
+              <span class="nr-hours">${hrs}h</span>
+            </button>`;
+      });
+      sidebarHtml += `</div></div>`;
+    });
+  }
+  sidebarHtml += '</div>';
+
+  let contentHtml = `
     <div class="send-bar">
       <div class="sb-info">
         <div class="sb-range">${from ? fmtDate(from) + ' – ' + fmtDate(to) : 'No dated entries yet'}</div>
-        <div class="sb-sub">${pool.length} entr${pool.length === 1 ? 'y' : 'ies'} since the last send · ${totalHours} hours so far${anyUnready ? ' · some still need checking' : ' · all clear'}${!sentColumnsExist ? ' · Historic filing needs a database update first, see below' : ''}</div>
+        <div class="sb-sub">${pool.length} entr${pool.length === 1 ? 'y' : 'ies'} since the last send · ${totalHours} hours so far${anyUnready ? ' · some still need checking' : ' · all clear, ready to send'}${!sentColumnsExist ? ' · Historic filing needs a database update first, see below' : ''}</div>
       </div>
-      <button class="btn-primary" id="sendBtn" ${anyUnready || !pool.length || !sentColumnsExist ? 'disabled' : ''}>Send to client</button>
+      <button class="btn-primary" id="sendBtn" ${canSend ? '' : 'disabled'}>Send to client</button>
     </div>
     ${!sentColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Can't file sent packs into Historic yet — run this in the Job Planner's SQL Editor first:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists sent_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists sent_batch_ref text;</code></p>` : ''}
     ${!lunchColumnExists ? `<p class="flag-note" style="max-width:none">&#9888; The editable lunch field won't save yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists lunch_mins integer;</code></p>` : ''}
   `;
 
-  if (!Object.keys(byJob).length) {
-    html += '<p class="empty-state">Nothing to review — upload some timesheets to get started.</p>';
+  let selectedRows = null;
+  if (state.job && state.name) {
+    selectedRows = byJob[state.job].filter(e => (e.name || NO_NAME) === state.name);
+    contentHtml += personDetailHtml(selectedRows);
+  } else if (!Object.keys(byJob).length) {
+    contentHtml += '<p class="empty-state">Upload some timesheets to get started.</p>';
   } else {
-    html += '<div class="job-grid">';
-    Object.keys(byJob).sort().forEach(job => {
-      const rows = byJob[job];
-      const names = new Set(rows.map(r => r.name || NO_NAME));
-      const flagged = rows.some(r => r.flagged || !r.confirmed);
-      const hrs = rows.reduce((s, r) => s + (r.hours || 0), 0);
-      html += `
-        <div class="job-card" data-job="${esc(job)}">
-          <div class="jc-name">${flagged ? '<span class="alert-dot" title="Needs checking"></span>' : ''}${esc(job)}</div>
-          <div class="jc-meta">${names.size} ${names.size === 1 ? 'person' : 'people'} · ${hrs} hours</div>
-        </div>`;
-    });
-    html += '</div>';
+    contentHtml += '<p class="empty-state">Pick a name on the left to review their timesheets.</p>';
   }
-  main.innerHTML = html;
 
-  main.querySelectorAll('.job-card').forEach(card => {
-    card.addEventListener('click', () => { state.job = card.dataset.job; state.name = null; render(); });
+  main.innerHTML = `<div class="dw-layout">${sidebarHtml}<div class="dw-content">${contentHtml}</div></div>`;
+
+  main.querySelectorAll('.sb-name-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.job = btn.dataset.job; state.name = btn.dataset.name; state.weekIndex = 0; render();
+    });
   });
   const sendBtn = document.getElementById('sendBtn');
   if (sendBtn) sendBtn.addEventListener('click', () => showSendPreview(pool, from, to));
+
+  if (selectedRows) wirePersonDetail(selectedRows);
 }
 
-function renderNamesLevel(main) {
-  const rows = unsent().filter(e => baseJob(e.site) === state.job);
-  const byName = {};
-  rows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
-
-  let html = `
-    <button class="back-inline" id="backToJobs">&#8592; Back</button>
-    <div class="crumb">
-      <button id="crumbJobs">Jobs</button><span class="sep">/</span><span>${esc(state.job)}</span>
-    </div>
-    <div class="name-list">
-  `;
-  Object.keys(byName).sort().forEach(name => {
-    const rs = byName[name];
-    const flagged = rs.some(r => r.flagged || !r.confirmed);
-    const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
-    html += `
-      <div class="name-row" data-name="${esc(name)}">
-        ${flagged ? '<span class="alert-dot" title="Needs checking"></span>' : ''}
-        <span class="nr-name">${esc(name)}</span>
-        <span class="nr-hours">${hrs}h</span>
-        <span class="nr-arrow">&rsaquo;</span>
-      </div>`;
-  });
-  html += '</div>';
-  main.innerHTML = html;
-
-  document.getElementById('backToJobs').addEventListener('click', () => { state.job = null; render(); });
-  document.getElementById('crumbJobs').addEventListener('click', () => { state.job = null; render(); });
-  main.querySelectorAll('.name-row').forEach(row => {
-    row.addEventListener('click', () => { state.name = row.dataset.name; state.weekIndex = 0; render(); });
-  });
-}
-
-function renderWeeksLevel(main) {
-  const rows = unsent().filter(e => baseJob(e.site) === state.job && (e.name || NO_NAME) === state.name);
+function personDetailHtml(rows) {
   const byWeek = {};
   rows.forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date yet)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
   const weekKeys = Object.keys(byWeek).sort();
@@ -464,13 +475,7 @@ function renderWeeksLevel(main) {
   const weekTotal = weekRows.reduce((s, r) => s + (r.hours || 0), 0);
   const images = [...new Set(weekRows.map(r => r.image))];
 
-  let html = `
-    <button class="back-inline" id="backToNames">&#8592; Back</button>
-    <div class="crumb">
-      <button id="crumbJobs">Jobs</button><span class="sep">/</span>
-      <button id="crumbNames">${esc(state.job)}</button><span class="sep">/</span>
-      <span>${esc(state.name)}</span>
-    </div>
+  return `
     ${personSummaryHtml(rows, state.name)}
     <div class="week-nav">
       <button id="wkPrev" ${state.weekIndex <= 0 ? 'disabled' : ''}>&lsaquo; Previous week</button>
@@ -486,15 +491,16 @@ function renderWeeksLevel(main) {
       </div>
     </div>
   `;
-  main.innerHTML = html;
+}
 
-  document.getElementById('backToNames').addEventListener('click', () => { state.name = null; render(); });
-  document.getElementById('crumbJobs').addEventListener('click', () => { state.job = null; state.name = null; render(); });
-  document.getElementById('crumbNames').addEventListener('click', () => { state.name = null; render(); });
+function wirePersonDetail(rows) {
   document.getElementById('wkPrev').addEventListener('click', () => { state.weekIndex--; render(); });
   document.getElementById('wkNext').addEventListener('click', () => { state.weekIndex++; render(); });
-
-  weekRows.forEach(e => wireDayRow(e));
+  const byWeek = {};
+  rows.forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date yet)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
+  const weekKeys = Object.keys(byWeek).sort();
+  const wk = weekKeys[state.weekIndex];
+  (byWeek[wk] || []).forEach(e => wireDayRow(e));
 }
 
 // Summary block at the top of a person's page: name + overall date
@@ -676,15 +682,45 @@ function buildPackHtml(rows, from, to, refNum) {
     </div>`;
 }
 
+// All the original timesheet photos, one per page, appended after the
+// branded summary — so printing/saving makes ONE PDF that carries both
+// the readable figures and the handwriting they were read from.
+function buildPhotoPagesHtml(rows) {
+  const images = [...new Set(rows.map(r => r.image))];
+  if (!images.length) return '';
+  return images.map((img, i) => `
+    <div class="photo-page">
+      <div class="photo-page-hdr">Original timesheet photo — ${i + 1} of ${images.length}</div>
+      <img src="${img}" alt="Original timesheet photo">
+    </div>`).join('');
+}
+function buildFullPackHtml(rows, from, to, refNum) {
+  return buildPackHtml(rows, from, to, refNum) + buildPhotoPagesHtml(rows);
+}
+// A static page can't write straight to the shared drive itself — no
+// backend, and browsers deliberately block that. Setting the tab title
+// before printing is the closest equivalent: Chrome/Edge's "Print > Save
+// as PDF" dialog uses it as the suggested filename, so the PM still just
+// has to pick the folder once, same as saving any PDF today, but the
+// date-range name is filled in for them rather than "Dayworks (TEST BUILD)".
+function printPack(from, to) {
+  const prev = document.title;
+  document.title = `DGC Dayworks ${fmtDate(from).replace(/\//g, '-')} to ${fmtDate(to).replace(/\//g, '-')}`;
+  const reset = () => { document.title = prev; window.removeEventListener('afterprint', reset); };
+  window.addEventListener('afterprint', reset);
+  window.print();
+}
+
 function showSendPreview(pool, from, to) {
   const refNum = `DW-${from.replace(/-/g,'')}-${to.replace(/-/g,'')}`;
   const main = document.getElementById('mainArea');
-  main.innerHTML = buildPackHtml(pool, from, to, refNum) + `
+  main.innerHTML = buildFullPackHtml(pool, from, to, refNum) + `
     <div class="report-actions">
-      <button class="btn-print" onclick="window.print()">&#128438; Print / Save PDF</button>
+      <button class="btn-print" id="printPackBtn">&#128438; Print / Save PDF (summary + all photos, one file)</button>
       <button class="btn-primary" id="confirmSendBtn">&#10003; Confirm &amp; send — file this away</button>
       <button class="btn-secondary" id="cancelSendBtn">Cancel</button>
     </div>`;
+  document.getElementById('printPackBtn').addEventListener('click', () => printPack(from, to));
   document.getElementById('cancelSendBtn').addEventListener('click', render);
   document.getElementById('confirmSendBtn').addEventListener('click', async () => {
     const btn = document.getElementById('confirmSendBtn');
@@ -759,9 +795,10 @@ function renderHistoric() {
     const dates = rows.map(r => r.date).filter(Boolean).sort();
     main.innerHTML = `
       <div class="crumb"><button id="crumbHist">Historic</button><span class="sep">/</span><span>${esc(state.historicRef)}</span></div>
-      ${buildPackHtml(rows, dates[0], dates[dates.length - 1], state.historicRef)}
-      <div class="report-actions"><button class="btn-print" onclick="window.print()">&#128438; Print / Save PDF</button></div>`;
+      ${buildFullPackHtml(rows, dates[0], dates[dates.length - 1], state.historicRef)}
+      <div class="report-actions"><button class="btn-print" id="printHistBtn">&#128438; Print / Save PDF (summary + all photos, one file)</button></div>`;
     document.getElementById('crumbHist').addEventListener('click', () => { state.historicRef = null; render(); });
+    document.getElementById('printHistBtn').addEventListener('click', () => printPack(dates[0], dates[dates.length - 1]));
     return;
   }
 
