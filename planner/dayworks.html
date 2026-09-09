@@ -85,6 +85,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .week-photos img{width:100%;border-radius:8px;border:1px solid var(--bord);margin-bottom:10px}
 .day-row{background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px 14px;margin-bottom:8px}
 .day-row.flagged{border-color:var(--accent);background:rgba(245,158,11,.06)}
+/* Stacked flagged rows for the same photo look almost identical (same
+   times, same site) — this puts the one thing that actually tells them
+   apart, the job description, front and centre so it's harder to edit
+   the wrong row by mistake. */
+.day-row .dr-task-hdr{font-size:1rem;font-weight:800;color:var(--accent);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bord)}
 .day-row .dr-fields{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end}
 .day-row label{display:flex;flex-direction:column;gap:3px;font-size:0.7rem;color:var(--muted)}
 input[type=text],input[type=date],input[type=time],input[type=number]{background:var(--bg);border:1px solid var(--bord);border-radius:6px;padding:7px 9px;color:var(--text);font-size:0.85rem;font-family:inherit;outline:none;width:100%}
@@ -584,10 +589,11 @@ function dayRowHtml(e) {
   return `
     <div class="day-row ${e.flagged ? 'flagged' : ''}" data-id="${e.id}">
       ${e.flagged ? `<div class="flag-note">&#9888; ${esc(e.note || 'Check this against the photo.')}</div>` : ''}
+      <div class="dr-task-hdr" data-task-hdr>${esc(e.description) || '(no description yet)'}</div>
       <label style="margin-bottom:8px">Staff name (fix here if it's wrong)<input type="text" class="dr-input dr-name" value="${esc(e.name)}" placeholder="Staff name" style="font-weight:800;font-size:0.9rem"></label>
       <p data-summary style="font-size:0.82rem;color:var(--muted);margin-bottom:8px">${daySummaryLine(e)}</p>
       <div class="dr-fields">
-        <label>Date<input type="date" class="dr-input" data-f="date" value="${esc(e.date)}"></label>
+        <label>Date<input type="date" class="dr-input" data-f="date" autocomplete="off" value="${esc(e.date)}"></label>
         <label>Start<input type="time" class="dr-input" data-f="start" value="${esc(e.start)}"></label>
         <label>Finish<input type="time" class="dr-input" data-f="finish" value="${esc(e.finish)}"></label>
         <label>Lunch (mins)<input type="number" min="0" step="5" class="dr-input" data-f="lunch" data-manual="${e.lunch != null ? '1' : '0'}" value="${e.lunch == null ? defaultLunchMins(e.start, e.finish) : e.lunch}"></label>
@@ -620,6 +626,7 @@ function wireDayRow(e) {
       lunch: lunchEl.value === '' ? null : Number(lunchEl.value),
       hours: calcHours(startEl.value, finishEl.value, lunchEl.value), description: descEl.value
     });
+    row.querySelector('[data-task-hdr]').textContent = descEl.value || '(no description yet)';
   };
   // Lunch auto-fills from the 7+/4hr presumption whenever start/finish
   // change — but only until the PM types into the lunch field directly.
