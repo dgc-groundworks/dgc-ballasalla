@@ -6,6 +6,9 @@
 <title>Dayworks (TEST BUILD)</title>
 <script src="../staff/config.js"></script>
 <script src="theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root {
   --bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;
@@ -153,21 +156,11 @@ input:focus{border-color:var(--accent)}
 .btn-print{background:#1a2a3f;color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
 .btn-print:hover{background:#243552}
 
-/* Original timesheet photos, appended after the branded summary so the
-   whole thing — figures AND the handwriting they came from — prints/
-   saves as ONE PDF. */
-.photo-page{max-width:900px;margin:24px auto;text-align:center}
-.photo-page-hdr{font-size:0.78rem;color:var(--muted);margin-bottom:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
-.photo-page img{max-width:100%;border:1px solid var(--bord);border-radius:6px}
-
 @media print {
   .topbar,.dw-nav,.report-actions{display:none!important}
   body{background:#fff}
   .dw-main{padding:0;max-width:100%}
   .report-doc{box-shadow:none;border-radius:0;padding:20mm 18mm;max-width:100%;margin:0}
-  .photo-page{page-break-before:always;padding:14mm 10mm;max-width:100%;margin:0}
-  .photo-page-hdr{color:#4a6080}
-  .photo-page img{border:1px solid #c8d4e0;max-height:230mm}
   @page{margin:0}
 }
 </style>
@@ -330,7 +323,7 @@ function entryToRow(e) {
 }
 
 let entries = [];
-let state = { tab: 'current', job: null, name: null, weekIndex: 0 };
+let state = { tab: 'current', job: null, name: null, weekIndex: 0, histJob: null, histName: null, historicRef: null };
 
 async function loadEntries() {
   const r = await fetch(REST + '?select=*&order=work_date.desc.nullslast', { headers: sbHeaders() });
@@ -410,11 +403,11 @@ function renderCurrent() {
     <div class="send-bar">
       <div class="sb-info">
         <div class="sb-range">${from ? fmtDate(from) + ' – ' + fmtDate(to) : 'No dated entries yet'}</div>
-        <div class="sb-sub">${pool.length} entr${pool.length === 1 ? 'y' : 'ies'} since the last send · ${totalHours} hours so far${anyUnready ? ' · some still need checking' : ' · all clear, ready to send'}${!sentColumnsExist ? ' · Historic filing needs a database update first, see below' : ''}</div>
+        <div class="sb-sub">${pool.length} entr${pool.length === 1 ? 'y' : 'ies'} since the last save · ${totalHours} hours so far${anyUnready ? ' · some still need checking' : ' · all clear, ready to save'}${!sentColumnsExist ? ' · Historic filing needs a database update first, see below' : ''}</div>
       </div>
-      <button class="btn-primary" id="sendBtn" ${canSend ? '' : 'disabled'}>Send to client</button>
+      <button class="btn-primary" id="sendBtn" ${canSend ? '' : 'disabled'}>Save for client</button>
     </div>
-    ${!sentColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Can't file sent packs into Historic yet — run this in the Job Planner's SQL Editor first:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists sent_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists sent_batch_ref text;</code></p>` : ''}
+    ${!sentColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Can't file saved packs into Historic yet — run this in the Job Planner's SQL Editor first:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists sent_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists sent_batch_ref text;</code></p>` : ''}
     ${!lunchColumnExists ? `<p class="flag-note" style="max-width:none">&#9888; The editable lunch field won't save yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists lunch_mins integer;</code></p>` : ''}
   `;
 
@@ -434,45 +427,7 @@ function renderCurrent() {
   }
 
   // List page — every job as its own wide table.
-  let html = sendBarHtml;
-  if (!Object.keys(byJob).length) {
-    html += '<p class="empty-state">Upload some timesheets to get started.</p>';
-  } else {
-    Object.keys(byJob).sort().forEach(job => {
-      const rows = byJob[job];
-      const byName = {};
-      rows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
-      const jobHours = rows.reduce((s, r) => s + (r.hours || 0), 0);
-      html += `
-        <div class="overview-section">
-          <div class="overview-hdr">${esc(job)}<span class="oh-hours">${jobHours} hours</span></div>
-          <table class="overview-table">
-            <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
-            <thead><tr><th>Name</th><th>Date range</th><th>Ground Workers</th><th>Total hours</th></tr></thead>
-            <tbody>`;
-      Object.keys(byName).sort().forEach(name => {
-        const rs = byName[name];
-        const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site));
-        const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
-        const nDates = rs.map(r => r.date).filter(Boolean).sort();
-        const range = nDates.length ? fmtDate(nDates[0]) + ' – ' + fmtDate(nDates[nDates.length - 1]) : 'No dates yet';
-        html += `
-              <tr class="overview-row" data-job="${esc(job)}" data-name="${esc(name)}">
-                <td>${flagged ? '<span class="alert-dot" title="Needs checking"></span> ' : ''}${esc(name)}</td>
-                <td>${range}</td>
-                <td>Ground Worker</td>
-                <td class="or-hours">${hrs}h</td>
-              </tr>`;
-      });
-      html += `</tbody></table></div>`;
-    });
-    html += `
-      <table class="overview-table overview-total-table">
-        <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
-        <tbody><tr class="overview-total-row"><td colspan="3">Total:</td><td class="or-hours">${totalHours}h</td></tr></tbody>
-      </table>`;
-  }
-
+  let html = sendBarHtml + overviewTablesHtml(pool);
   main.innerHTML = html;
 
   main.querySelectorAll('.overview-row').forEach(row => {
@@ -482,6 +437,52 @@ function renderCurrent() {
   });
   const sendBtn = document.getElementById('sendBtn');
   if (sendBtn) sendBtn.addEventListener('click', () => showSendPreview(pool, from, to));
+}
+
+// Shared by the Current list and a Historic batch's own page — one wide
+// table per job (Name / Date range / Ground Workers / Total hours) plus
+// a grand total row. Rows carry data-job/data-name for the caller to wire.
+function overviewTablesHtml(rows) {
+  const byJob = {};
+  rows.forEach(e => { (byJob[baseJob(e.site)] = byJob[baseJob(e.site)] || []).push(e); });
+  if (!Object.keys(byJob).length) return '<p class="empty-state">Nothing here yet.</p>';
+
+  const totalHours = rows.reduce((s, e) => s + (e.hours || 0), 0);
+  let html = '';
+  Object.keys(byJob).sort().forEach(job => {
+    const jrows = byJob[job];
+    const byName = {};
+    jrows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
+    const jobHours = jrows.reduce((s, r) => s + (r.hours || 0), 0);
+    html += `
+      <div class="overview-section">
+        <div class="overview-hdr">${esc(job)}<span class="oh-hours">${jobHours} hours</span></div>
+        <table class="overview-table">
+          <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
+          <thead><tr><th>Name</th><th>Date range</th><th>Ground Workers</th><th>Total hours</th></tr></thead>
+          <tbody>`;
+    Object.keys(byName).sort().forEach(name => {
+      const rs = byName[name];
+      const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site));
+      const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
+      const nDates = rs.map(r => r.date).filter(Boolean).sort();
+      const range = nDates.length ? fmtDate(nDates[0]) + ' – ' + fmtDate(nDates[nDates.length - 1]) : 'No dates yet';
+      html += `
+            <tr class="overview-row" data-job="${esc(job)}" data-name="${esc(name)}">
+              <td>${flagged ? '<span class="alert-dot" title="Needs checking"></span> ' : ''}${esc(name)}</td>
+              <td>${range}</td>
+              <td>Ground Worker</td>
+              <td class="or-hours">${hrs}h</td>
+            </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+  html += `
+    <table class="overview-table overview-total-table">
+      <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
+      <tbody><tr class="overview-total-row"><td colspan="3">Total:</td><td class="or-hours">${totalHours}h</td></tr></tbody>
+    </table>`;
+  return html;
 }
 
 function personDetailHtml(rows) {
@@ -703,58 +704,189 @@ function buildPackHtml(rows, from, to, refNum) {
     </div>`;
 }
 
-// All the original timesheet photos, one per page, appended after the
-// branded summary — so printing/saving makes ONE PDF that carries both
-// the readable figures and the handwriting they were read from.
-function buildPhotoPagesHtml(rows) {
-  const images = [...new Set(rows.map(r => r.image))];
-  if (!images.length) return '';
-  return images.map((img, i) => `
-    <div class="photo-page">
-      <div class="photo-page-hdr">Original timesheet photo — ${i + 1} of ${images.length}</div>
-      <img src="${img}" alt="Original timesheet photo">
-    </div>`).join('');
-}
-function buildFullPackHtml(rows, from, to, refNum) {
-  return buildPackHtml(rows, from, to, refNum) + buildPhotoPagesHtml(rows);
-}
-// A static page can't write straight to the shared drive itself — no
+// A static page can't write straight to the shared drive on its own — no
 // backend, and browsers deliberately block that. Setting the tab title
-// before printing is the closest equivalent: Chrome/Edge's "Print > Save
-// as PDF" dialog uses it as the suggested filename, so the PM still just
-// has to pick the folder once, same as saving any PDF today, but the
-// date-range name is filled in for them rather than "Dayworks (TEST BUILD)".
+// before a manual print is the closest fallback equivalent (Chrome/Edge's
+// "Print > Save as PDF" dialog suggests it as the filename).
+function rangeLabel(from, to) {
+  return `${fmtDate(from).replace(/\//g, '-')} to ${fmtDate(to).replace(/\//g, '-')}`;
+}
 function printPack(from, to) {
   const prev = document.title;
-  document.title = `DGC Dayworks ${fmtDate(from).replace(/\//g, '-')} to ${fmtDate(to).replace(/\//g, '-')}`;
+  document.title = `DGC Dayworks ${rangeLabel(from, to)}`;
   const reset = () => { document.title = prev; window.removeEventListener('afterprint', reset); };
   window.addEventListener('afterprint', reset);
   window.print();
 }
 
+// ---------------------------------------------------------------
+// Real file output: a proper PDF (branded summary, same look as the
+// on-screen preview) + the original photos, bundled and — on Chrome/Edge
+// — written straight into the Daywork/Dandara folder via the File System
+// Access API. Safari/Firefox don't support writing to a chosen folder
+// from a webpage at all, so there it falls back to one zip download that
+// the PM extracts into a same-named folder themselves.
+// ---------------------------------------------------------------
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('dayworks-fs', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('handles');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('handles', 'readonly');
+    const r = tx.objectStore('handles').get(key);
+    r.onsuccess = () => resolve(r.result || null);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function idbSet(key, val) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+// Grabs (or asks Ash to pick, once) the Daywork/Dandara folder handle.
+// Must be called as the FIRST await after the click, before any slow
+// work — the browser only allows the picker/permission prompt while the
+// click's "user activation" is still fresh.
+async function getDandaraFolderHandle() {
+  if (!('showDirectoryPicker' in window)) return null;
+  let handle = await idbGet('dandaraFolder').catch(() => null);
+  if (handle) {
+    try {
+      const perm = await handle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') return handle;
+      if ((await handle.requestPermission({ mode: 'readwrite' })) === 'granted') return handle;
+    } catch (e) { /* handle gone (folder moved/deleted) — fall through to re-pick */ }
+    handle = null;
+  }
+  try {
+    handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    await idbSet('dandaraFolder', handle);
+    return handle;
+  } catch (e) {
+    return null; // user cancelled the picker
+  }
+}
+async function writeFileToDir(dirHandle, name, blob) {
+  const fh = await dirHandle.getFileHandle(name, { create: true });
+  const w = await fh.createWritable();
+  await w.write(blob);
+  await w.close();
+}
+// Renders the branded summary off-screen at full size, rasterises it
+// (html2canvas), then slices that image across as many A4 pages as
+// needed (the standard "negative-offset" trick for a tall single image).
+async function buildClientPdfBlob(rows, from, to, refLabel) {
+  const holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px;background:#fff';
+  holder.innerHTML = buildPackHtml(rows, from, to, refLabel);
+  const doc = holder.querySelector('.report-doc');
+  if (doc) { doc.style.boxShadow = 'none'; doc.style.borderRadius = '0'; doc.style.margin = '0'; }
+  document.body.appendChild(holder);
+  try {
+    const canvas = await html2canvas(holder, { scale: 2, backgroundColor: '#ffffff' });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgW = pageW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    let heightLeft = imgH, y = 0;
+    pdf.addImage(imgData, 'JPEG', 0, y, imgW, imgH);
+    heightLeft -= pageH;
+    while (heightLeft > 0) {
+      y = heightLeft - imgH;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, y, imgW, imgH);
+      heightLeft -= pageH;
+    }
+    return pdf.output('blob');
+  } finally {
+    holder.remove();
+  }
+}
+// Builds the PDF + gathers the photos, then either writes everything
+// straight into Daywork/Dandara/[range] (Chrome/Edge, once a folder is
+// chosen) or downloads one zip with the same contents for Safari/Firefox
+// (and for anyone who cancels the folder picker) to extract into place.
+async function saveClientPackToDisk(rows, from, to) {
+  const range = rangeLabel(from, to);
+  const dirHandle = await getDandaraFolderHandle(); // first, while the click is still fresh
+
+  const pdfBlob = await buildClientPdfBlob(rows, from, to, `DGC Dayworks Hours ${range}`);
+  const images = [...new Set(rows.map(r => r.image))];
+  const photos = [];
+  for (let i = 0; i < images.length; i++) {
+    const blob = await fetch(images[i]).then(r => r.blob());
+    const ext = (images[i].split('.').pop() || 'jpg').split('?')[0];
+    photos.push({ name: `Timesheet ${i + 1}.${ext}`, blob });
+  }
+
+  const zip = new JSZip();
+  zip.file(`DGC Dayworks ${range}.pdf`, pdfBlob);
+  const tsFolder = zip.folder(`DGC Timesheets ${range}`);
+  photos.forEach(p => tsFolder.file(p.name, p.blob));
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+  if (dirHandle) {
+    const dated = await dirHandle.getDirectoryHandle(range, { create: true });
+    await writeFileToDir(dated, `DGC Dayworks ${range}.pdf`, pdfBlob);
+    const tsDir = await dated.getDirectoryHandle(`DGC Timesheets ${range}`, { create: true });
+    for (const p of photos) await writeFileToDir(tsDir, p.name, p.blob);
+    await writeFileToDir(dated, `DGC Dayworks ${range}.zip`, zipBlob);
+    return { wroteToDisk: true, range };
+  }
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(zipBlob);
+  a.download = `DGC Dayworks ${range}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  return { wroteToDisk: false, range };
+}
+
 function showSendPreview(pool, from, to) {
-  const refNum = `DW-${from.replace(/-/g,'')}-${to.replace(/-/g,'')}`;
+  const range = rangeLabel(from, to);
+  const batchRef = `DGC Dayworks Hours ${range}`;
   const main = document.getElementById('mainArea');
-  main.innerHTML = buildFullPackHtml(pool, from, to, refNum) + `
+  main.innerHTML = buildPackHtml(pool, from, to, batchRef) + `
     <div class="report-actions">
-      <button class="btn-print" id="printPackBtn">&#128438; Print / Save PDF (summary + all photos, one file)</button>
-      <button class="btn-primary" id="confirmSendBtn">&#10003; Confirm &amp; send — file this away</button>
+      <button class="btn-primary" id="confirmSendBtn">&#10003; Save for client</button>
+      <button class="btn-print" id="printPackBtn">&#128438; Print / Save PDF manually</button>
       <button class="btn-secondary" id="cancelSendBtn">Cancel</button>
-    </div>`;
+    </div>
+    <p class="flag-note" id="saveStatus" style="max-width:none;display:none"></p>`;
   document.getElementById('printPackBtn').addEventListener('click', () => printPack(from, to));
   document.getElementById('cancelSendBtn').addEventListener('click', render);
   document.getElementById('confirmSendBtn').addEventListener('click', async () => {
     const btn = document.getElementById('confirmSendBtn');
-    btn.disabled = true; btn.textContent = 'Filing away…';
+    const status = document.getElementById('saveStatus');
+    status.style.display = 'block';
+    btn.disabled = true; btn.textContent = 'Saving…';
+    status.textContent = 'Building the PDF and gathering photos…';
     try {
+      const result = await saveClientPackToDisk(pool, from, to);
+      status.textContent = result.wroteToDisk
+        ? `Saved straight into the "${range}" folder in Daywork/Dandara.`
+        : `Downloaded "DGC Dayworks ${range}.zip" — extract it into a new folder named "${range}" inside Daywork/Dandara.`;
       for (const e of pool) {
-        await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: refNum }));
+        await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: batchRef }));
       }
-      state.job = null; state.name = null; state.tab = 'current';
-      render();
+      setTimeout(() => { state.job = null; state.name = null; state.tab = 'current'; render(); }, result.wroteToDisk ? 500 : 2200);
     } catch (err) {
-      btn.disabled = false; btn.textContent = '✓ Confirm & send — file this away';
-      alert('Send failed partway through: ' + err.message + ' — check Historic/Current for what went through before retrying the rest.');
+      btn.disabled = false; btn.textContent = '✓ Save for client';
+      status.textContent = 'Save failed: ' + err.message + ' — nothing has been marked as sent, safe to retry.';
     }
   });
 }
@@ -809,17 +941,10 @@ function renderHistoric() {
   const refs = Object.keys(byBatch).sort().reverse();
 
   const main = document.getElementById('mainArea');
-  if (!refs.length) { main.innerHTML = '<p class="empty-state">Nothing sent yet — sent packs will show up here.</p>'; return; }
+  if (!refs.length) { main.innerHTML = '<p class="empty-state">Nothing sent yet — saved packs will show up here.</p>'; return; }
 
   if (state.historicRef && byBatch[state.historicRef]) {
-    const rows = byBatch[state.historicRef];
-    const dates = rows.map(r => r.date).filter(Boolean).sort();
-    main.innerHTML = `
-      <div class="crumb"><button id="crumbHist">Historic</button><span class="sep">/</span><span>${esc(state.historicRef)}</span></div>
-      ${buildFullPackHtml(rows, dates[0], dates[dates.length - 1], state.historicRef)}
-      <div class="report-actions"><button class="btn-print" id="printHistBtn">&#128438; Print / Save PDF (summary + all photos, one file)</button></div>`;
-    document.getElementById('crumbHist').addEventListener('click', () => { state.historicRef = null; render(); });
-    document.getElementById('printHistBtn').addEventListener('click', () => printPack(dates[0], dates[dates.length - 1]));
+    renderHistoricBatch(byBatch[state.historicRef], state.historicRef);
     return;
   }
 
@@ -834,14 +959,61 @@ function renderHistoric() {
     </div>`;
   }).join('');
   main.querySelectorAll('.hist-batch').forEach(el => {
-    el.addEventListener('click', () => { state.historicRef = el.dataset.ref; render(); });
+    el.addEventListener('click', () => { state.historicRef = el.dataset.ref; state.histJob = null; state.histName = null; render(); });
+  });
+}
+
+// A sent batch browses exactly like the Current homepage — the same wide
+// job tables, click a name to see their page — just sourced from this
+// batch's rows instead of the unsent pool, and read-only (nothing here
+// should still be edited once it's gone to the client).
+function renderHistoricBatch(rows, ref) {
+  const main = document.getElementById('mainArea');
+  const dates = rows.map(r => r.date).filter(Boolean).sort();
+  const from = dates[0], to = dates[dates.length - 1];
+
+  if (state.histJob && state.histName) {
+    const selRows = rows.filter(e => baseJob(e.site) === state.histJob && (e.name || NO_NAME) === state.histName);
+    main.innerHTML = `
+      <div class="crumb"><button id="crumbHistList">Historic</button><span class="sep">/</span><button id="crumbHistBatch">${esc(ref)}</button><span class="sep">/</span><span>${esc(state.histName)}</span></div>
+      <button class="back-inline" id="backToHistBatch">&#8592; Back to ${esc(ref)}</button>
+      ${personSummaryHtml(selRows, state.histName)}
+      <div class="week-photos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
+        ${[...new Set(selRows.map(r => r.image))].map(img => `<img src="${img}" alt="Timesheet photo" style="width:100%;border-radius:8px;border:1px solid var(--bord)">`).join('')}
+      </div>`;
+    document.getElementById('crumbHistList').addEventListener('click', () => { state.historicRef = null; state.histJob = null; state.histName = null; render(); });
+    document.getElementById('crumbHistBatch').addEventListener('click', () => { state.histJob = null; state.histName = null; render(); });
+    document.getElementById('backToHistBatch').addEventListener('click', () => { state.histJob = null; state.histName = null; render(); });
+    return;
+  }
+
+  main.innerHTML = `
+    <div class="crumb"><button id="crumbHistList">Historic</button><span class="sep">/</span><span>${esc(ref)}</span></div>
+    <div class="send-bar">
+      <div class="sb-info">
+        <div class="sb-range">${fmtDate(from)} – ${fmtDate(to)}</div>
+        <div class="sb-sub">${rows.length} entries · ${rows.reduce((s, r) => s + (r.hours || 0), 0)} hours · sent ${rows[0].sentAt ? new Date(rows[0].sentAt).toLocaleDateString('en-GB') : '—'}</div>
+      </div>
+      <button class="btn-secondary" id="downloadHistBtn">Download PDF + photos again</button>
+    </div>
+    ${overviewTablesHtml(rows)}
+  `;
+  document.getElementById('crumbHistList').addEventListener('click', () => { state.historicRef = null; render(); });
+  document.getElementById('downloadHistBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('downloadHistBtn');
+    btn.disabled = true; btn.textContent = 'Preparing…';
+    try { await saveClientPackToDisk(rows, from, to); btn.textContent = 'Done'; }
+    catch (err) { alert('Could not prepare files: ' + err.message); btn.disabled = false; btn.textContent = 'Download PDF + photos again'; }
+  });
+  main.querySelectorAll('.overview-row').forEach(row => {
+    row.addEventListener('click', () => { state.histJob = row.dataset.job; state.histName = row.dataset.name; render(); });
   });
 }
 
 // ---------------------------------------------------------------
 document.querySelectorAll('.dw-navbtn').forEach(btn => {
   btn.addEventListener('click', () => {
-    state.tab = btn.dataset.tab; state.job = null; state.name = null; state.historicRef = null;
+    state.tab = btn.dataset.tab; state.job = null; state.name = null; state.historicRef = null; state.histJob = null; state.histName = null;
     render();
   });
 });
