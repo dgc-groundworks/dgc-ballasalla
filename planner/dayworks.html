@@ -653,7 +653,20 @@ function wireDayRow(e) {
     });
     updated.hours = calcHours(updated.start, updated.finish, updated.lunch);
     try {
-      await saveEntry(e.id, updated);
+      const saved = await saveEntry(e.id, updated);
+      // Filling in a date moves this row into a different week bucket than
+      // the one being edited — without this it looks like the save just
+      // made the entry vanish, because the view stays on the old (now
+      // possibly empty) week. Jump to wherever it actually landed instead.
+      if (state.job && state.name) {
+        const rows = unsent().filter(x => baseJob(x.site) === state.job && (x.name || NO_NAME) === state.name);
+        const byWeek = {};
+        rows.forEach(x => { const wk = x.date ? getMonday(x.date) : '(no date yet)'; (byWeek[wk] = byWeek[wk] || []).push(x); });
+        const weekKeys = Object.keys(byWeek).sort();
+        const savedWeek = saved.date ? getMonday(saved.date) : '(no date yet)';
+        const idx = weekKeys.indexOf(savedWeek);
+        if (idx >= 0) state.weekIndex = idx;
+      }
       render();
     } catch (err) {
       btn.disabled = false; status.textContent = 'Save failed: ' + err.message;
