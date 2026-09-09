@@ -115,6 +115,13 @@ input:focus{border-color:var(--accent)}
 .btn-secondary{background:var(--surf2);color:var(--muted);border:1px solid var(--bord);padding:8px 16px;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit}
 .btn-danger{background:none;border:1px solid rgba(239,68,68,.4);color:var(--red);padding:7px 12px;border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit}
 
+/* Warning popup when Save for client is clicked with missing/unchecked fields */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-box{background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:24px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.modal-box h3{font-size:1.05rem;margin-bottom:10px;color:var(--accent)}
+.modal-box p{font-size:0.88rem;color:var(--text);line-height:1.55;margin-bottom:20px}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px}
+
 /* Upload tab */
 .upload-zone{padding:40px 20px;border:2px dashed var(--bord);border-radius:10px;text-align:center;color:var(--muted);font-size:0.95rem;cursor:pointer;transition:all .15s}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);color:var(--accent);background:rgba(245,158,11,.06)}
@@ -390,7 +397,10 @@ function renderCurrent() {
   const from = dates[0], to = dates[dates.length - 1];
   const anyUnready = pool.some(e => e.flagged || !e.confirmed || siteNamesMultipleJobs(e.site));
   const totalHours = pool.reduce((s, e) => s + (e.hours || 0), 0);
-  const canSend = pool.length > 0 && !anyUnready && sentColumnsExist;
+  // Missing/unchecked fields no longer block the button outright — clicking
+  // with some still unready pops a warning (Save anyway / Cancel) instead.
+  // Only a genuinely empty pool or a missing database column still disables it.
+  const canSend = pool.length > 0 && sentColumnsExist;
 
   // If whatever was selected has since been sent/removed, drop back to
   // the picker rather than showing an empty detail page.
@@ -421,7 +431,7 @@ function renderCurrent() {
     `;
     document.getElementById('backToList').addEventListener('click', () => { state.name = null; render(); });
     const sendBtn = document.getElementById('sendBtn');
-    if (sendBtn) sendBtn.addEventListener('click', () => showSendPreview(pool, from, to));
+    if (sendBtn) sendBtn.addEventListener('click', () => attemptSaveForClient(pool, from, to, anyUnready));
     wirePersonDetail(selectedRows);
     return;
   }
@@ -436,7 +446,7 @@ function renderCurrent() {
     });
   });
   const sendBtn = document.getElementById('sendBtn');
-  if (sendBtn) sendBtn.addEventListener('click', () => showSendPreview(pool, from, to));
+  if (sendBtn) sendBtn.addEventListener('click', () => attemptSaveForClient(pool, from, to, anyUnready));
 }
 
 // Shared by the Current list and a Historic batch's own page — one wide
@@ -854,6 +864,33 @@ async function saveClientPackToDisk(rows, from, to) {
   a.click();
   a.remove();
   return { wroteToDisk: false, range };
+}
+
+// Ash, 10 Sep 2026: don't hard-block the button when something's still
+// missing or unchecked — warn instead, and let him decide. "Save anyway"
+// goes ahead with what's there; "Cancel" backs out so it can be fixed first.
+function showUnreadyModal(count, onSaveAnyway) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <h3>&#9888; Some fields are missing</h3>
+      <p>${count} ${count === 1 ? 'entry still needs' : 'entries still need'} a date, a confirmation, or a job split before this pack is fully accurate — some of it may be unreadable or not entered yet. You can save anyway and sort the rest later, or cancel and go check them first.</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="modalCancel">Cancel</button>
+        <button class="btn-primary" id="modalSaveAnyway">Save anyway</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  overlay.querySelector('#modalCancel').addEventListener('click', close);
+  overlay.querySelector('#modalSaveAnyway').addEventListener('click', () => { close(); onSaveAnyway(); });
+}
+function attemptSaveForClient(pool, from, to, anyUnready) {
+  if (!anyUnready) { showSendPreview(pool, from, to); return; }
+  const count = pool.filter(e => e.flagged || !e.confirmed || siteNamesMultipleJobs(e.site)).length;
+  showUnreadyModal(count, () => showSendPreview(pool, from, to));
 }
 
 function showSendPreview(pool, from, to) {
