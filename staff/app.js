@@ -739,53 +739,6 @@ async function buildWorkbook() {
     for (let ci = 1; ci <= LAST_COL; ci++) hiddenCell(fRow.getCell(ci), BG);
   }
 
-  // ── ROWS 5-6: stat labels + values (3 blocks; cols 12-21 dark fill) ──────────
-  const statDefs = [
-    { label: 'STAFF',     val: String(staff.length), fg: TEXT_C, bg: BG,    span: 3 },
-    { label: 'NET WAGES', val: fmt(totalNet),          fg: NET_FG, bg: SURF2, span: 4 },
-    { label: 'ADVANCES',  val: fmt(totalAdv),          fg: ADV_FG, bg: SURF2, span: 4 },
-  ];
-
-  const labRow = ws.addRow(zeros());
-  labRow.height = 16;
-  { let sc = 1;
-    statDefs.forEach(({ label, fg, bg, span }) => {
-      for (let ci = sc; ci < sc + span; ci++) {
-        const cell = labRow.getCell(ci);
-        if (ci === sc) {
-          cell.value     = `  ${label}`;
-          cell.fill      = fl(bg);
-          cell.font      = { color: { argb: fg }, size: 8, name: 'Calibri' };
-          cell.alignment = { horizontal: 'left', vertical: 'bottom', indent: 1 };
-        } else {
-          hiddenCell(cell, bg);
-        }
-      }
-      sc += span;
-    });
-    for (let ci = 12; ci <= LAST_COL; ci++) hiddenCell(labRow.getCell(ci), SURF2);
-  }
-
-  const valRow = ws.addRow(zeros());
-  valRow.height = 36;
-  { let sc = 1;
-    statDefs.forEach(({ val, fg, bg, span }) => {
-      for (let ci = sc; ci < sc + span; ci++) {
-        const cell = valRow.getCell(ci);
-        if (ci === sc) {
-          cell.value     = `  ${val}`;
-          cell.fill      = fl(bg);
-          cell.font      = { color: { argb: fg }, bold: true, size: 18, name: 'Calibri' };
-          cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
-        } else {
-          hiddenCell(cell, bg);
-        }
-      }
-      sc += span;
-    });
-    for (let ci = 12; ci <= LAST_COL; ci++) hiddenCell(valRow.getCell(ci), SURF2);
-  }
-
   // ── ROW 7: legend ─────────────────────────────────────────────────────────────
   const legRow = ws.addRow(zeros());
   legRow.height = 16;
