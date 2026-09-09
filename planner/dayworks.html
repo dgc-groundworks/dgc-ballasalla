@@ -85,7 +85,6 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .week-photos img{width:100%;border-radius:8px;border:1px solid var(--bord);margin-bottom:10px}
 .day-row{background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px 14px;margin-bottom:8px}
 .day-row.flagged{border-color:var(--accent);background:rgba(245,158,11,.06)}
-.day-row .dr-date{font-weight:800;margin-bottom:8px}
 .day-row .dr-fields{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end}
 .day-row label{display:flex;flex-direction:column;gap:3px;font-size:0.7rem;color:var(--muted)}
 input[type=text],input[type=date],input[type=time],input[type=number]{background:var(--bg);border:1px solid var(--bord);border-radius:6px;padding:7px 9px;color:var(--text);font-size:0.85rem;font-family:inherit;outline:none;width:100%}
@@ -585,9 +584,7 @@ function dayRowHtml(e) {
   return `
     <div class="day-row ${e.flagged ? 'flagged' : ''}" data-id="${e.id}">
       ${e.flagged ? `<div class="flag-note">&#9888; ${esc(e.note || 'Check this against the photo.')}</div>` : ''}
-      <div class="dr-date">
-        <input type="text" class="dr-name" value="${esc(e.name)}" placeholder="Staff name" style="font-weight:800;border:none;background:none;padding:0;margin-bottom:2px;font-size:0.9rem">
-      </div>
+      <label style="margin-bottom:8px">Staff name (fix here if it's wrong)<input type="text" class="dr-input dr-name" value="${esc(e.name)}" placeholder="Staff name" style="font-weight:800;font-size:0.9rem"></label>
       <p data-summary style="font-size:0.82rem;color:var(--muted);margin-bottom:8px">${daySummaryLine(e)}</p>
       <div class="dr-fields">
         <label>Date<input type="date" class="dr-input" data-f="date" value="${esc(e.date)}"></label>
@@ -601,9 +598,10 @@ function dayRowHtml(e) {
         <input type="text" class="dr-input" data-f="site" value="${esc(e.site)}" placeholder="Job/site" style="max-width:220px">
         ${area ? `<span style="font-size:0.75rem;color:var(--muted)">Area: ${esc(area)}</span>` : ''}
       </div>
-      <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <button class="btn-save" data-save>${e.confirmed && !e.flagged ? '&#10003; Confirmed' : 'Confirm & save'}</button>
         <button class="btn-danger" data-remove>Remove</button>
+        <button class="btn-secondary" data-reread title="Re-read this entry from the photo using AI" style="font-size:0.72rem;padding:6px 10px">&#8635; Re-read from photo</button>
         <span class="form-status" data-status style="font-size:0.76rem;color:var(--muted)"></span>
       </div>
     </div>`;
@@ -655,16 +653,23 @@ function wireDayRow(e) {
     try {
       const saved = await saveEntry(e.id, updated);
       // Filling in a date moves this row into a different week bucket than
-      // the one being edited — without this it looks like the save just
-      // made the entry vanish, because the view stays on the old (now
-      // possibly empty) week. Jump to wherever it actually landed instead.
+      // the one being edited. Ash, 10 Sep 2026: jumping to that new week
+      // every time made it look like the OTHER entries still waiting in
+      // the original "no date set" bucket had been deleted — they hadn't,
+      // the view had just moved away from them without saying so. Now it
+      // only moves on if the bucket being worked through is actually empty
+      // afterwards; otherwise it stays put so the rest of the batch can be
+      // confirmed one after another without jumping around.
       if (state.job && state.name) {
         const rows = unsent().filter(x => baseJob(x.site) === state.job && (x.name || NO_NAME) === state.name);
         const byWeek = {};
         rows.forEach(x => { const wk = x.date ? getMonday(x.date) : '(no date yet)'; (byWeek[wk] = byWeek[wk] || []).push(x); });
         const weekKeys = Object.keys(byWeek).sort();
-        const savedWeek = saved.date ? getMonday(saved.date) : '(no date yet)';
-        const idx = weekKeys.indexOf(savedWeek);
+        const originalWeek = e.date ? getMonday(e.date) : '(no date yet)';
+        const targetWeek = (byWeek[originalWeek] && byWeek[originalWeek].length > 0)
+          ? originalWeek
+          : (saved.date ? getMonday(saved.date) : '(no date yet)');
+        const idx = weekKeys.indexOf(targetWeek);
         if (idx >= 0) state.weekIndex = idx;
       }
       render();
@@ -677,6 +682,16 @@ function wireDayRow(e) {
     if (!confirm('Remove this entry permanently?')) return;
     try { await deleteRow(e.id); entries = entries.filter(x => x.id !== e.id); render(); }
     catch (err) { alert('Could not remove: ' + err.message); }
+  });
+
+  // Placeholder for re-reading a single entry straight from its photo via
+  // the Claude API — the button Ash asked for as a safety net for when a
+  // transcription looks wrong. Not wired up yet: needs Ash's own Anthropic
+  // API key + a Supabase Edge Function first (see the Obsidian spec).
+  // Left visible (not hidden) so it's ready to connect the moment that's
+  // in place, instead of quietly doing nothing.
+  row.querySelector('[data-reread]').addEventListener('click', () => {
+    alert('Re-reading from the photo needs the Claude API set up first (your own Anthropic API key + a Supabase Edge Function) — not wired up yet.\n\nFor now, compare the fields on the left against the photo on the right and correct them by hand.');
   });
 }
 
