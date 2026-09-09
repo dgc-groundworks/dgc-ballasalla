@@ -90,6 +90,16 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
    apart, the job description, front and centre so it's harder to edit
    the wrong row by mistake. */
 .day-row .dr-task-hdr{font-size:1rem;font-weight:800;color:var(--accent);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bord)}
+
+/* Same-person date clash — two different photos both claiming one real
+   day. Shown side by side so it can be resolved by eye, never guessed. */
+.day-row.conflict{border-color:var(--red)}
+.conflict-note{background:rgba(239,68,68,.1);border:1px solid var(--red);border-radius:6px;padding:10px 12px;font-size:0.8rem;color:var(--red);margin-bottom:10px;line-height:1.5}
+.conflict-compare{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.conflict-item{flex:1;min-width:160px;background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:8px;color:var(--text)}
+.conflict-item-label{font-size:0.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:800;margin-bottom:6px}
+.conflict-item img{width:100%;height:90px;object-fit:cover;border-radius:4px;margin-bottom:6px;display:block}
+.conflict-item-text{font-size:0.78rem;line-height:1.4}
 .day-row .dr-fields{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end}
 .day-row label{display:flex;flex-direction:column;gap:3px;font-size:0.7rem;color:var(--muted)}
 input[type=text],input[type=date],input[type=time],input[type=number]{background:var(--bg);border:1px solid var(--bord);border-radius:6px;padding:7px 9px;color:var(--text);font-size:0.85rem;font-family:inherit;outline:none;width:100%}
@@ -286,6 +296,34 @@ function jobDescription(site) {
   return s;
 }
 
+// Ash, 10 Sep 2026: two different physical timesheets both claimed
+// Nathan Swift's 1st/2nd September, with different hours — a genuine
+// double-billing risk the app was never catching on its own. Maps a
+// person's own entry id -> the OTHER entries of theirs sharing the same
+// real date, so it can be flagged and shown side by side instead of
+// relying on a manual audit to ever notice.
+function conflictsByDate(rows) {
+  const byDate = {};
+  rows.forEach(r => { if (r.date) (byDate[r.date] = byDate[r.date] || []).push(r); });
+  const map = {};
+  Object.values(byDate).forEach(group => {
+    if (group.length > 1) group.forEach(r => { map[r.id] = group.filter(x => x.id !== r.id); });
+  });
+  return map;
+}
+// Every id (across the whole pool) that needs attention before a pack is
+// accurate: flagged/unconfirmed/unsplit, OR a same-person date clash.
+function unreadyIds(pool) {
+  const ids = new Set();
+  pool.forEach(e => { if (e.flagged || !e.confirmed || siteNamesMultipleJobs(e.site)) ids.add(e.id); });
+  const byName = {};
+  pool.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
+  Object.values(byName).forEach(rs => {
+    Object.keys(conflictsByDate(rs)).forEach(id => ids.add(id));
+  });
+  return ids;
+}
+
 function rowToEntry(r) {
   return {
     id: r.id, image: STORAGE_PUBLIC + encodeURIComponent(r.image_path), imagePath: r.image_path,
@@ -399,7 +437,7 @@ function renderCurrent() {
 
   const dates = pool.map(e => e.date).filter(Boolean).sort();
   const from = dates[0], to = dates[dates.length - 1];
-  const anyUnready = pool.some(e => e.flagged || !e.confirmed || siteNamesMultipleJobs(e.site));
+  const anyUnready = unreadyIds(pool).size > 0;
   const totalHours = pool.reduce((s, e) => s + (e.hours || 0), 0);
   // Missing/unchecked fields no longer block the button outright — clicking
   // with some still unready pops a warning (Save anyway / Cancel) instead.
@@ -461,6 +499,12 @@ function overviewTablesHtml(rows) {
   rows.forEach(e => { (byJob[baseJob(e.site)] = byJob[baseJob(e.site)] || []).push(e); });
   if (!Object.keys(byJob).length) return '<p class="empty-state">Nothing here yet.</p>';
 
+  // Date-clash detection runs across ALL of a person's entries, not just
+  // the ones in whichever job table is being drawn — a clash can span
+  // two different photos filed under the same or different jobs.
+  const byNameAll = {};
+  rows.forEach(e => { (byNameAll[e.name || NO_NAME] = byNameAll[e.name || NO_NAME] || []).push(e); });
+
   const totalHours = rows.reduce((s, e) => s + (e.hours || 0), 0);
   let html = '';
   Object.keys(byJob).sort().forEach(job => {
@@ -477,7 +521,8 @@ function overviewTablesHtml(rows) {
           <tbody>`;
     Object.keys(byName).sort().forEach(name => {
       const rs = byName[name];
-      const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site));
+      const conflicts = conflictsByDate(byNameAll[name] || rs);
+      const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site) || conflicts[r.id]);
       const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
       const nDates = rs.map(r => r.date).filter(Boolean).sort();
       const range = nDates.length ? fmtDate(nDates[0]) + ' – ' + fmtDate(nDates[nDates.length - 1]) : 'No dates yet';
@@ -509,6 +554,7 @@ function personDetailHtml(rows) {
   const weekRows = (byWeek[wk] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const weekTotal = weekRows.reduce((s, r) => s + (r.hours || 0), 0);
   const images = [...new Set(weekRows.map(r => r.image))];
+  const conflictMap = conflictsByDate(rows);
 
   return `
     ${personSummaryHtml(rows, state.name)}
@@ -519,7 +565,7 @@ function personDetailHtml(rows) {
     </div>
     <div class="week-grid">
       <div>
-        ${weekRows.map(e => dayRowHtml(e)).join('')}
+        ${weekRows.map(e => dayRowHtml(e, conflictMap[e.id] || [])).join('')}
       </div>
       <div class="week-photos">
         ${images.map(img => `<img src="${img}" alt="Timesheet photo">`).join('')}
@@ -584,11 +630,29 @@ function personSummaryHtml(rows, name) {
     </div>`;
 }
 
-function dayRowHtml(e) {
+function dayRowHtml(e, conflicts) {
   const area = jobDescription(e.site);
+  const hasConflict = conflicts && conflicts.length > 0;
   return `
-    <div class="day-row ${e.flagged ? 'flagged' : ''}" data-id="${e.id}">
+    <div class="day-row ${e.flagged ? 'flagged' : ''} ${hasConflict ? 'conflict' : ''}" data-id="${e.id}">
       ${e.flagged ? `<div class="flag-note">&#9888; ${esc(e.note || 'Check this against the photo.')}</div>` : ''}
+      ${hasConflict ? `
+        <div class="conflict-note">
+          &#9888; ${esc(e.name)} already has ${conflicts.length === 1 ? 'another entry' : 'other entries'} dated ${fmtDate(e.date)} — a genuine double-billing risk. Check both against their photos before this goes to the client; only one is likely real for this day.
+          <div class="conflict-compare">
+            <div class="conflict-item">
+              <div class="conflict-item-label">This entry</div>
+              <img src="${e.image}" alt="This entry's photo">
+              <div class="conflict-item-text"><strong>${esc(e.description) || '(no description)'}</strong><br>${esc(e.start) || '—'}&ndash;${esc(e.finish) || '—'} &middot; ${e.hours == null ? '—' : e.hours}h</div>
+            </div>
+            ${conflicts.map(c => `
+              <div class="conflict-item">
+                <div class="conflict-item-label">Also dated ${fmtDate(c.date)}</div>
+                <img src="${c.image}" alt="Conflicting entry's photo">
+                <div class="conflict-item-text"><strong>${esc(c.description) || '(no description)'}</strong><br>${esc(c.start) || '—'}&ndash;${esc(c.finish) || '—'} &middot; ${c.hours == null ? '—' : c.hours}h</div>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
       <div class="dr-task-hdr" data-task-hdr>${esc(e.description) || '(no description yet)'}</div>
       <label style="margin-bottom:8px">Staff name (fix here if it's wrong)<input type="text" class="dr-input dr-name" value="${esc(e.name)}" placeholder="Staff name" style="font-weight:800;font-size:0.9rem"></label>
       <p data-summary style="font-size:0.82rem;color:var(--muted);margin-bottom:8px">${daySummaryLine(e)}</p>
@@ -910,7 +974,7 @@ function showUnreadyModal(count, onSaveAnyway) {
   overlay.innerHTML = `
     <div class="modal-box">
       <h3>&#9888; Some fields are missing</h3>
-      <p>${count} ${count === 1 ? 'entry still needs' : 'entries still need'} a date, a confirmation, or a job split before this pack is fully accurate — some of it may be unreadable or not entered yet. You can save anyway and sort the rest later, or cancel and go check them first.</p>
+      <p>${count} ${count === 1 ? 'entry still needs' : 'entries still need'} a date, a confirmation, a job split, or has the same date as another entry for that person before this pack is fully accurate. You can save anyway and sort the rest later, or cancel and go check them first.</p>
       <div class="modal-actions">
         <button class="btn-secondary" id="modalCancel">Cancel</button>
         <button class="btn-primary" id="modalSaveAnyway">Save anyway</button>
@@ -924,7 +988,7 @@ function showUnreadyModal(count, onSaveAnyway) {
 }
 function attemptSaveForClient(pool, from, to, anyUnready) {
   if (!anyUnready) { showSendPreview(pool, from, to); return; }
-  const count = pool.filter(e => e.flagged || !e.confirmed || siteNamesMultipleJobs(e.site)).length;
+  const count = unreadyIds(pool).size;
   showUnreadyModal(count, () => showSendPreview(pool, from, to));
 }
 
