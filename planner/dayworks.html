@@ -63,7 +63,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .overview-row.active td{background:var(--accent);color:#1a1d27}
 .overview-row .or-hours{font-weight:800;color:var(--accent)}
 .overview-row.active .or-hours{color:#1a1d27}
-.overview-grand{text-align:right;font-weight:900;font-size:1rem;color:var(--accent);margin-top:4px;padding:16px 20px;background:var(--surf);border:1px solid var(--bord);border-radius:10px}
+/* Same table/colgroup as .overview-table so its number sits directly
+   under the "Total hours" column above it, not just right-aligned loose. */
+.overview-total-table{margin-top:4px}
+.overview-total-row td{font-weight:900;font-size:1rem;background:var(--surf2);border-bottom:none}
+.overview-total-row .or-hours{color:var(--accent)}
 
 .back-inline{display:inline-flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bord);border-radius:7px;padding:8px 16px;color:var(--text);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:16px}
 .back-inline:hover{border-color:var(--accent);color:var(--accent)}
@@ -462,7 +466,11 @@ function renderCurrent() {
       });
       html += `</tbody></table></div>`;
     });
-    html += `<div class="overview-grand">Total hours, all jobs: ${totalHours}</div>`;
+    html += `
+      <table class="overview-table overview-total-table">
+        <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
+        <tbody><tr class="overview-total-row"><td colspan="3">Total:</td><td class="or-hours">${totalHours}h</td></tr></tbody>
+      </table>`;
   }
 
   main.innerHTML = html;
