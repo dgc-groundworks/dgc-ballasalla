@@ -63,6 +63,10 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .overview-row.active td{background:var(--accent);color:#1a1d27}
 .overview-row .or-hours{font-weight:800;color:var(--accent)}
 .overview-row.active .or-hours{color:#1a1d27}
+.overview-grand{text-align:right;font-weight:900;font-size:1rem;color:var(--accent);margin-top:4px;padding:16px 20px;background:var(--surf);border:1px solid var(--bord);border-radius:10px}
+
+.back-inline{display:inline-flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bord);border-radius:7px;padding:8px 16px;color:var(--text);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:16px}
+.back-inline:hover{border-color:var(--accent);color:var(--accent)}
 
 /* Week view */
 .week-nav{display:flex;align-items:center;gap:10px;margin-bottom:16px}
@@ -374,10 +378,11 @@ function render() {
   else renderCurrent();
 }
 
-// Ash, 9 Sep 2026: replaced the narrow left-hand list with one wide
-// table per job — Name / Date range / Ground Workers / Total hours —
-// running most of the page width. Clicking a row loads that person's
-// detail below, same as before.
+// Ash, 9 Sep 2026: one wide table per job — Name / Date range / Ground
+// Workers / Total hours — running most of the page width. Ash, 10 Sep
+// 2026: clicking a name should open THEIR OWN page (not stack the detail
+// underneath the tables) — so the list and the detail are two distinct
+// views of the Current tab, with a Back link out of the detail one.
 function renderCurrent() {
   const main = document.getElementById('mainArea');
   const pool = unsent();
@@ -391,13 +396,13 @@ function renderCurrent() {
   const canSend = pool.length > 0 && !anyUnready && sentColumnsExist;
 
   // If whatever was selected has since been sent/removed, drop back to
-  // the picker rather than showing an empty detail pane.
+  // the picker rather than showing an empty detail page.
   if (state.job && !byJob[state.job]) { state.job = null; state.name = null; }
   if (state.job && state.name && !byJob[state.job].some(e => (e.name || NO_NAME) === state.name)) {
     state.name = null;
   }
 
-  let html = `
+  const sendBarHtml = `
     <div class="send-bar">
       <div class="sb-info">
         <div class="sb-range">${from ? fmtDate(from) + ' – ' + fmtDate(to) : 'No dated entries yet'}</div>
@@ -409,6 +414,23 @@ function renderCurrent() {
     ${!lunchColumnExists ? `<p class="flag-note" style="max-width:none">&#9888; The editable lunch field won't save yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists lunch_mins integer;</code></p>` : ''}
   `;
 
+  // Detail page for one person — replaces the list entirely.
+  if (state.job && state.name) {
+    const selectedRows = byJob[state.job].filter(e => (e.name || NO_NAME) === state.name);
+    main.innerHTML = `
+      ${sendBarHtml}
+      <button class="back-inline" id="backToList">&#8592; Back to list</button>
+      ${personDetailHtml(selectedRows)}
+    `;
+    document.getElementById('backToList').addEventListener('click', () => { state.name = null; render(); });
+    const sendBtn = document.getElementById('sendBtn');
+    if (sendBtn) sendBtn.addEventListener('click', () => showSendPreview(pool, from, to));
+    wirePersonDetail(selectedRows);
+    return;
+  }
+
+  // List page — every job as its own wide table.
+  let html = sendBarHtml;
   if (!Object.keys(byJob).length) {
     html += '<p class="empty-state">Upload some timesheets to get started.</p>';
   } else {
@@ -430,9 +452,8 @@ function renderCurrent() {
         const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
         const nDates = rs.map(r => r.date).filter(Boolean).sort();
         const range = nDates.length ? fmtDate(nDates[0]) + ' – ' + fmtDate(nDates[nDates.length - 1]) : 'No dates yet';
-        const active = state.job === job && state.name === name;
         html += `
-              <tr class="overview-row ${active ? 'active' : ''}" data-job="${esc(job)}" data-name="${esc(name)}">
+              <tr class="overview-row" data-job="${esc(job)}" data-name="${esc(name)}">
                 <td>${flagged ? '<span class="alert-dot" title="Needs checking"></span> ' : ''}${esc(name)}</td>
                 <td>${range}</td>
                 <td>Ground Worker</td>
@@ -441,12 +462,7 @@ function renderCurrent() {
       });
       html += `</tbody></table></div>`;
     });
-  }
-
-  let selectedRows = null;
-  if (state.job && state.name) {
-    selectedRows = byJob[state.job].filter(e => (e.name || NO_NAME) === state.name);
-    html += personDetailHtml(selectedRows);
+    html += `<div class="overview-grand">Total hours, all jobs: ${totalHours}</div>`;
   }
 
   main.innerHTML = html;
@@ -454,14 +470,10 @@ function renderCurrent() {
   main.querySelectorAll('.overview-row').forEach(row => {
     row.addEventListener('click', () => {
       state.job = row.dataset.job; state.name = row.dataset.name; state.weekIndex = 0; render();
-      const detail = document.querySelector('.person-summary');
-      if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
   const sendBtn = document.getElementById('sendBtn');
   if (sendBtn) sendBtn.addEventListener('click', () => showSendPreview(pool, from, to));
-
-  if (selectedRows) wirePersonDetail(selectedRows);
 }
 
 function personDetailHtml(rows) {
