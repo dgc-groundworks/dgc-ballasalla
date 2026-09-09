@@ -58,6 +58,18 @@
 [data-theme="light"] #tab-resources .res-placed-chip{background:#1b2a3b;border:1px solid #0d1a26;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 [data-theme="light"] #tab-resources .res-placed-chip .res-remove-btn{color:rgba(255,255,255,.5)}
 [data-theme="light"] #tab-resources .res-week-cell-hdr{color:#2a5070}
+/* Light: job table */
+[data-theme="light"] .job-tbl{background:#ffffff}
+[data-theme="light"] .job-tbl th{background:#e8f0f7;color:#1b2a3b;border-top-color:rgba(0,0,0,.1);border-bottom-color:rgba(0,0,0,.12)}
+[data-theme="light"] .job-tbl td{border-bottom-color:rgba(0,0,0,.06)}
+[data-theme="light"] .job-tbl tbody tr:nth-child(even) td{background:rgba(0,0,0,.025)}
+[data-theme="light"] .job-tbl tr:hover td{background:rgba(0,0,0,.04)}
+[data-theme="light"] .jname{color:#1b2a3b}
+[data-theme="light"] .jnote{color:#5c7a94}
+[data-theme="light"] .wks,[data-theme="light"] .ppl{color:#2a5070}
+[data-theme="light"] .tbl-btn{color:#5c7a94}
+[data-theme="light"] .tbl-btn:hover{color:#1b2a3b;background:rgba(0,0,0,.06)}
+[data-theme="light"] .arch-hdr{background:#e8f0f7;color:#5c7a94;border-bottom-color:rgba(0,0,0,.08)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh}
 a{color:var(--accent);text-decoration:none}
@@ -428,6 +440,7 @@ a{color:var(--accent);text-decoration:none}
     <button onclick="showTab('staffhours',this)">Staff</button>
     <button onclick="showTab('sitediary',this)">Site Diary</button>
     <button onclick="showTab('resources',this)">Deployment — Testing</button>
+    <button onclick="showTab('daywork',this)">Day work Testing</button>
   </div>
 
   <!-- Timeline tab -->
@@ -504,6 +517,15 @@ a{color:var(--accent);text-decoration:none}
         </div>
         <div id="res-jobs-body" style="display:flex;flex-wrap:nowrap;gap:12px;align-items:flex-start;flex:1;overflow-x:auto;padding-bottom:8px"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Day work Testing tab -->
+  <div id="tab-daywork" class="panel">
+    <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">
+      <div style="font-size:32px;margin-bottom:12px">🏗️</div>
+      <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:6px">Day work Testing</div>
+      <div>App coming soon</div>
     </div>
   </div>
 
