@@ -72,6 +72,17 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .overview-total-row td{font-weight:900;font-size:1rem;background:var(--surf2);border-bottom:none}
 .overview-total-row .or-hours{color:var(--accent)}
 
+/* Client queries — flagged on the homepage the same way any other
+   "needs checking" issue is, so a PM can't miss that Dandara flagged
+   something on the public site. */
+.queries-panel{background:rgba(239,68,68,.08);border:1px solid var(--red);border-radius:10px;padding:14px 18px;margin-bottom:20px}
+.queries-hdr{font-weight:800;color:var(--red);margin-bottom:10px;font-size:0.9rem}
+.query-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(239,68,68,.2)}
+.query-item:first-of-type{border-top:none}
+.qi-main{font-size:0.85rem;line-height:1.5;cursor:pointer}
+.qi-main:hover{text-decoration:underline}
+.qi-msg{color:var(--muted);font-style:italic}
+
 .back-inline{display:inline-flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bord);border-radius:7px;padding:8px 16px;color:var(--text);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:16px}
 .back-inline:hover{border-color:var(--accent);color:var(--accent)}
 
@@ -199,6 +210,7 @@ input:focus{border-color:var(--accent)}
   <a class="back-btn" href="index.html" target="_top">&#8592; Planner</a>
   <h1>Dayworks</h1>
   <span class="test-banner">Test build — not live</span>
+  <a class="test-banner" href="https://dgc-groundworks.github.io/dgc-dayworks-client/" target="_blank" rel="noopener" style="text-decoration:none;cursor:pointer">Public Dayworks &#8599;</a>
   <button class="theme-toggle-btn" onclick="toggleTheme()">Light Mode</button>
 </header>
 <nav class="dw-nav">
@@ -225,10 +237,13 @@ input:focus{border-color:var(--accent)}
 // ---------------------------------------------------------------
 
 const REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_entries';
+const QUERIES_REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_queries';
 const STORAGE_UPLOAD = SUPABASE_URL + '/storage/v1/object/dayworks-timesheets/';
 const STORAGE_PUBLIC = SUPABASE_URL + '/storage/v1/object/public/dayworks-timesheets/';
 const NO_JOB = '(Needs a job assigned)';
 const NO_NAME = '(Needs a name)';
+const DAYWORKS_RATE = 29; // £/hr charged to Dandara — shown on the client export, matches the client site
+function fmtMoney(n) { return '£' + n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 function sbHeaders(extra) {
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, extra || {});
@@ -340,7 +355,8 @@ function rowToEntry(r) {
     hours: r.hours == null ? null : Number(r.hours), confirmed: !!r.confirmed, flagged: !!r.flagged,
     note: r.note || '', description: r.description || '',
     lunch: r.lunch_mins == null ? null : Number(r.lunch_mins),
-    sentAt: r.sent_at || null, sentBatchRef: r.sent_batch_ref || null
+    sentAt: r.sent_at || null, sentBatchRef: r.sent_batch_ref || null,
+    approvedBy: r.approved_by || null, approvedAt: r.approved_at || null
   };
 }
 // sent_at/sent_batch_ref/lunch_mins were each added after this table's
@@ -352,6 +368,7 @@ function rowToEntry(r) {
 let sentColumnsExist = true;
 let descriptionColumnExists = true;
 let lunchColumnExists = true;
+let approvedColumnsExist = true;
 async function detectSentColumns() {
   try {
     const r = await fetch(REST + '?select=sent_at&limit=1', { headers: sbHeaders() });
@@ -365,6 +382,10 @@ async function detectSentColumns() {
     const r3 = await fetch(REST + '?select=lunch_mins&limit=1', { headers: sbHeaders() });
     lunchColumnExists = r3.ok;
   } catch (e) { lunchColumnExists = false; }
+  try {
+    const r4 = await fetch(REST + '?select=approved_by&limit=1', { headers: sbHeaders() });
+    approvedColumnsExist = r4.ok;
+  } catch (e) { approvedColumnsExist = false; }
 }
 
 function entryToRow(e) {
@@ -376,16 +397,42 @@ function entryToRow(e) {
   if (sentColumnsExist) { row.sent_at = e.sentAt || null; row.sent_batch_ref = e.sentBatchRef || null; }
   if (descriptionColumnExists) { row.description = e.description || ''; }
   if (lunchColumnExists) { row.lunch_mins = e.lunch == null ? null : e.lunch; }
+  if (approvedColumnsExist) { row.approved_by = e.approvedBy || null; row.approved_at = e.approvedAt || null; }
   return row;
 }
 
 let entries = [];
+let queries = [];
+let queriesTableExists = true;
 let state = { tab: 'current', job: null, name: null, weekIndex: 0, histJob: null, histName: null, historicRef: null };
 
 async function loadEntries() {
   const r = await fetch(REST + '?select=*&order=work_date.desc.nullslast', { headers: sbHeaders() });
   if (!r.ok) throw new Error(await r.text());
   entries = (await r.json()).map(rowToEntry);
+}
+// dgc_dayworks_queries holds messages the client submits from the public
+// site ("Query these hours") — read here so PMs can see and chase them
+// without needing to check the client site themselves. Table is new and
+// may not exist yet, so this degrades quietly rather than breaking boot.
+async function loadQueries() {
+  try {
+    const r = await fetch(QUERIES_REST + '?select=*&resolved=eq.false&order=created_at.desc', { headers: sbHeaders() });
+    queriesTableExists = r.ok;
+    queries = r.ok ? await r.json() : [];
+  } catch (e) { queriesTableExists = false; queries = []; }
+}
+// No anon UPDATE (same platform quirk as everywhere else) — resolving a
+// query is delete-then-reinsert with resolved:true, same pattern as
+// every other "save" in this app.
+async function resolveQuery(q) {
+  await fetch(QUERIES_REST + '?id=eq.' + encodeURIComponent(q.id), { method: 'DELETE', headers: sbHeaders() });
+  await fetch(QUERIES_REST, {
+    method: 'POST',
+    headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+    body: JSON.stringify(Object.assign({}, q, { resolved: true }))
+  });
+  queries = queries.filter(x => x.id !== q.id);
 }
 async function insertRow(entryLike) {
   const r = await fetch(REST, {
@@ -469,6 +516,7 @@ function renderCurrent() {
     </div>
     ${!sentColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Can't file saved packs into Historic yet — run this in the Job Planner's SQL Editor first:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists sent_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists sent_batch_ref text;</code></p>` : ''}
     ${!lunchColumnExists ? `<p class="flag-note" style="max-width:none">&#9888; The editable lunch field won't save yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists lunch_mins integer;</code></p>` : ''}
+    ${!approvedColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Client approval won't be recorded yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists approved_by text;<br>alter table public.dgc_dayworks_entries add column if not exists approved_at timestamptz;</code></p>` : ''}
   `;
 
   // Detail page for one person — replaces the list entirely.
@@ -487,12 +535,39 @@ function renderCurrent() {
   }
 
   // List page — every job as its own wide table.
-  let html = sendBarHtml + overviewTablesHtml(pool);
+  const queriesHtml = queries.length ? `
+    <div class="queries-panel">
+      <div class="queries-hdr">&#9888; ${queries.length} unresolved ${queries.length === 1 ? 'query' : 'queries'} from the client</div>
+      ${queries.map(q => `
+        <div class="query-item">
+          <div class="qi-main" data-query-jump data-job="${esc(baseJob(q.site))}" data-name="${esc(q.staff_name)}">
+            <strong>${esc(q.staff_name)}</strong> — ${fmtDate(q.work_date)} (${esc(baseJob(q.site))})<br>
+            <span class="qi-msg">"${esc(q.message)}"</span>
+          </div>
+          <button class="btn-secondary" data-resolve-id="${esc(q.id)}">Mark resolved</button>
+        </div>`).join('')}
+    </div>` : '';
+
+  let html = sendBarHtml + queriesHtml + overviewTablesHtml(pool);
   main.innerHTML = html;
 
   main.querySelectorAll('.overview-row').forEach(row => {
     row.addEventListener('click', () => {
       state.job = row.dataset.job; state.name = row.dataset.name; state.weekIndex = 0; render();
+    });
+  });
+  main.querySelectorAll('[data-query-jump]').forEach(el => {
+    el.addEventListener('click', () => {
+      state.job = el.dataset.job; state.name = el.dataset.name; state.weekIndex = 0; render();
+    });
+  });
+  main.querySelectorAll('[data-resolve-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const q = queries.find(x => x.id === btn.dataset.resolveId);
+      if (!q) return;
+      btn.disabled = true; btn.textContent = 'Resolving…';
+      try { await resolveQuery(q); render(); }
+      catch (err) { btn.disabled = false; btn.textContent = 'Mark resolved'; alert('Could not resolve: ' + err.message); }
     });
   });
   const sendBtn = document.getElementById('sendBtn');
@@ -791,11 +866,11 @@ function buildPackHtml(rows, from, to, refNum) {
       const weekTotal = wrows.reduce((s, r) => s + (r.hours || 0), 0);
       grandTotal += weekTotal;
       body += `<div class="week-hdr">Week ${i + 1} — w/c ${fmtDate(wkStart)}</div>
-        <table class="dw-table"><thead><tr><th>Date</th><th>Name</th><th>Start</th><th>Finish</th><th>Hours</th><th>Role</th></tr></thead><tbody>`;
+        <table class="dw-table"><thead><tr><th>Date</th><th>Name</th><th>Start</th><th>Finish</th><th>Hours</th><th>Role</th><th>Amount</th></tr></thead><tbody>`;
       wrows.forEach(r => {
-        body += `<tr><td>${fmtDate(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.start)}</td><td>${esc(r.finish)}</td><td>${r.hours}</td><td>Ground Worker</td></tr>`;
+        body += `<tr><td>${fmtDate(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.start)}</td><td>${esc(r.finish)}</td><td>${r.hours}</td><td>Ground Worker</td><td>${fmtMoney((r.hours || 0) * DAYWORKS_RATE)}</td></tr>`;
       });
-      body += `<tr class="week-total-row"><td colspan="4">Week ${i + 1} total</td><td>${weekTotal}</td><td></td></tr></tbody></table>`;
+      body += `<tr class="week-total-row"><td colspan="4">Week ${i + 1} total</td><td>${weekTotal}</td><td></td><td>${fmtMoney(weekTotal * DAYWORKS_RATE)}</td></tr></tbody></table>`;
     });
     body += `</div>`;
   });
@@ -816,8 +891,8 @@ function buildPackHtml(rows, from, to, refNum) {
         <div class="rm-cell"><div class="rmc-label">Prepared</div><div class="rmc-val">${fmtDate(new Date().toISOString().slice(0,10))}</div></div>
       </div>
       ${body}
-      <div class="grand-total">Total hours, all sites: ${grandTotal}</div>
-      <div class="report-footer">This document summarises dayworks hours recorded by Drainage &amp; Groundwork Contractors Limited operatives, evidenced by the original signed timesheets. Ref: ${esc(refNum)}</div>
+      <div class="grand-total">Total hours, all sites: ${grandTotal} &nbsp;&middot;&nbsp; Total due at ${fmtMoney(DAYWORKS_RATE)}/hr: ${fmtMoney(grandTotal * DAYWORKS_RATE)}</div>
+      <div class="report-footer">This document summarises dayworks hours recorded by Drainage &amp; Groundwork Contractors Limited operatives, evidenced by the original signed timesheets, at a rate of ${fmtMoney(DAYWORKS_RATE)}/hr. Ref: ${esc(refNum)}</div>
     </div>`;
 }
 
@@ -1025,6 +1100,19 @@ function showSendPreview(pool, from, to) {
   // just always opens the folder picker fresh (and remembers that new
   // choice), instead of quietly reusing whatever folder was picked last.
   const doSave = async (forceAs) => {
+    // Ash, 10 Sep 2026: "approved by John" on the client site — there's no
+    // login system anywhere in this stack (deliberately), so this is a
+    // lightweight name prompt at the exact moment a batch is filed, which
+    // is already the closest thing to a formal sign-off in this flow.
+    // Runs synchronously, before any await, so it doesn't cost the
+    // "user activation" the folder picker below needs.
+    const lastApprover = localStorage.getItem('dwApprover') || '';
+    const typed = prompt("Who's approving this for the client?", lastApprover);
+    if (typed === null) return; // cancelled — do nothing
+    const approvedBy = typed.trim() || 'DGC';
+    localStorage.setItem('dwApprover', approvedBy);
+    const approvedAt = new Date().toISOString();
+
     const confirmBtn = document.getElementById('confirmSendBtn');
     const asBtn = document.getElementById('saveAsBtn');
     const status = document.getElementById('saveStatus');
@@ -1038,7 +1126,7 @@ function showSendPreview(pool, from, to) {
         ? `Saved straight into the "${range}" folder in ${forceAs ? 'the folder you picked' : 'Daywork/Dandara'}.`
         : `Downloaded "DGC Dayworks ${range}.zip" — extract it into a new folder named "${range}" inside Daywork/Dandara.`;
       for (const e of pool) {
-        await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: batchRef }));
+        await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: batchRef, approvedBy, approvedAt }));
       }
       setTimeout(() => { state.job = null; state.name = null; state.tab = 'current'; render(); }, result.wroteToDisk ? 500 : 2200);
     } catch (err) {
@@ -1182,6 +1270,7 @@ document.querySelectorAll('.dw-navbtn').forEach(btn => {
   try {
     await detectSentColumns();
     await loadEntries();
+    await loadQueries();
     render();
   } catch (err) {
     document.getElementById('mainArea').innerHTML =
