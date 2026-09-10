@@ -120,6 +120,51 @@ const STANDING_EXCLUDE = ['manx utilities', 'hartford homes', 'dandara', 'excel'
 const LS_LOG = 'silverdale_canvassing_processed';   // { ref: { date, name } }
 const LS_LEADS = 'silverdale_canvassing_leads';     // last-parsed batch, so a refresh doesn't lose work
 
+// Starter batch — the most recent real pull (8 Sep 2026, 39 leads) — so
+// the tool shows real, working content the first time it's opened rather
+// than a blank screen. Paste a new week's leads on Import any time to
+// replace it; this only ever loads when nothing's been saved yet.
+const STARTER_TSV = `No.	Reference	Site Address	Applicant / Developer	Type of Development	Local Authority
+1	26/00465/B	11 Carrick Bay View, Ballagawne Road, Colby, IM9 4DD	Mr & Mrs W. Philip & Norma Richards	Extension	Arbory/Colby
+2	26/00507/B	Glascoe Cottage, Nassau Road, Dog Mills, Bride, IM7 4AQ	Mrs Nicola Glover	New build dwelling (demolition + rebuild)	Bride
+3	26/00440/B	7 Albany Street, Douglas	Mr Wesley Roussouw (H&B Developments)	Extension	Douglas
+4	26/00463/B	7 Taubman Terrace, Douglas Head Road, Douglas, IM1 5BB	Mr Joannis Vamvakopoulos	Extension	Douglas
+5	26/00416/B	Ballakesh Farm, Lhen Road, Bride, IM7 4BF	Mr Henry Sage	Extension	Bride
+6	26/00444/B	33 Queens Drive, Peel, IM5 1BQ	Mr & Mrs Andrew & Melissa Cannell	Extension	Peel
+7	26/00571/B	No 38 Carrick Park, Sulby, Lezayre, IM7 2EX	Mrs Linda Atkinson	Extension	Lezayre
+8	26/00347/B	Cornerstones, Lhergydhoo, Peel, IM5 2AE	Mr & Mrs Jonathan & Diane Corlett	Extension	Peel
+9	26/00412/B	Moordown, 27 Ballagale Avenue, Surby, IM9 6QJ	Mr & Mrs Chris and Linda Hilton	Extension	Rushen
+10	26/00397/B	29 West View, Peel, IM5 1DL	Mr & Mrs David & Jan Brooks & Cooil	Extension	Peel
+11	26/00385/B	Mann Crane Hire Ltd, Balthane Industrial Estate, Ballasalla, IM9 2AJ	Mann Crane Hire Ltd	Commercial extension	Malew
+12	26/00398/B	Noa Bea, No 42 Ard Reayrt, Laxey, IM4 7QP	Mr & Mrs Daniel Clague	Extension	Garff/Laxey
+13	26/00382/B	13 Scarlett Close, Castletown, IM9 1NY	Mr Neil Allcote	Extension	Castletown
+14	26/00361/B	49 Windermere Drive, Onchan, IM3 2DS	Mr Mark Thomas	Extension	Onchan
+15	26/00355/B	Plots 65 & 66, Braddan Woods, Braddan Road, Braddan, IM4 4DR	Mr Robin Croase (Hartford Homes)	New build dwellings (2 dwellings)	Braddan
+16	26/00350/B	11 Beach Avenue, Onchan, IM3 3HQ	Mr Robert Shaw	Extension	Onchan
+17	26/00542/B	1 Claughbane Drive, Ramsey, IM8 2AZ	Mr & Mrs David Everett	Extension	Ramsey
+18	26/00336/B	Cosy Corner, 12 Ballanoa Meadow, Newtown, Santon, IM4 1HQ	Mr & Mrs Jack and Johanna Emmerson/Gledhill	Extension	Santon
+19	26/00467/B	The Snakepit, Lord Street, Douglas, IM1 2BD	Applicant name not legible on form - Company ends "Enterprise LTD"	New build commercial (wellness retreat conversion)	Douglas
+20	26/00327/B	Colby Moor House, Main Road, Colby, IM9 4NS	Mrs Kirsty Harris (Newtown Architects Ltd)	Extension	Arbory/Colby
+21	26/00433/B	Cooil Drinagh, Ronague Road, Ballabeg, Arbory, IM9 4HF	Mr & Mrs Roy & Trisha Gelling	Extension	Arbory
+22	25/91215/B	Dunedin, Quarterbridge Road, Douglas, IM2 3RG	Mr Ben Jonathan Phin	Extension	Douglas
+23	26/00419/B	Kenyons Cafe, The Hub, School Road, Onchan, IM3 4LA	Onchan District Commissioners	Commercial extension	Onchan
+24	26/00275/B	Bibaloe, Glan Road, Colby, IM9 4PA	Mr Martyn Lester & Mrs Cornelia Dahlgren	Extension	Arbory/Colby
+25	26/00411/B	13 Peel Road, Douglas, IM1 4LR	Janus Developments Ltd	Change of use (offices to HMO) + extension	Douglas
+26	26/00291/B	Ballacubbon Farm, St Marks Road, Ballasalla, IM9 3AG	Mr & Mrs Jack & Hayley Garrett	Extension	Malew
+27	26/00250/B	Rollage-ny-Twoaie, Sloc Road, Colby, IM9 4BW	Mark Patrick O'Meara & Miss Kathryn Anne Newton	New build dwelling (via refurbishment)	Rushen
+28	26/00369/B	Ben Elin, Baldhoon Road, Laxey	Mr Ben Kinrade	Extension (first floor)	Garff/Laxey
+29	26/00236/B	1, 1A & 2 Marina Road, Douglas, IM1 2HD	Niche Innovation Limited	New build commercial/mixed-use	Douglas
+30	26/00167/B	Meary Veg Wastewater Treatment Works, Ballahowe, Santon, IM4 1HL	Mr Leo Morris (Manx Utilities)	Commercial extension	Santon
+31	26/00164/B	14, Derby Square, Douglas, IM1 3LS	Mr Craig Carlson	Extension	Douglas
+32	26/00234/B	Ardane, Ballamenagh Road, Baldrine, Lonan, IM4 6AQ	Mr David Wormald	New build dwelling (replacement dwellinghouse)	Garff/Lonan
+33	26/00108/B	Lhergy Farm, Cordeman Road, St Marks, Ballasalla, IM9 3AJ	Bravo Homes Limited	Extension	Malew
+34	25/91176/B	Unit 16, Hills Meadow Industrial Estate, Peel Road, Douglas, IM1 5EA	Iron House Limited	Extension	Douglas
+35	26/00018/B	Ballagarraghyn Manor, Peel Road, St John's, German, IM4 3LH	Mr & Mrs Maurice Kelly	Extension	German
+36	25/91224/B	Rocky Mount, Stoney Mountain Road, Higher Foxdale, Malew, IM4 3ER	Vincent Hesketh	Extension	Malew
+37	25/91172/B	The Nunnery, Old Castletown Road, Douglas, IM2 1QB	Mr Philip Vermeulen (International Centre for Technology Ltd)	New build commercial (two 2-storey buildings 8 lettable units)	Douglas
+38	25/91059/B	Ballamenaugh Beg Farm, Ballamenaugh Road, Baldrine, Lonan, IM4 6AL	Mr Allan & Dave Kinrade (YOKBROS LTD)	New build commercial (replacement steel-framed building)	Garff/Lonan
+39	25/90268/B	The Boatyard, Derbyhaven, IM9 1TR	Weatherill Advocates & Solicitors Ltd (acting for applicant - individual name not stated on form)	New build dwelling	Malew`;
+
 let leads = [];      // working batch
 let state = { tab: 'import' };
 
@@ -523,7 +568,9 @@ function renderLog(main){
 
 document.querySelectorAll('.navbtn').forEach(btn => btn.addEventListener('click', () => { state.tab = btn.dataset.tab; render(); }));
 
-leads = loadLeadsFromStorage().map(classify);
+const stored = loadLeadsFromStorage();
+leads = stored.length ? stored.map(classify) : parseInput(STARTER_TSV);
+if (leads.length && !stored.length) state.tab = 'review';
 render();
 </script>
 </body>
