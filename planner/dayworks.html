@@ -874,19 +874,25 @@ async function idbSet(key, val) {
 // Must be called as the FIRST await after the click, before any slow
 // work — the browser only allows the picker/permission prompt while the
 // click's "user activation" is still fresh.
-async function getDandaraFolderHandle() {
+async function getDandaraFolderHandle(opts) {
+  const forcePick = !!(opts && opts.forcePick);
   if (!('showDirectoryPicker' in window)) return null;
-  let handle = await idbGet('dandaraFolder').catch(() => null);
-  if (handle) {
-    try {
-      const perm = await handle.queryPermission({ mode: 'readwrite' });
-      if (perm === 'granted') return handle;
-      if ((await handle.requestPermission({ mode: 'readwrite' })) === 'granted') return handle;
-    } catch (e) { /* handle gone (folder moved/deleted) — fall through to re-pick */ }
-    handle = null;
+  if (!forcePick) {
+    let handle = await idbGet('dandaraFolder').catch(() => null);
+    if (handle) {
+      try {
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm === 'granted') return handle;
+        if ((await handle.requestPermission({ mode: 'readwrite' })) === 'granted') return handle;
+      } catch (e) { /* handle gone (folder moved/deleted) — fall through to re-pick */ }
+    }
   }
+  // forcePick (the "Save As..." button) always opens the picker fresh,
+  // ignoring whatever was remembered — and remembers THIS choice as the
+  // new default for next time, same as a real "Save As" changing where
+  // "Save" points afterwards.
   try {
-    handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
     await idbSet('dandaraFolder', handle);
     return handle;
   } catch (e) {
@@ -936,9 +942,9 @@ async function buildClientPdfBlob(rows, from, to, refLabel) {
 // straight into Daywork/Dandara/[range] (Chrome/Edge, once a folder is
 // chosen) or downloads one zip with the same contents for Safari/Firefox
 // (and for anyone who cancels the folder picker) to extract into place.
-async function saveClientPackToDisk(rows, from, to) {
+async function saveClientPackToDisk(rows, from, to, opts) {
   const range = rangeLabel(from, to);
-  const dirHandle = await getDandaraFolderHandle(); // first, while the click is still fresh
+  const dirHandle = await getDandaraFolderHandle(opts); // first, while the click is still fresh
 
   const pdfBlob = await buildClientPdfBlob(rows, from, to, `DGC Dayworks Hours ${range}`);
   const images = [...new Set(rows.map(r => r.image))];
@@ -1007,32 +1013,42 @@ function showSendPreview(pool, from, to) {
   main.innerHTML = buildPackHtml(pool, from, to, batchRef) + `
     <div class="report-actions">
       <button class="btn-primary" id="confirmSendBtn">&#10003; Save for client</button>
+      <button class="btn-secondary" id="saveAsBtn">Save As&hellip;</button>
       <button class="btn-print" id="printPackBtn">&#128438; Print / Save PDF manually</button>
       <button class="btn-secondary" id="cancelSendBtn">Cancel</button>
     </div>
     <p class="flag-note" id="saveStatus" style="max-width:none;display:none"></p>`;
   document.getElementById('printPackBtn').addEventListener('click', () => printPack(from, to));
   document.getElementById('cancelSendBtn').addEventListener('click', render);
-  document.getElementById('confirmSendBtn').addEventListener('click', async () => {
-    const btn = document.getElementById('confirmSendBtn');
+
+  // Both buttons do the same save-and-file-to-Historic action — "Save As"
+  // just always opens the folder picker fresh (and remembers that new
+  // choice), instead of quietly reusing whatever folder was picked last.
+  const doSave = async (forceAs) => {
+    const confirmBtn = document.getElementById('confirmSendBtn');
+    const asBtn = document.getElementById('saveAsBtn');
     const status = document.getElementById('saveStatus');
     status.style.display = 'block';
-    btn.disabled = true; btn.textContent = 'Saving…';
-    status.textContent = 'Building the PDF and gathering photos…';
+    confirmBtn.disabled = true; asBtn.disabled = true;
+    (forceAs ? asBtn : confirmBtn).textContent = 'Saving…';
+    status.textContent = forceAs ? 'Pick a folder, then building the PDF and gathering photos…' : 'Building the PDF and gathering photos…';
     try {
-      const result = await saveClientPackToDisk(pool, from, to);
+      const result = await saveClientPackToDisk(pool, from, to, { forcePick: forceAs });
       status.textContent = result.wroteToDisk
-        ? `Saved straight into the "${range}" folder in Daywork/Dandara.`
+        ? `Saved straight into the "${range}" folder in ${forceAs ? 'the folder you picked' : 'Daywork/Dandara'}.`
         : `Downloaded "DGC Dayworks ${range}.zip" — extract it into a new folder named "${range}" inside Daywork/Dandara.`;
       for (const e of pool) {
         await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: batchRef }));
       }
       setTimeout(() => { state.job = null; state.name = null; state.tab = 'current'; render(); }, result.wroteToDisk ? 500 : 2200);
     } catch (err) {
-      btn.disabled = false; btn.textContent = '✓ Save for client';
+      confirmBtn.disabled = false; asBtn.disabled = false;
+      confirmBtn.textContent = '✓ Save for client'; asBtn.textContent = 'Save As…';
       status.textContent = 'Save failed: ' + err.message + ' — nothing has been marked as sent, safe to retry.';
     }
-  });
+  };
+  document.getElementById('confirmSendBtn').addEventListener('click', () => doSave(false));
+  document.getElementById('saveAsBtn').addEventListener('click', () => doSave(true));
 }
 
 // ---------------------------------------------------------------
