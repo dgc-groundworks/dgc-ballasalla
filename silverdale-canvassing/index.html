@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silverdale Canvassing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+.topbar{background:var(--surf);border-bottom:1px solid var(--bord);padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:1.05rem;font-weight:800;color:var(--accent)}
+.topbar .sub{font-size:0.78rem;color:var(--muted);margin-left:auto}
+.nav{background:var(--surf);border-bottom:1px solid var(--bord);padding:0 20px;display:flex;gap:4px;position:sticky;top:49px;z-index:9}
+.navbtn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:0.85rem;font-weight:700;padding:10px 14px;cursor:pointer;font-family:inherit}
+.navbtn:hover{color:var(--text)}
+.navbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.main{padding:22px;max-width:1200px;margin:0 auto}
+.empty-state{padding:60px 20px;text-align:center;color:var(--muted)}
+textarea{width:100%;min-height:220px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--text);padding:14px;font-family:ui-monospace,Menlo,monospace;font-size:0.8rem;resize:vertical}
+.hint{font-size:0.8rem;color:var(--muted);margin:10px 0 16px}
+.btn{background:var(--accent);color:#1a1d27;border:none;padding:10px 20px;border-radius:6px;font-size:0.88rem;font-weight:800;cursor:pointer;font-family:inherit}
+.btn:disabled{opacity:.4;cursor:default}
+.btn-secondary{background:var(--surf2);color:var(--text);border:1px solid var(--bord);padding:9px 18px;border-radius:6px;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-danger{background:none;border:1px solid rgba(239,68,68,.4);color:var(--red);padding:6px 12px;border-radius:6px;font-size:0.76rem;cursor:pointer;font-family:inherit}
+.row-actions{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
+.stat-bar{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px;font-size:0.82rem;color:var(--muted)}
+.stat-bar b{color:var(--text)}
+table.leads{width:100%;border-collapse:collapse;font-size:0.8rem}
+table.leads th{text-align:left;padding:8px 10px;background:var(--surf2);border-bottom:1px solid var(--bord);white-space:nowrap;position:sticky;top:94px}
+table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-align:top}
+
+.lead-section-hdr{font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--bord)}
+.lead-section-hdr:first-of-type{margin-top:4px}
+.lead-list{display:flex;flex-direction:column;background:var(--surf);border:1px solid var(--bord);border-radius:10px;overflow:hidden}
+.lead-row{display:flex;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid var(--bord)}
+.lead-list .lead-row:last-child{border-bottom:none}
+.lead-row.flagged{background:rgba(245,158,11,.06)}
+.lr-main{flex:1;min-width:0}
+.lr-applicant{font-size:0.98rem;font-weight:700;margin-bottom:3px}
+.lr-meta{font-size:0.78rem;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lr-meta select{background:var(--bg);border:1px solid var(--bord);border-radius:5px;color:var(--muted);padding:3px 6px;font-size:0.74rem;font-family:inherit}
+.sal-input{width:100%;max-width:420px;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text);padding:6px 8px;margin-left:-8px;font-size:0.92rem;font-family:inherit}
+.sal-input:hover{border-color:var(--bord)}
+.sal-input:focus{background:var(--bg);border-color:var(--accent);outline:none}
+.lr-side{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.send-toggle{border:none;border-radius:20px;padding:9px 20px;font-size:0.82rem;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;min-width:104px}
+.send-toggle.on{background:var(--green);color:#08210f}
+.send-toggle.off{background:var(--surf2);color:var(--muted);border:1px solid var(--bord)}
+.send-toggle:disabled{opacity:.4;cursor:default}
+.tag{display:inline-block;font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:4px}
+.tag-excl{background:rgba(239,68,68,.15);color:var(--red)}
+.tag-dupe{background:rgba(100,116,139,.2);color:var(--muted)}
+.tag-review{background:rgba(245,158,11,.18);color:var(--accent)}
+.print-doc{background:#fff;color:#1a2a3f;box-shadow:0 4px 32px rgba(0,0,0,.4);margin:0 auto 28px;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif}
+.letter-page{width:210mm;min-height:297mm;padding:30mm 30mm;position:relative}
+.letter-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:26mm}
+.letter-logo img{height:16mm;width:auto;display:block}
+.letter-sender{text-align:right}
+.letter-sender .name{font-weight:600;font-size:16pt;letter-spacing:.01em;color:#141f30}
+.letter-sender .addr{font-size:11.5pt;color:#3a4a60;margin-top:6px;line-height:1.6}
+.letter-date,.letter-addr,.letter-subject,.letter-body p{font-size:13.5pt;line-height:1.8;margin-top:18px;color:#1e2c40}
+.letter-subject b{font-weight:700;letter-spacing:.01em}
+.letter-sign{margin-top:14px}
+.letter-sign img{height:56px}
+.letter-body p:last-of-type{margin-top:0}
+.letter-ref{position:absolute;bottom:10mm;left:30mm;font-size:7pt;font-family:-apple-system,sans-serif;color:#aaa;font-style:italic}
+.env-page{width:220mm;height:110mm;padding:14mm 16mm;position:relative;background:#fff}
+.env-logo{position:absolute;left:16mm;top:13mm}
+.env-logo img{height:11mm;width:auto;display:block}
+.env-recipient{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;line-height:1.48}
+.env-recipient .er-name{font-size:13.5pt;font-weight:600;letter-spacing:.01em;color:#141f30;margin-bottom:3pt}
+.env-recipient .er-line{font-size:11pt;font-weight:400;color:#3a4a60}
+@media print{
+  .topbar,.nav,.row-actions,.stat-bar{display:none!important}
+  body{background:#fff}
+  .main{padding:0;max-width:100%}
+  .print-doc{box-shadow:none;margin:0}
+  .letter-page,.env-page{page-break-after:always}
+  @page{margin:0}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <h1>Silverdale Canvassing</h1>
+  <span class="sub">Planning-leads intake &rarr; letters &amp; envelopes, ready to print</span>
+</header>
+<nav class="nav">
+  <button class="navbtn active" data-tab="import">Import</button>
+  <button class="navbtn" data-tab="review">Review</button>
+  <button class="navbtn" data-tab="letters">Print — Letters</button>
+  <button class="navbtn" data-tab="envelopes">Print — Envelopes</button>
+  <button class="navbtn" data-tab="log">Processed Log</button>
+</nav>
+<main class="main" id="mainArea"><p class="empty-state">Loading…</p></main>
+
+<script>
+// ---------------------------------------------------------------
+// Silverdale Canvassing — pulls a pasted table of IoM planning
+// applications, classifies each lead, applies the standing
+// never-contact list and a dedup log (both persisted in
+// localStorage — no backend yet, this is v1), then generates
+// print-ready branded letters and DL envelopes from the templates
+// agreed 8 Sep 2026.
+//
+// v1 intake is paste-based, not a live pull from pbc.gov.im: a
+// browser page can't cross-origin-scrape a .gov site directly, and
+// building a real scraper needs a server-side piece (a Supabase
+// Edge Function, same pattern as Dayworks' AI extraction) — that's
+// a deliberate next phase, not skipped by accident. For now: copy
+// the table from the Weekly List export (or the PDF) and paste it
+// in on the Import tab.
+// ---------------------------------------------------------------
+
+const STANDING_EXCLUDE = ['manx utilities', 'hartford homes', 'dandara', 'excel'];
+const LS_LOG = 'silverdale_canvassing_processed';   // { ref: { date, name } }
+const LS_LEADS = 'silverdale_canvassing_leads';     // last-parsed batch, so a refresh doesn't lose work
+
+let leads = [];      // working batch
+let state = { tab: 'import' };
+
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function todayOrdinal(){
+  const d = new Date();
+  const day = d.getDate();
+  const suf = (day % 10 === 1 && day !== 11) ? 'st' : (day % 10 === 2 && day !== 12) ? 'nd' : (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
+  return day + suf + ' ' + d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
+function getLog(){ try { return JSON.parse(localStorage.getItem(LS_LOG) || '{}'); } catch { return {}; } }
+function saveLog(log){ try { localStorage.setItem(LS_LOG, JSON.stringify(log)); } catch {} }
+function saveLeadsToStorage(){ try { localStorage.setItem(LS_LEADS, JSON.stringify(leads)); } catch {} }
+function loadLeadsFromStorage(){ try { return JSON.parse(localStorage.getItem(LS_LEADS) || '[]'); } catch { return []; } }
+
+// ---- Parsing a pasted table ----
+// Expects tab-separated (straight copy from a spreadsheet or the
+// PDF's extracted table) with columns roughly: No / Reference / Site
+// Address / Applicant / Developer / Type of Development / Local
+// Authority. Column order is detected from the header row where
+// possible; falls back to positional guessing otherwise.
+// Matches a planning reference like "26/00465/B" or "25/91215/B".
+function looksLikeRef(s){ return /^\d{2}\/\d{3,6}\/[A-Za-z]$/.test((s || '').trim()); }
+
+function parseInput(text){
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  const rows = lines.map(l => l.split('\t').map(c => c.trim()));
+  const header = rows[0].map(c => c.toLowerCase());
+  const findCol = names => header.findIndex(h => names.some(n => h.includes(n)));
+  let cRef = findCol(['reference']), cSite = findCol(['site address', 'address']),
+      cApplicant = findCol(['applicant', 'developer']), cType = findCol(['type']),
+      cAuth = findCol(['authority']);
+  let start = (cRef >= 0 || cSite >= 0 || cApplicant >= 0) ? 1 : 0;
+
+  if (cRef < 0) {
+    // No header keywords found — locate the reference column by what its
+    // values actually look like (across every row) rather than assuming
+    // a fixed position, since a pasted table may or may not have a
+    // leading row-number column or a header row at all.
+    const width = Math.max(...rows.map(r => r.length));
+    let best = -1, bestCount = 0;
+    for (let c = 0; c < width; c++) {
+      const count = rows.filter(r => looksLikeRef(r[c])).length;
+      if (count > bestCount) { bestCount = count; best = c; }
+    }
+    if (best >= 0) {
+      cRef = best;
+      start = looksLikeRef(rows[0][cRef]) ? 0 : 1;
+    } else {
+      cRef = 1; start = 0; // total fallback: assume a leading "No." column
+    }
+    if (cSite < 0) cSite = cRef + 1;
+    if (cApplicant < 0) cApplicant = cRef + 2;
+    if (cType < 0) cType = cRef + 3;
+    if (cAuth < 0) cAuth = cRef + 4;
+  } else {
+    if (cSite < 0) cSite = cRef + 1;
+    if (cApplicant < 0) cApplicant = cRef + 2;
+    if (cType < 0) cType = cRef + 3;
+    if (cAuth < 0) cAuth = cRef + 4;
+  }
+
+  const out = [];
+  for (let i = start; i < rows.length; i++) {
+    const r = rows[i];
+    if (r.length < 2) continue;
+    const ref = (r[cRef] || '').trim();
+    const site = (r[cSite] || '').trim();
+    const applicant = (r[cApplicant] || '').trim();
+    if (!ref && !site && !applicant) continue;
+    out.push(classify({
+      ref, site, applicant,
+      type: (r[cType] || '').trim(),
+      authority: (r[cAuth] || '').trim()
+    }));
+  }
+  return out;
+}
+
+const COMPANY_WORDS = /\b(ltd|limited|llp|plc|commissioners|council|enterprises|group|homes|developments|hire|innovation|advocates|solicitors)\b/i;
+const TITLE_RE = /^(mr|mrs|miss|ms|dr)\b/i;
+
+function classify(lead){
+  const log = getLog();
+  const applicantLower = lead.applicant.toLowerCase();
+
+  lead.excludedReason = null;
+  for (const name of STANDING_EXCLUDE) {
+    if (applicantLower.includes(name) || lead.site.toLowerCase().includes(name)) { lead.excludedReason = 'Standing never-contact: ' + name; break; }
+  }
+  lead.alreadyProcessed = !!log[lead.ref];
+
+  lead.needsReview = false;
+  lead.reviewNote = '';
+  if (/not legible|illegible|acting for|not stated/i.test(lead.applicant)) {
+    lead.needsReview = true; lead.reviewNote = 'Applicant unclear on the form — check before sending.';
+  }
+
+  // Checked on the name with any bracketed aside removed first, so an
+  // individual like "Mr Wesley Roussouw (H&B Developments)" isn't
+  // misclassified as a company just because of what's in brackets. A
+  // leading personal title always wins (individual); otherwise Company
+  // is the positive signal (Ltd/Limited/Commissioners/etc.), Homeowner
+  // is the safe default.
+  const mainText = lead.applicant.replace(/\([^)]*\)/g, '').trim();
+  lead.type = TITLE_RE.test(mainText) ? 'Homeowner' : (COMPANY_WORDS.test(mainText) ? 'Company' : 'Homeowner');
+
+  lead.recipientLines = buildAddressBlock(lead);
+  lead.salutation = buildSalutation(lead);
+  if (lead.salutation === 'Dear Sir/Madam,' && lead.type === 'Homeowner') {
+    lead.needsReview = true;
+    lead.reviewNote = lead.reviewNote || 'Joint applicants with different surnames — check the salutation before sending.';
+  }
+
+  // Send by default — homeowners and businesses alike — unless it's on
+  // the standing never-contact list, already sent before, or flagged
+  // for a manual look (illegible/agent-only/genuinely unresolved name).
+  lead.include = !lead.excludedReason && !lead.alreadyProcessed && !lead.needsReview;
+  return lead;
+}
+
+function buildAddressBlock(lead){
+  const name = lead.applicant.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  let addrParts = lead.site.split(',').map(s => s.trim()).filter(Boolean);
+  // Site address sometimes repeats the company name as its own first
+  // segment (e.g. "Mann Crane Hire Ltd, Balthane Industrial Estate...")
+  // — drop it there so it isn't printed twice.
+  if (addrParts.length && addrParts[0].toLowerCase() === name.toLowerCase()) addrParts = addrParts.slice(1);
+  return [name || '(Name unclear — check)'].concat(addrParts);
+}
+
+// Strips a trailing "&"/"and" connector before taking the last word, so
+// "Martyn Lester &" (mid-string, before the next title) correctly
+// yields the surname "Lester" rather than the ampersand itself.
+function lastWord(s){
+  const t = (s || '').trim().replace(/\s*(?:&|and)\s*$/i, '').trim();
+  if (!t) return '';
+  return (t.split(/\s+/).pop() || '').replace(/[.,]/g, '');
+}
+function cap(s){ return s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : s; }
+
+function buildSalutation(lead){
+  // Illegible/agent-only/unstated applicants aren't real names to parse —
+  // trying just produces garbled output. Already flagged for a manual
+  // look in classify(); default cleanly instead of guessing.
+  if (/not legible|illegible|acting for|not stated/i.test(lead.applicant)) return 'Dear Sir/Madam,';
+  if (lead.type === 'Company') {
+    // Prefer an actual company name in brackets over the named individual
+    // in front of it — "Mr Allan & Dave Kinrade (YOKBROS LTD)" should
+    // address YOKBROS, not garble the two directors' first names together.
+    const bracket = lead.applicant.match(/\(([^)]*)\)/);
+    let name = (bracket && COMPANY_WORDS.test(bracket[1])) ? bracket[1] : lead.applicant.replace(/\s*\([^)]*\)\s*/g, '').trim();
+    name = name.replace(/\b(ltd|limited|llp|plc)\b\.?/gi, '').trim();
+    if (!name || /commissioners|council|advocates|solicitors/i.test(lead.applicant)) return 'Dear Sir/Madam,';
+    return `Dear ${name} Team,`;
+  }
+
+  const core = lead.applicant.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!core) return 'Dear Sir/Madam,';
+
+  // "Mr & Mrs <given names> <Surname>" / "Mr and Mrs ..." — a single
+  // shared surname is the norm here (the first person's own surname is
+  // conventionally omitted, not actually different), so this is checked
+  // as one atomic unit before any general title-splitting below —
+  // otherwise the combined title's own "&" gets mistaken for a second,
+  // differently-surnamed person.
+  const combined = core.match(/^(Mr)\s*(?:&|and)\s*(Mrs)\b\s*(.*)$/i);
+  if (combined) {
+    const remainder = combined[3];
+    // Exactly one connector ("A & B Surname") reads as one shared
+    // surname — including a slash-joined surname like "Emmerson/Gledhill",
+    // which is how this couple's own name is written, not a sign of
+    // trouble. Two connectors ("David & Jan Brooks & Cooil") genuinely
+    // could be two different surnames — not safe to guess which.
+    const connectorCount = (remainder.match(/\s(?:&|and)\s/gi) || []).length;
+    const surname = lastWord(remainder);
+    if (connectorCount > 1 || !surname) return 'Dear Sir/Madam,';
+    return `Dear Mr & Mrs ${surname},`;
+  }
+
+  // General case: split on every title mention (Mr/Mrs/Miss/Ms/Dr) and
+  // compare the surname attached to each segment, including any
+  // untitled text before the first title (e.g. "Mark Patrick O'Meara &
+  // Miss Kathryn Newton" — "O'Meara" has no title of its own).
+  const TITLE_G = /\b(Mr|Mrs|Miss|Ms|Dr)\b/gi;
+  const titles = [...core.matchAll(TITLE_G)];
+  // No title anywhere (e.g. the source just wrote "Vincent Hesketh") —
+  // address by full name rather than falling back to Sir/Madam, since
+  // we do at least have a real, unambiguous single name to use.
+  if (!titles.length) return core.includes('&') || / and /i.test(core) ? 'Dear Sir/Madam,' : `Dear ${core},`;
+
+  const namedParts = [];
+  const preText = core.slice(0, titles[0].index).trim();
+  const preSurname = lastWord(preText);
+  const preFull = preText.replace(/\s*(?:&|and)\s*$/i, '').trim();
+  if (preSurname) namedParts.push({ title: null, surname: preSurname, full: preFull });
+  titles.forEach((t, i) => {
+    const end = i + 1 < titles.length ? titles[i + 1].index : core.length;
+    const text = core.slice(t.index + t[0].length, end);
+    const surname = lastWord(text);
+    if (surname) namedParts.push({ title: t[1], surname, full: null });
+  });
+
+  if (namedParts.length === 1) {
+    const only = namedParts[0];
+    return only.title ? `Dear ${cap(only.title)} ${only.surname},` : `Dear ${only.full},`;
+  }
+  const allSurnames = namedParts.map(p => p.surname.toLowerCase());
+  const allSame = allSurnames.every(s => s === allSurnames[0]);
+  if (allSame) {
+    const titleWords = namedParts.map(p => p.title).filter(Boolean);
+    const prefix = titleWords.length ? titleWords.map(cap).join(' & ') : 'Mr & Mrs';
+    return `Dear ${prefix} ${namedParts[namedParts.length - 1].surname},`;
+  }
+  // Two clearly-named people, genuinely different surnames (e.g. "Mr
+  // Martyn Lester & Mrs Cornelia Dahlgren") — the data isn't unclear,
+  // there just isn't one shared surname, so address both by name
+  // rather than falling back to a generic greeting.
+  if (namedParts.length === 2) {
+    const label = p => p.title ? `${cap(p.title)} ${p.surname}` : p.full;
+    return `Dear ${label(namedParts[0])} and ${label(namedParts[1])},`;
+  }
+  return 'Dear Sir/Madam,';
+}
+function closingLine(sal){ return (sal === 'Dear Sir/Madam,' || /Team,$/.test(sal)) ? 'Yours faithfully,' : 'Yours sincerely,'; }
+
+// ---- Rendering ----
+function render(){
+  document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
+  const main = document.getElementById('mainArea');
+  if (state.tab === 'review') return renderReview(main);
+  if (state.tab === 'letters') return renderPrint(main, 'letter');
+  if (state.tab === 'envelopes') return renderPrint(main, 'envelope');
+  if (state.tab === 'log') return renderLog(main);
+  renderImport(main);
+}
+
+function renderImport(main){
+  main.innerHTML = `
+    <p class="hint">Paste the leads table here — straight copy from the Weekly List export or the extracted PDF table (columns: Reference, Site Address, Applicant/Developer, Type, Local Authority; a header row is fine, tab-separated). Each pull replaces the working batch below, but the processed-log and excluded rows carry over.</p>
+    <textarea id="pasteBox" placeholder="Reference&#9;Site Address&#9;Applicant / Developer&#9;Type of Development&#9;Local Authority"></textarea>
+    <div class="row-actions" style="margin-top:14px">
+      <button class="btn" id="parseBtn">Parse leads</button>
+      <span id="parseMsg" style="color:var(--muted);font-size:0.82rem"></span>
+    </div>`;
+  document.getElementById('parseBtn').addEventListener('click', () => {
+    const text = document.getElementById('pasteBox').value;
+    leads = parseInput(text);
+    saveLeadsToStorage();
+    document.getElementById('parseMsg').textContent = leads.length ? `Parsed ${leads.length} leads — go to Review.` : 'Nothing recognised — check the paste has tab-separated columns.';
+    if (leads.length) { state.tab = 'review'; render(); }
+  });
+}
+
+function renderReview(main){
+  if (!leads.length) { main.innerHTML = '<p class="empty-state">Nothing parsed yet — go to Import and paste this week\'s leads.</p>'; return; }
+  const included = leads.filter(l => l.include).length;
+  const companies = leads.filter(l => l.type === 'Company').length;
+
+  function leadRow(l, i){
+    const flag = l.excludedReason ? { cls: 'tag-excl', label: 'Excluded', title: l.excludedReason }
+      : l.alreadyProcessed ? { cls: 'tag-dupe', label: 'Already sent', title: '' }
+      : l.needsReview ? { cls: 'tag-review', label: 'Check', title: l.reviewNote }
+      : null;
+    const locked = !!(l.excludedReason || l.alreadyProcessed);
+    return `
+      <div class="lead-row ${flag ? 'flagged' : ''}" data-i="${i}">
+        <div class="lr-main">
+          <div class="lr-applicant">${esc(l.applicant)}</div>
+          <div class="lr-meta">${esc(l.ref)} &middot; ${esc(l.site)} &middot; <select class="type-sel">${['Homeowner','Company'].map(t=>`<option ${l.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+          <input type="text" class="sal-input" value="${esc(l.salutation)}">
+        </div>
+        <div class="lr-side">
+          ${flag ? `<span class="tag ${flag.cls}" title="${esc(flag.title)}">${flag.label}</span>` : ''}
+          <button class="send-toggle ${l.include ? 'on' : 'off'}" ${locked ? 'disabled' : ''}>${l.include ? 'Send' : "Don't send"}</button>
+        </div>
+      </div>`;
+  }
+
+  const homeowners = leads.map((l,i)=>({l,i})).filter(x => x.l.type === 'Homeowner');
+  const businesses = leads.map((l,i)=>({l,i})).filter(x => x.l.type === 'Company');
+
+  main.innerHTML = `
+    <div class="stat-bar">
+      <span><b>${leads.length}</b> total</span>
+      <span><b>${leads.filter(l=>l.excludedReason).length}</b> standing-excluded</span>
+      <span><b>${leads.filter(l=>l.alreadyProcessed).length}</b> already sent before</span>
+      <span><b>${leads.filter(l=>l.needsReview).length}</b> flagged for a manual look</span>
+      <span><b>${leads.length-companies}</b> homeowners &middot; <b>${companies}</b> businesses</span>
+      <span style="color:var(--accent)"><b>${included}</b> set to send</span>
+    </div>
+    <h3 class="lead-section-hdr">Homeowners &middot; ${homeowners.length}</h3>
+    <div class="lead-list">${homeowners.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None in this batch.</p>'}</div>
+    <h3 class="lead-section-hdr">Businesses &middot; ${businesses.length}</h3>
+    <div class="lead-list">${businesses.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None in this batch.</p>'}</div>
+  `;
+
+  main.querySelectorAll('.lead-row[data-i]').forEach(row => {
+    const i = +row.dataset.i;
+    const toggle = row.querySelector('.send-toggle');
+    if (!toggle.disabled) toggle.addEventListener('click', () => {
+      leads[i].include = !leads[i].include;
+      saveLeadsToStorage();
+      renderReview(main);
+    });
+    row.querySelector('.type-sel').addEventListener('change', e => { leads[i].type = e.target.value; saveLeadsToStorage(); renderReview(main); });
+    row.querySelector('.sal-input').addEventListener('change', e => { leads[i].salutation = e.target.value; saveLeadsToStorage(); });
+  });
+}
+
+function letterBody(){
+  return [
+    "We noticed your recent planning application on the Isle of Man and wanted to take the opportunity to introduce Silverdale Limited.",
+    "Silverdale is an Isle of Man-based property development company, working across residential and commercial land and development opportunities on the Island. We work with landowners, developers and investors to bring projects forward, from initial planning and design through to delivery.",
+    "We're part of the same group as Drainage &amp; Groundwork Contractors Ltd (DGC), which gives us direct, in-house access to groundworks, drainage and civils delivery alongside our development and planning expertise &mdash; helping keep costs under control and projects on programme from the outset.",
+    "As we continue to build our own development pipeline, we'd welcome the chance to talk through your current plans, a future site, or how we might work together as things move forward.",
+    "If it would ever be useful to talk, or if there's anything Silverdale could help with, we'd be glad to hear from you. Thank you for your time, and best of luck with your project."
+  ];
+}
+
+function renderPrint(main, kind){
+  const batch = leads.filter(l => l.include);
+  if (!batch.length) {
+    const msg = leads.length
+      ? `Nothing set to Send right now — ${leads.length} leads are loaded, but they're all either already marked sent, excluded, or flagged for a check. Go to Review to see them and flip anything back to Send.`
+      : `Nothing parsed yet — go to Import and paste this week's leads.`;
+    main.innerHTML = `<p class="empty-state">${esc(msg)}</p>`;
+    return;
+  }
+
+  main.innerHTML = `
+    <div class="row-actions">
+      <button class="btn" id="printBtn">&#128438; Print / Save PDF (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
+      <button class="btn-secondary" id="markSentBtn">&#10003; Mark these ${batch.length} as sent (updates the processed log)</button>
+      <span id="printMsg" style="color:var(--muted);font-size:0.82rem"></span>
+    </div>
+    ${batch.map(l => kind === 'letter' ? letterHtml(l) : envelopeHtml(l)).join('')}
+  `;
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+  document.getElementById('markSentBtn').addEventListener('click', () => {
+    const log = getLog();
+    const today = new Date().toISOString().slice(0,10);
+    batch.forEach(l => { if (l.ref) log[l.ref] = { date: today, name: l.applicant }; });
+    saveLog(log);
+    batch.forEach(l => { l.alreadyProcessed = true; l.include = false; });
+    saveLeadsToStorage();
+    document.getElementById('markSentBtn').textContent = '✓ Logged';
+    document.getElementById('markSentBtn').disabled = true;
+  });
+}
+
+function letterHtml(l){
+  return `<div class="print-doc letter-page">
+    <div class="letter-head">
+      <div class="letter-logo"><img src="assets/silverdale-logo.jpg" alt="Silverdale"></div>
+      <div class="letter-sender">
+        <div class="name">Silverdale Limited</div>
+        <div class="addr">23 Circular Road, Douglas, Isle of Man, IM1 1AF<br>+44 016 246 14845 &nbsp;|&nbsp; info@silverdale.im</div>
+      </div>
+    </div>
+    <div class="letter-date">${todayOrdinal()}</div>
+    <div class="letter-addr">${l.recipientLines.map(esc).join('<br>')}</div>
+    <div class="letter-subject"><b>Subject:</b> Introducing Silverdale</div>
+    <div class="letter-body">
+      <p>${esc(l.salutation)}</p>
+      ${letterBody().map(p => `<p>${p}</p>`).join('')}
+      <p>${closingLine(l.salutation)}</p>
+      <div class="letter-sign"><img src="assets/harry-signature.jpeg" alt="Signature"></div>
+      <p style="margin-top:0">Harry Harrison &ndash; Director<br>Silverdale Limited</p>
+    </div>
+    <div class="letter-ref">Ref: ${esc(l.ref)} &mdash; admin use only, not for print</div>
+  </div>`;
+}
+function envelopeHtml(l){
+  const [name, ...addr] = l.recipientLines;
+  return `<div class="print-doc env-page">
+    <div class="env-logo"><img src="assets/silverdale-logo.jpg" alt="Silverdale"></div>
+    <div class="env-recipient">
+      <div class="er-name">${esc(name)}</div>
+      ${addr.map(line => `<div class="er-line">${esc(line)}</div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function renderLog(main){
+  const log = getLog();
+  const refs = Object.keys(log).sort().reverse();
+  if (!refs.length) { main.innerHTML = '<p class="empty-state">Nothing logged as sent yet.</p>'; return; }
+  main.innerHTML = `
+    <div class="row-actions"><button class="btn-danger" id="clearLogBtn">Clear entire log</button></div>
+    <table class="leads"><thead><tr><th>Reference</th><th>Applicant</th><th>Date logged</th></tr></thead><tbody>
+    ${refs.map(ref => `<tr><td>${esc(ref)}</td><td>${esc(log[ref].name)}</td><td>${esc(log[ref].date)}</td></tr>`).join('')}
+    </tbody></table>`;
+  document.getElementById('clearLogBtn').addEventListener('click', () => {
+    if (!confirm('Clear the whole processed-log? This will make every past reference look new again next import.')) return;
+    saveLog({}); render();
+  });
+}
+
+document.querySelectorAll('.navbtn').forEach(btn => btn.addEventListener('click', () => { state.tab = btn.dataset.tab; render(); }));
+
+leads = loadLeadsFromStorage().map(classify);
+render();
+</script>
+</body>
+</html>
