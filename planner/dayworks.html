@@ -356,7 +356,8 @@ function rowToEntry(r) {
     note: r.note || '', description: r.description || '',
     lunch: r.lunch_mins == null ? null : Number(r.lunch_mins),
     sentAt: r.sent_at || null, sentBatchRef: r.sent_batch_ref || null,
-    approvedBy: r.approved_by || null, approvedAt: r.approved_at || null
+    approvedBy: r.approved_by || null, approvedAt: r.approved_at || null,
+    removedAt: r.removed_at || null, removedNote: r.removed_note || null
   };
 }
 // sent_at/sent_batch_ref/lunch_mins were each added after this table's
@@ -369,6 +370,7 @@ let sentColumnsExist = true;
 let descriptionColumnExists = true;
 let lunchColumnExists = true;
 let approvedColumnsExist = true;
+let removedColumnsExist = true;
 async function detectSentColumns() {
   try {
     const r = await fetch(REST + '?select=sent_at&limit=1', { headers: sbHeaders() });
@@ -386,6 +388,10 @@ async function detectSentColumns() {
     const r4 = await fetch(REST + '?select=approved_by&limit=1', { headers: sbHeaders() });
     approvedColumnsExist = r4.ok;
   } catch (e) { approvedColumnsExist = false; }
+  try {
+    const r5 = await fetch(REST + '?select=removed_at&limit=1', { headers: sbHeaders() });
+    removedColumnsExist = r5.ok;
+  } catch (e) { removedColumnsExist = false; }
 }
 
 function entryToRow(e) {
@@ -398,6 +404,7 @@ function entryToRow(e) {
   if (descriptionColumnExists) { row.description = e.description || ''; }
   if (lunchColumnExists) { row.lunch_mins = e.lunch == null ? null : e.lunch; }
   if (approvedColumnsExist) { row.approved_by = e.approvedBy || null; row.approved_at = e.approvedAt || null; }
+  if (removedColumnsExist) { row.removed_at = e.removedAt || null; row.removed_note = e.removedNote || null; }
   return row;
 }
 
@@ -467,7 +474,8 @@ async function uploadImageFile(file) {
   return path;
 }
 
-function unsent() { return entries.filter(e => !e.sentAt); }
+function unsent() { return entries.filter(e => !e.sentAt && !e.removedAt); }
+function removedEntries() { return entries.filter(e => !!e.removedAt); }
 
 // ---------------------------------------------------------------
 // Rendering — one dispatcher into #mainArea based on `state`.
@@ -517,6 +525,7 @@ function renderCurrent() {
     ${!sentColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Can't file saved packs into Historic yet — run this in the Job Planner's SQL Editor first:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists sent_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists sent_batch_ref text;</code></p>` : ''}
     ${!lunchColumnExists ? `<p class="flag-note" style="max-width:none">&#9888; The editable lunch field won't save yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists lunch_mins integer;</code></p>` : ''}
     ${!approvedColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Client approval won't be recorded yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists approved_by text;<br>alter table public.dgc_dayworks_entries add column if not exists approved_at timestamptz;</code></p>` : ''}
+    ${!removedColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; "Remove" is switched off until this is run — without it, removing would have to permanently delete instead of just hiding with a reason. Run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists removed_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists removed_note text;</code></p>` : ''}
   `;
 
   // Detail page for one person — replaces the list entirely.
@@ -548,7 +557,25 @@ function renderCurrent() {
         </div>`).join('')}
     </div>` : '';
 
-  let html = sendBarHtml + queriesHtml + overviewTablesHtml(pool);
+  // Removed entries stay on record now instead of being hard-deleted —
+  // this is where they can actually be found and put back, at the bottom
+  // of the page, our side only, same "explain the error" spirit as the
+  // Staff Hours discrepancy box.
+  const removed = removedEntries();
+  const removedHtml = removed.length ? `
+    <div class="queries-panel" style="border-color:var(--muted);background:rgba(100,116,139,.08)">
+      <div class="queries-hdr" style="color:var(--muted)">&#128465; ${removed.length} removed ${removed.length === 1 ? 'entry' : 'entries'} — kept on record, not deleted</div>
+      ${removed.map(r => `
+        <div class="query-item">
+          <div class="qi-main">
+            <strong>${esc(r.name) || '(no name)'}</strong> — ${fmtDate(r.date)} (${esc(baseJob(r.site))})${r.description ? ' — ' + esc(r.description) : ''}<br>
+            <span class="qi-msg">Removed: "${esc(r.removedNote || '')}"</span>
+          </div>
+          <button class="btn-secondary" data-restore-id="${esc(r.id)}">Restore</button>
+        </div>`).join('')}
+    </div>` : '';
+
+  let html = sendBarHtml + queriesHtml + overviewTablesHtml(pool) + removedHtml;
   main.innerHTML = html;
 
   main.querySelectorAll('.overview-row').forEach(row => {
@@ -568,6 +595,17 @@ function renderCurrent() {
       btn.disabled = true; btn.textContent = 'Resolving…';
       try { await resolveQuery(q); render(); }
       catch (err) { btn.disabled = false; btn.textContent = 'Mark resolved'; alert('Could not resolve: ' + err.message); }
+    });
+  });
+  main.querySelectorAll('[data-restore-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const r = removed.find(x => x.id === btn.dataset.restoreId);
+      if (!r) return;
+      btn.disabled = true; btn.textContent = 'Restoring…';
+      try {
+        await saveEntry(r.id, Object.assign({}, r, { removedAt: null, removedNote: null }));
+        render();
+      } catch (err) { btn.disabled = false; btn.textContent = 'Restore'; alert('Could not restore: ' + err.message); }
     });
   });
   const sendBtn = document.getElementById('sendBtn');
@@ -833,9 +871,24 @@ function wireDayRow(e) {
   });
 
   row.querySelector('[data-remove]').addEventListener('click', async () => {
-    if (!confirm('Remove this entry permanently?')) return;
-    try { await deleteRow(e.id); entries = entries.filter(x => x.id !== e.id); render(); }
-    catch (err) { alert('Could not remove: ' + err.message); }
+    // Ash, 11 Sep 2026: "Remove" used to be a straight permanent DELETE —
+    // no undo, gone the moment you clicked it. Same lesson as Staff Hours:
+    // it now keeps the row (and its photo), just takes it out of the
+    // working list, and asks why — recoverable from the "Removed" list
+    // at the bottom of the Jobs page rather than gone outright.
+    const reason = prompt('Removing this from the working list — it stays on record and can be restored. Why is it being removed?', '');
+    if (reason === null) return; // cancelled
+    const status = row.querySelector('[data-status]');
+    try {
+      if (removedColumnsExist) {
+        await saveEntry(e.id, Object.assign({}, e, { removedAt: new Date().toISOString(), removedNote: reason.trim() || 'No reason given' }));
+        render();
+      } else {
+        if (status) status.textContent = "Can't remove yet — run the removed_at/removed_note SQL first (see the banner above).";
+      }
+    } catch (err) {
+      if (status) status.textContent = 'Could not remove: ' + err.message;
+    }
   });
 
   // Placeholder for re-reading a single entry straight from its photo via
