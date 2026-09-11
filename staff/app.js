@@ -381,6 +381,7 @@ async function flushCell(staffId, date, input) {
   const key = staffId + '_' + date;
   const existing = hoursCache[key];
   document.getElementById('hoursStatus').textContent = 'Saving…';
+  await ensureLoggedIn(); // refresh token in localStorage if expired
   try {
     const hours = raw === '' ? null : Number(raw);
     if (raw === '' || hours === 0) {
