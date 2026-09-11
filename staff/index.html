@@ -27,7 +27,7 @@
 </div>
 
 <div style="position:fixed;top:8px;right:12px;z-index:100;display:flex;gap:6px;align-items:center">
-  <span style="color:#6b7f8f;font-size:10px;font-weight:600;font-family:inherit">v26</span>
+  <span style="color:#6b7f8f;font-size:10px;font-weight:600;font-family:inherit">v27</span>
   <button class="theme-toggle-btn" onclick="toggleTheme()" style="background:none;border:1px solid rgba(255,255,255,.18);border-radius:5px;color:#8ab0cc;font-size:10px;font-weight:600;padding:3px 8px;cursor:pointer;font-family:inherit">Light Mode</button>
   <button id="signOutBtn" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:5px;color:#6b7f8f;font-size:10px;font-weight:600;padding:3px 8px;cursor:pointer;font-family:inherit">Sign out</button>
 </div>
@@ -55,13 +55,7 @@
       <table id="hoursTable" class="hours-table"></table>
     </div>
 
-    <section class="wages-forward-section" id="hourDiscrepancySection" hidden>
-      <h3>&#9888; Possible Double Entries</h3>
-      <p class="hours-hint">Same person, same day, entered on two different sheets with two different numbers — the grid can't tell which is right, so check these by hand.</p>
-      <div id="hourDiscrepancyList" class="advances-list"></div>
-    </section>
-
-    <section class="wages-forward-section" id="wagesForwardSection" hidden>
+<section class="wages-forward-section" id="wagesForwardSection" hidden>
       <h3>Wages Brought Forward</h3>
       <p class="hours-hint">Logged after that week was already approved — missed that pay run, add as a backpay adjustment this period.</p>
       <div id="wagesForwardList" class="advances-list"></div>
