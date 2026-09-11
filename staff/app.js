@@ -116,6 +116,7 @@ let staff = [];
 let staffById = {};
 let hoursCache = {}; // `${staff_id}_${date}` -> {id, hours, note}
 let hourDiscrepancies = []; // {staffId, date, manualHours, submittedHours} — same person/day entered twice, values disagree
+let noteColumnExists = true; // set false at boot if the note column hasn't been added to dgc_staff_hours yet
 let leaveCache = [];
 let advancesCache = [];
 let confirmedNames = new Set(); // staff who've pressed "Send" on the Timesheet app for a period overlapping this one
@@ -141,7 +142,8 @@ async function loadAll() {
   const [staffRows, hourRows, leaveRows, advRows, approval1Rows, approval2Rows, tsRows, confirmRows] = await Promise.all([
     sbGet('/dgc_staff?select=id,name,role,rate,active&order=name'),
     sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours,note&work_date=gte.' + from + '&work_date=lte.' + to)
-      .catch(() => sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours&work_date=gte.' + from + '&work_date=lte.' + to)),
+      .then(rows => { noteColumnExists = true; return rows; })
+      .catch(() => { noteColumnExists = false; return sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours&work_date=gte.' + from + '&work_date=lte.' + to); }),
     sbGet('/dgc_staff_leave?select=*&from_date=lte.' + to + '&to_date=gte.' + from),
     sbGet('/dgc_staff_advances?select=*&entry_date=gte.' + from + '&entry_date=lte.' + to + '&order=entry_date.desc'),
     sbGet('/dgc_payroll_approval?select=*&period_start=eq.' + from).catch(() => []),
@@ -458,27 +460,62 @@ function scheduleSave(staffId, date, input) {
   clearTimeout(saveTimers[key]);
   saveTimers[key] = setTimeout(() => flushCell(staffId, date, input), 1500);
 }
+// Ash, 11 Sep 2026: clearing a cell used to hard-DELETE the row outright
+// — no undo, no trace, gone. That cost a real recorded value with no way
+// to recover it. Now clearing a cell that actually had a value on it
+// never deletes the row: it keeps it, zeroes the hours, and asks why —
+// so there's always a record of what happened, and nothing an admin
+// clears here is ever silently unrecoverable again. A cell that was
+// already empty (nothing to lose) just clears with no fuss.
 async function flushCell(staffId, date, input) {
   clearTimeout(saveTimers[staffId + '_' + date]);
   const raw = input.value.trim();
   const key = staffId + '_' + date;
   const existing = hoursCache[key];
+  const hadRealValue = !!(existing && existing.id && existing.hours !== null && existing.hours !== undefined);
+
+  if (raw === '' && hadRealValue) {
+    const reason = prompt(
+      `This clears ${existing.hours}h already recorded here for this day. The entry is kept on record with the hours set to nil, not deleted — why is it being cleared?`,
+      existing.note || ''
+    );
+    if (reason === null) {
+      input.value = existing.hours; // cancelled — put the real value back on screen
+      return;
+    }
+    document.getElementById('hoursStatus').textContent = 'Saving…';
+    await ensureLoggedIn();
+    try {
+      const patch = { hours: null };
+      if (noteColumnExists) patch.note = reason.trim() || 'Cleared — no reason given';
+      await sbPatch('dgc_staff_hours', 'id=eq.' + existing.id, patch);
+      hoursCache[key] = { id: existing.id, hours: null, note: noteColumnExists ? patch.note : (existing.note || '') };
+      document.getElementById('hoursStatus').textContent = noteColumnExists
+        ? 'Saved ✓ — kept on record as nil, with your note'
+        : 'Saved ✓ — kept on record as nil (note not saved yet — run the note-column SQL)';
+      updateTotalCells();
+    } catch (e) {
+      document.getElementById('hoursStatus').textContent = 'Save failed — check connection';
+      console.error(e);
+    }
+    return;
+  }
+
   document.getElementById('hoursStatus').textContent = 'Saving…';
   await ensureLoggedIn(); // refresh token in localStorage if expired
   try {
     const hours = raw === '' ? null : Number(raw);
     if (raw === '') {
-      // Empty = clear entry (restores BH/H display or blanks the cell)
-      if (existing && existing.id) await sbDelete('dgc_staff_hours', 'id=eq.' + existing.id);
+      // Nothing real was here to lose — just clear it, no row to keep.
       delete hoursCache[key];
     } else {
       // Save the value — including 0, which explicitly overrides BH/H to not pay
       if (existing && existing.id) {
         await sbPatch('dgc_staff_hours', 'id=eq.' + existing.id, { hours });
-        hoursCache[key] = { id: existing.id, hours };
+        hoursCache[key] = { id: existing.id, hours, note: existing.note || '' };
       } else {
         const [row] = await sbPost('dgc_staff_hours', { staff_id: staffId, work_date: date, hours });
-        hoursCache[key] = { id: row.id, hours };
+        hoursCache[key] = { id: row.id, hours, note: '' };
       }
     }
     document.getElementById('hoursStatus').textContent = 'Saved ✓ ' + new Date().toLocaleTimeString('en-GB');
