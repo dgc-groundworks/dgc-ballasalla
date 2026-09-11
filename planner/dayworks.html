@@ -737,18 +737,18 @@ function dayRowHtml(e, conflicts) {
           </div>
         </div>` : ''}
       <div class="dr-task-hdr" data-task-hdr>${esc(e.description) || '(no description yet)'}</div>
-      <label style="margin-bottom:8px">Staff name (fix here if it's wrong)<input type="text" class="dr-input dr-name" value="${esc(e.name)}" placeholder="Staff name" style="font-weight:800;font-size:0.9rem"></label>
+      <label style="margin-bottom:8px">Staff name (fix here if it's wrong)<input type="text" class="dr-input dr-name" autocomplete="off" value="${esc(e.name)}" placeholder="Staff name" style="font-weight:800;font-size:0.9rem"></label>
       <p data-summary style="font-size:0.82rem;color:var(--muted);margin-bottom:8px">${daySummaryLine(e)}</p>
       <div class="dr-fields">
         <label>Date<input type="date" class="dr-input" data-f="date" autocomplete="off" value="${esc(e.date)}"></label>
-        <label>Start<input type="time" class="dr-input" data-f="start" value="${esc(e.start)}"></label>
-        <label>Finish<input type="time" class="dr-input" data-f="finish" value="${esc(e.finish)}"></label>
-        <label>Lunch (mins)<input type="number" min="0" step="5" class="dr-input" data-f="lunch" data-manual="${e.lunch != null ? '1' : '0'}" value="${e.lunch == null ? defaultLunchMins(e.start, e.finish) : e.lunch}"></label>
+        <label>Start<input type="time" class="dr-input" data-f="start" autocomplete="off" value="${esc(e.start)}"></label>
+        <label>Finish<input type="time" class="dr-input" data-f="finish" autocomplete="off" value="${esc(e.finish)}"></label>
+        <label>Lunch (mins)<input type="number" min="0" step="5" class="dr-input" data-f="lunch" autocomplete="off" data-manual="${e.lunch != null ? '1' : '0'}" value="${e.lunch == null ? defaultLunchMins(e.start, e.finish) : e.lunch}"></label>
         <span class="dr-hours" data-hours>${e.hours == null ? '—' : e.hours}h</span>
       </div>
-      <label style="margin-top:8px">Description of work<input type="text" class="dr-input" data-f="description" value="${esc(e.description)}" placeholder="e.g. Slab prep, pour, drainage…"></label>
+      <label style="margin-top:8px">Description of work<input type="text" class="dr-input" data-f="description" autocomplete="off" value="${esc(e.description)}" placeholder="e.g. Slab prep, pour, drainage…"></label>
       <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <input type="text" class="dr-input" data-f="site" value="${esc(e.site)}" placeholder="Job/site" style="max-width:220px">
+        <input type="text" class="dr-input" data-f="site" autocomplete="off" value="${esc(e.site)}" placeholder="Job/site" style="max-width:220px">
         ${area ? `<span style="font-size:0.75rem;color:var(--muted)">Area: ${esc(area)}</span>` : ''}
       </div>
       <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -1166,9 +1166,14 @@ async function handleFiles(files) {
     label.textContent = `Uploading ${done + 1} of ${imgFiles.length}…`;
     try {
       const path = await uploadImageFile(file);
+      // Ash, 11 Sep 2026: this used to default start/finish to 08:00–16:30,
+      // which then showed a confident-looking "8h" on a brand-new upload
+      // nothing has actually read yet — easy to mistake for real
+      // extraction. Left blank now, same as name/date/site, so nothing
+      // here claims to know anything about the sheet until a PM types it.
       const saved = await insertRow({
         imagePath: path, name: '', date: '', weekEnding: '', site: '',
-        start: '08:00', finish: '16:30', hours: null, confirmed: false, flagged: true,
+        start: '', finish: '', hours: null, confirmed: false, flagged: true,
         note: 'Just uploaded — AI reading is not wired up yet. Type in what the sheet says.'
       });
       entries.push(saved);
