@@ -58,6 +58,7 @@ async function sbDelete(table, filter) {
   return true;
 }
 
+function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 function isoFromVal(t) { return new Date(t).toISOString().slice(0, 10); }
 function valFromIso(iso) { const [y, m, d] = iso.split('-').map(Number); return Date.UTC(y, m - 1, d); }
 function addDaysVal(t, n) { return t + n * 86400000; }
@@ -91,7 +92,8 @@ let week2Approved = false;
 let periodDates = [];
 let staff = [];
 let staffById = {};
-let hoursCache = {}; // `${staff_id}_${date}` -> {id, hours}
+let hoursCache = {}; // `${staff_id}_${date}` -> {id, hours, note}
+let hourDiscrepancies = []; // {staffId, date, manualHours, submittedHours} — same person/day entered twice, values disagree
 let leaveCache = [];
 let advancesCache = [];
 let confirmedNames = new Set(); // staff who've pressed "Send" on the Timesheet app for a period overlapping this one
@@ -115,7 +117,8 @@ async function loadAll() {
   const overlappingStaffPeriods = staffPeriodsOverlapping(valFromIso(from), valFromIso(to));
   const [staffRows, hourRows, leaveRows, advRows, approval1Rows, approval2Rows, tsRows, confirmRows] = await Promise.all([
     sbGet('/dgc_staff?select=id,name,role,rate,active&order=name'),
-    sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours&work_date=gte.' + from + '&work_date=lte.' + to),
+    sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours,note&work_date=gte.' + from + '&work_date=lte.' + to)
+      .catch(() => sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours&work_date=gte.' + from + '&work_date=lte.' + to)),
     sbGet('/dgc_staff_leave?select=*&from_date=lte.' + to + '&to_date=gte.' + from),
     sbGet('/dgc_staff_advances?select=*&entry_date=gte.' + from + '&entry_date=lte.' + to + '&order=entry_date.desc'),
     sbGet('/dgc_payroll_approval?select=*&period_start=eq.' + from).catch(() => []),
@@ -148,16 +151,28 @@ async function loadAll() {
 
   hoursCache = {};
   // Load manual entries first
-  hourRows.forEach(h => hoursCache[h.staff_id + '_' + h.work_date] = { id: h.id, hours: h.hours });
+  hourRows.forEach(h => hoursCache[h.staff_id + '_' + h.work_date] = { id: h.id, hours: h.hours, note: h.note || '' });
   // Worker timesheet submissions override — they carry true decimal hours (e.g. 8.5)
   const staffByName = {};
   staffRows.forEach(s => { staffByName[s.name.trim().toLowerCase()] = s.id; });
+  // Ash, 11 Sep 2026: when a manual entry AND a worker-submitted timesheet
+  // both exist for the same person/day with different hours, the line
+  // below used to just silently keep the timesheet's number — the manual
+  // figure vanished from view with no trace it ever existed, which is
+  // exactly the "double entry" that went unnoticed. Now it's recorded in
+  // hourDiscrepancies instead, so it surfaces on screen rather than
+  // quietly disappearing.
+  hourDiscrepancies = [];
   (Array.isArray(tsRows) ? tsRows : []).forEach(t => {
     const sid = staffByName[(t.staff_name || '').trim().toLowerCase()];
     if (sid && parseFloat(t.hours) > 0) {
       const key = sid + '_' + t.work_date;
       const existing = hoursCache[key];
-      hoursCache[key] = { id: existing ? existing.id : null, hours: parseFloat(t.hours) };
+      const submitted = parseFloat(t.hours);
+      if (existing && existing.hours != null && Number(existing.hours) !== submitted) {
+        hourDiscrepancies.push({ staffId: sid, date: t.work_date, manualHours: Number(existing.hours), submittedHours: submitted });
+      }
+      hoursCache[key] = { id: existing ? existing.id : null, hours: submitted, note: existing ? existing.note : '' };
     }
   });
 
@@ -176,6 +191,30 @@ async function loadAll() {
   renderHolidays();
   renderApprovalState();
   renderWagesBroughtForward();
+  renderHourDiscrepancies();
+}
+
+// Ash, 11 Sep 2026: a plain, single box at the bottom, admin-side only —
+// not mixed into the grid itself — listing every date where a manual
+// entry and a worker-submitted timesheet disagree, so it can't silently
+// resolve itself in the client's/anyone else's favour without a PM
+// noticing. Deliberately just a list, not an inline flag on every cell.
+function renderHourDiscrepancies() {
+  const section = document.getElementById('hourDiscrepancySection');
+  const list = document.getElementById('hourDiscrepancyList');
+  if (!section || !list) return;
+  if (!hourDiscrepancies.length) { section.hidden = true; list.innerHTML = ''; return; }
+  list.innerHTML = hourDiscrepancies.map(d => {
+    const name = (staffById[d.staffId] && staffById[d.staffId].name) || 'Unknown staff';
+    return `<div class="advance-row">
+      <div class="row-fields">
+        <span class="advance-date">${fmtShort(d.date)}</span>
+        <span class="advance-name">${name}</span>
+        <span class="advance-notes">NB: entered twice on this date — Hours grid says ${d.manualHours}h, their submitted timesheet says ${d.submittedHours}h. Currently showing ${d.submittedHours}h. Fix the wrong one on the grid above and leave a note on the cell explaining what happened.</span>
+      </div>
+    </div>`;
+  }).join('');
+  section.hidden = false;
 }
 
 // Flags hours entered AFTER a week was already approved/locked for pay —
@@ -307,12 +346,14 @@ function renderHours() {
       const c = cellFor(s.id, date);
       const todayCls = date === todayIso ? 'today-col' : '';
       const isLocked = i < 7 ? week1Approved : week2Approved;
+      const cellNote = (hoursCache[s.id + '_' + date] || {}).note || '';
+      const noteBtn = `<button type="button" class="hours-note-btn${cellNote ? ' has-note' : ''}" data-staff="${s.id}" data-date="${date}" title="${cellNote ? esc(cellNote) : 'Add a note'}">&#128221;</button>`;
       if (c.kind === 'hours') {
         dayTotals[i] += Number(c.value) || 0;
         if (isLocked) {
           body += `<td class="hours-readonly ${todayCls}">${Number(c.value) || ''}</td>`;
         } else {
-          body += `<td class="${todayCls}"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" value="${c.value}"></td>`;
+          body += `<td class="${todayCls}"><div class="hours-cell-wrap"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" value="${c.value}">${noteBtn}</div></td>`;
         }
       } else if (c.kind === 'weekend') {
         body += `<td class="${todayCls}"></td>`;
@@ -324,7 +365,7 @@ function renderHours() {
         } else if (isLocked) {
           body += `<td class="hours-readonly ${todayCls}"></td>`;
         } else {
-          body += `<td class="${todayCls}"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" value=""></td>`;
+          body += `<td class="${todayCls}"><div class="hours-cell-wrap"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" value="">${noteBtn}</div></td>`;
         }
       } else {
         if (c.kind === 'BH' || c.kind === 'H') dayTotals[i] += 8;
@@ -436,7 +477,43 @@ document.getElementById('hoursTable').addEventListener('click', e => {
     updateAmountUnit();
     document.getElementById('advAmount').focus();
   }
+  if (e.target.classList.contains('hours-note-btn')) {
+    addOrEditHoursNote(e.target.dataset.staff, e.target.dataset.date, e.target);
+  }
 });
+
+// Ash, 11 Sep 2026: "make the provision to add a note" — a plain text
+// note on any hours cell, so a correction (like fixing a double entry)
+// leaves an explanation instead of a silent edit. Needs a row to PATCH
+// against — if the cell has no saved row yet (nothing typed in), save the
+// current value first so there's something to attach the note to.
+async function addOrEditHoursNote(staffId, date, btn) {
+  const key = staffId + '_' + date;
+  let existing = hoursCache[key];
+  const current = existing ? (existing.note || '') : '';
+  const typed = prompt('Note for this entry:', current);
+  if (typed === null) return; // cancelled
+  const note = typed.trim();
+  btn.disabled = true;
+  try {
+    if (!existing || !existing.id) {
+      const tr = btn.closest('tr');
+      const input = tr.querySelector(`.hours-cell[data-date="${date}"]`);
+      const hours = input && input.value.trim() !== '' ? Number(input.value) : null;
+      if (hours == null) { alert('Enter the hours for this day first, then add a note.'); btn.disabled = false; return; }
+      const [row] = await sbPost('dgc_staff_hours', { staff_id: staffId, work_date: date, hours, note });
+      hoursCache[key] = { id: row.id, hours, note };
+    } else {
+      await sbPatch('dgc_staff_hours', 'id=eq.' + existing.id, { note });
+      hoursCache[key] = { id: existing.id, hours: existing.hours, note };
+    }
+    btn.classList.toggle('has-note', !!note);
+    btn.title = note || 'Add a note';
+  } catch (err) {
+    alert('Could not save the note — has the note column been added yet? ' + err.message);
+  }
+  btn.disabled = false;
+}
 
 async function toggleFillOnePerson(staffId) {
   const tr = document.querySelector(`tr[data-staff="${staffId}"]`);

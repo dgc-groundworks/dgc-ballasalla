@@ -398,6 +398,15 @@ label.checkbox input { width: auto; padding: 0; }
 .hours-cell.invalid-cell { border-color: var(--danger); background: rgba(217,83,79,0.12); }
 /* off-work weekends: same H/U shown as a placeholder only — never real data */
 .hours-cell::placeholder { color: var(--muted); opacity: 0.7; font-style: italic; }
+.hours-cell-wrap { position: relative; display: inline-block; }
+.hours-cell-wrap .hours-cell { padding-right: 14px; }
+.hours-note-btn {
+  position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px;
+  padding: 0; border: none; background: none; cursor: pointer;
+  font-size: 9px; line-height: 1; opacity: 0.25;
+}
+.hours-note-btn:hover { opacity: 0.7; }
+.hours-note-btn.has-note { opacity: 1; filter: drop-shadow(0 0 1px var(--accent)); }
 
 .hours-readonly.clickable { cursor: pointer; text-decoration: underline dotted; text-decoration-color: var(--muted); }
 .hours-readonly.clickable:hover { color: var(--accent); }
