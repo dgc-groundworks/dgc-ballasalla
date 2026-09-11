@@ -362,10 +362,10 @@ function renderHours() {
     const ot = overtimeFor(s.id);
     const salaryHrs = SALARIED.get(s.name) || 0;
     const total = rowTotal(s.id, s.name);
+    const excl = isExcluded(s);
     if (!excl) { footOT += ot; footTotal += total; footAdv += moneyFor(s.id, 'Advance'); footBonus += moneyFor(s.id, 'Bonus'); }
 
     const sentTick = confirmedNames.has(s.name) ? ' <span class="send-tick" title="Sent their hours — happy with this fortnight">&#10003;</span>' : '';
-    const excl = isExcluded(s);
     const exclBtn = `<button type="button" class="excl-toggle${excl ? ' excl-off' : ''}" data-staff="${s.id}" title="${excl ? 'Excluded from totals — click to include' : 'Included in totals — click to exclude'}">&#9679;</button>`;
     body += `<tr data-staff="${s.id}"${excl ? ' class="excl-row"' : ''}><td class="hours-name">${exclBtn}${s.name}${sentTick}${salaryHrs ? ' <span style="font-size:0.7em;color:var(--muted);font-weight:400">(salary)</span>' : ''}</td>`;
     periodDates.forEach((date, i) => {
