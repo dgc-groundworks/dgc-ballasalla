@@ -66,8 +66,9 @@ function loadExcludeOverrides() {
   try { _excludeOverrides = JSON.parse(localStorage.getItem('dgc_excl') || '{}'); } catch(e) { _excludeOverrides = {}; }
 }
 function isExcluded(s) {
+  if (/^test\b/i.test(s.name)) return true; // test staff: always excluded, cannot be toggled
   if (s.id in _excludeOverrides) return _excludeOverrides[s.id];
-  return /^test\b/i.test(s.name); // default: exclude staff named Test*
+  return false;
 }
 function toggleExclusion(staffId) {
   const s = staff.find(x => x.id === staffId);
@@ -191,12 +192,21 @@ async function loadAll() {
       const key = sid + '_' + t.work_date;
       const existing = hoursCache[key];
       const submitted = parseFloat(t.hours);
-      if (existing && existing.id && existing.hours != null && Number(existing.hours) !== submitted) {
-        // Flag discrepancy for visibility but always show timesheet value
-        hourDiscrepancies.push({ staffId: sid, date: t.work_date, manualHours: Number(existing.hours), submittedHours: submitted });
+      if (existing && existing.id) {
+        const adminVal = Number(existing.hours);
+        if (adminVal === submitted) {
+          // Same value — nothing to do
+        } else if (adminVal === 8) {
+          // DB has the default fill value (8) — timesheet wins (e.g. staff submitted 8.5)
+          hoursCache[key] = { id: existing.id, hours: submitted, note: existing.note || '' };
+        } else {
+          // Admin deliberately set a non-default value (e.g. 6 for a short day) — keep it
+          hourDiscrepancies.push({ staffId: sid, date: t.work_date, manualHours: adminVal, submittedHours: submitted });
+        }
+      } else {
+        // No saved DB entry — pre-fill from timesheet
+        hoursCache[key] = { id: existing ? existing.id : null, hours: submitted, note: existing ? existing.note : '' };
       }
-      // Timesheet always fills the displayed value (staff submitted actual hours)
-      hoursCache[key] = { id: existing ? existing.id : null, hours: submitted, note: existing ? existing.note : '' };
     }
   });
 
@@ -366,7 +376,7 @@ function renderHours() {
     if (!excl) { footOT += ot; footTotal += total; footAdv += moneyFor(s.id, 'Advance'); footBonus += moneyFor(s.id, 'Bonus'); }
 
     const sentTick = confirmedNames.has(s.name) ? ' <span class="send-tick" title="Sent their hours — happy with this fortnight">&#10003;</span>' : '';
-    const exclBtn = `<button type="button" class="excl-toggle${excl ? ' excl-off' : ''}" data-staff="${s.id}" title="${excl ? 'Excluded from totals — click to include' : 'Included in totals — click to exclude'}">&#9679;</button>`;
+    const exclBtn = /^test\b/i.test(s.name) ? '' : `<button type="button" class="excl-toggle${excl ? ' excl-off' : ''}" data-staff="${s.id}" title="${excl ? 'Excluded from totals — click to include' : 'Included in totals — click to exclude'}">&#9679;</button>`;
     body += `<tr data-staff="${s.id}"${excl ? ' class="excl-row"' : ''}><td class="hours-name">${exclBtn}${s.name}${sentTick}${salaryHrs ? ' <span style="font-size:0.7em;color:var(--muted);font-weight:400">(salary)</span>' : ''}</td>`;
     periodDates.forEach((date, i) => {
       const c = cellFor(s.id, date);
@@ -394,7 +404,12 @@ function renderHours() {
         }
       } else {
         if (!excl && (c.kind === 'BH' || c.kind === 'H')) dayTotals[i] += 8;
-        body += `<td class="hours-readonly ${todayCls}">${c.kind}</td>`;
+        if (isLocked || excl) {
+          body += `<td class="hours-readonly ${todayCls}">${c.kind}</td>`;
+        } else {
+          // Editable BH/H cell — leave blank to keep full 8h pay, type 0 to not pay
+          body += `<td class="${todayCls}"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" placeholder="${c.kind}" title="Blank = ${c.kind} (8h paid). Enter 0 = not paid." style="color:var(--accent-green);font-weight:600;width:100%;text-align:center;border:none;background:transparent;padding:0"></td>`;
+        }
       }
     });
     const bothApproved = week1Approved && week2Approved;
@@ -452,10 +467,12 @@ async function flushCell(staffId, date, input) {
   await ensureLoggedIn(); // refresh token in localStorage if expired
   try {
     const hours = raw === '' ? null : Number(raw);
-    if (raw === '' || hours === 0) {
+    if (raw === '') {
+      // Empty = clear entry (restores BH/H display or blanks the cell)
       if (existing && existing.id) await sbDelete('dgc_staff_hours', 'id=eq.' + existing.id);
       delete hoursCache[key];
     } else {
+      // Save the value — including 0, which explicitly overrides BH/H to not pay
       if (existing && existing.id) {
         await sbPatch('dgc_staff_hours', 'id=eq.' + existing.id, { hours });
         hoursCache[key] = { id: existing.id, hours };
