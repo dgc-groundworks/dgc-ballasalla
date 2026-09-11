@@ -385,9 +385,10 @@ async function flushCell(staffId, date, input) {
   try {
     const hours = raw === '' ? null : Number(raw);
     if (raw === '' || hours === 0) {
-      if (existing) { await sbDelete('dgc_staff_hours', 'id=eq.' + existing.id); delete hoursCache[key]; }
+      if (existing && existing.id) await sbDelete('dgc_staff_hours', 'id=eq.' + existing.id);
+      delete hoursCache[key];
     } else {
-      if (existing) {
+      if (existing && existing.id) {
         await sbPatch('dgc_staff_hours', 'id=eq.' + existing.id, { hours });
         hoursCache[key] = { id: existing.id, hours };
       } else {
