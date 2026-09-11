@@ -169,10 +169,13 @@ async function loadAll() {
       const key = sid + '_' + t.work_date;
       const existing = hoursCache[key];
       const submitted = parseFloat(t.hours);
-      if (existing && existing.hours != null && Number(existing.hours) !== submitted) {
+      if (existing && existing.id && existing.hours != null && Number(existing.hours) !== submitted) {
+        // Admin entry exists and disagrees with timesheet — flag it but keep admin value
         hourDiscrepancies.push({ staffId: sid, date: t.work_date, manualHours: Number(existing.hours), submittedHours: submitted });
+      } else if (!existing || !existing.id) {
+        // No admin entry yet — use timesheet hours to pre-fill
+        hoursCache[key] = { id: existing ? existing.id : null, hours: submitted, note: '' };
       }
-      hoursCache[key] = { id: existing ? existing.id : null, hours: submitted, note: existing ? existing.note : '' };
     }
   });
 
