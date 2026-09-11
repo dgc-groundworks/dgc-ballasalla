@@ -340,7 +340,8 @@ function renderHours() {
     const ot = overtimeFor(s.id);
     const salaryHrs = SALARIED.get(s.name) || 0;
     const total = rowTotal(s.id, s.name);
-    footOT += ot; footTotal += total; footAdv += moneyFor(s.id, 'Advance'); footBonus += moneyFor(s.id, 'Bonus');
+    const isTest = /^test\b/i.test(s.name);
+    if (!isTest) { footOT += ot; footTotal += total; footAdv += moneyFor(s.id, 'Advance'); footBonus += moneyFor(s.id, 'Bonus'); }
 
     const sentTick = confirmedNames.has(s.name) ? ' <span class="send-tick" title="Sent their hours — happy with this fortnight">&#10003;</span>' : '';
     body += `<tr data-staff="${s.id}"><td class="hours-name">${s.name}${sentTick}${salaryHrs ? ' <span style="font-size:0.7em;color:var(--muted);font-weight:400">(salary)</span>' : ''}</td>`;
@@ -351,7 +352,7 @@ function renderHours() {
       const cellNote = (hoursCache[s.id + '_' + date] || {}).note || '';
       const noteBtn = `<button type="button" class="hours-note-btn${cellNote ? ' has-note' : ''}" data-staff="${s.id}" data-date="${date}" title="${cellNote ? esc(cellNote) : 'Add a note'}">&#128221;</button>`;
       if (c.kind === 'hours') {
-        dayTotals[i] += Number(c.value) || 0;
+        if (!isTest) dayTotals[i] += Number(c.value) || 0;
         if (isLocked) {
           body += `<td class="hours-readonly ${todayCls}">${Number(c.value) || ''}</td>`;
         } else {
@@ -361,8 +362,7 @@ function renderHours() {
         body += `<td class="${todayCls}"></td>`;
       } else if (c.kind === 'blank') {
         if (salaryHrs) {
-          // Salaried staff: show contracted hours read-only for reference
-          dayTotals[i] += salaryHrs;
+          if (!isTest) dayTotals[i] += salaryHrs;
           body += `<td class="hours-readonly ${todayCls}" style="color:var(--muted);font-style:italic" title="Salaried — ${salaryHrs}h/day reference">${salaryHrs}</td>`;
         } else if (isLocked) {
           body += `<td class="hours-readonly ${todayCls}"></td>`;
@@ -370,7 +370,7 @@ function renderHours() {
           body += `<td class="${todayCls}"><div class="hours-cell-wrap"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" value="">${noteBtn}</div></td>`;
         }
       } else {
-        if (c.kind === 'BH' || c.kind === 'H') dayTotals[i] += 8;
+        if (!isTest && (c.kind === 'BH' || c.kind === 'H')) dayTotals[i] += 8;
         body += `<td class="hours-readonly ${todayCls}">${c.kind}</td>`;
       }
     });
@@ -395,9 +395,11 @@ function updateTotalCells() {
   staff.forEach(s => {
     const salaryHrs = SALARIED.get(s.name) || 0;
     const total = rowTotal(s.id, s.name);
-    footTotal += total;
+    const isTest = /^test\b/i.test(s.name);
+    if (!isTest) footTotal += total;
     const el = document.querySelector(`[data-staff-total="${s.id}"]`);
     if (el) el.textContent = total;
+    if (isTest) return;
     periodDates.forEach((date, i) => {
       const c = cellFor(s.id, date);
       if (c.kind === 'hours') dayTotals[i] += Number(c.value) || 0;
