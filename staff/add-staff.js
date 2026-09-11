@@ -661,14 +661,21 @@ async function saveForm(e) {
     const profile = { staff_id: staffId, skills };
     profileFields.forEach(f => { profile[f] = fd.get(f) || null; });
 
-    // Try to upsert profile (table may not exist yet — ignore error)
-    try {
-      await fetch(REST + '/dgc_staff_profile?on_conflict=staff_id', {
-        method: 'POST',
-        headers: authedHeaders(session, { Prefer: 'resolution=merge-duplicates,return=representation' }),
-        body: JSON.stringify(profile),
-      });
-    } catch { /* profile table not created yet */ }
+    // Upsert profile — surface any RLS/auth errors instead of swallowing them
+    const profileRes = await fetch(REST + '/dgc_staff_profile?on_conflict=staff_id', {
+      method: 'POST',
+      headers: authedHeaders(session, { Prefer: 'resolution=merge-duplicates,return=representation' }),
+      body: JSON.stringify(profile),
+    });
+    if (!profileRes.ok) {
+      const errData = await profileRes.json().catch(() => ({}));
+      const msg = errData.message || errData.hint || errData.details || 'Unknown error';
+      status.textContent = 'Staff saved but profile details failed (' + profileRes.status + '): ' + msg;
+      status.className = 'form-status error';
+      btn.disabled = false;
+      await loadStaff();
+      return;
+    }
 
     status.textContent = 'Saved ✓'; status.className = 'form-status success';
     await loadStaff();
