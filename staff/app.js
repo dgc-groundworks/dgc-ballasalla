@@ -1100,16 +1100,32 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
   const prevLabel = btn.textContent;
   btn.disabled = true;
 
-  // Flush any unsaved cells before building the workbook
-  const pendingFlushes = Object.entries(saveTimers).map(([key, timer]) => {
-    if (!timer) return Promise.resolve();
+  // Sync DOM input values into hoursCache so export always uses what's on screen,
+  // regardless of whether the async save has completed yet.
+  document.querySelectorAll('#hoursTable input.hours-cell').forEach(input => {
+    const tr = input.closest('tr');
+    const staffId = tr && tr.dataset.staff;
+    const date = input.dataset.date;
+    if (!staffId || !date) return;
+    const key = staffId + '_' + date;
+    const raw = input.value.trim();
+    const hours = raw === '' ? null : Number(raw);
+    if (hours === null || hours === 0) {
+      delete hoursCache[key];
+    } else {
+      hoursCache[key] = Object.assign(hoursCache[key] || {}, { hours });
+    }
+  });
+
+  // Also flush any pending save timers to Supabase in the background
+  Object.entries(saveTimers).forEach(([key, timer]) => {
+    if (!timer) return;
     clearTimeout(timer);
     delete saveTimers[key];
     const [staffId, date] = key.split(/_(.+)/);
     const input = document.querySelector(`tr[data-staff="${staffId}"] input[data-date="${date}"]`);
-    return input ? flushCell(staffId, date, input) : Promise.resolve();
+    if (input) flushCell(staffId, date, input);
   });
-  if (pendingFlushes.length) await Promise.all(pendingFlushes);
 
   const from = periodDates[0], to = periodDates[PERIOD_DAYS - 1];
   const suggestedName = `Staff Hours ${from} to ${to}.xlsx`;
