@@ -347,6 +347,10 @@ label.checkbox input { width: auto; padding: 0; }
 .hours-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
 
 .hours-table { border-collapse: collapse; width: 100%; font-size: 0.74rem; table-layout: auto; }
+.excl-toggle { background: none; border: none; cursor: pointer; font-size: 8px; color: #4ade80; padding: 0 4px 0 0; line-height: 1; opacity: 0.7; vertical-align: middle; }
+.excl-toggle:hover { opacity: 1; }
+.excl-toggle.excl-off { color: var(--muted); opacity: 0.35; }
+tr.excl-row td { opacity: 0.4; }
 .hours-table th, .hours-table td {
   border-bottom: 1px solid var(--border);
   padding: 4px 3px;
