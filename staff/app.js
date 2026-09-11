@@ -1164,7 +1164,7 @@ async function buildWorkbook() {
   ws.getColumn(OT_COL).width    = 7;
   ws.getColumn(TOT_COL).width   = 9;
   ws.getColumn(RATE_COL).width  = 7;
-  ws.getColumn(GROSS_COL).width = 11;
+  ws.getColumn(GROSS_COL).width = 14;
   ws.getColumn(ADV_COL).width   = 11;
   ws.getColumn(NET_COL).width   = 12;
 
