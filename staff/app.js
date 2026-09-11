@@ -332,16 +332,40 @@ function renderHours() {
     const bothApproved = week1Approved && week2Approved;
     body += `<td>${bothApproved ? '' : `<button class="row-fill-btn${s.id in rowFillSnapshots ? ' active' : ''}" data-staff="${s.id}">→8</button>`}</td>`;
     body += `<td class="hours-readonly clickable" data-jump="${s.id}" data-jump-type="Overtime">${ot || 0}h</td>`;
-    body += `<td class="hours-readonly">${total}</td>`;
+    body += `<td class="hours-readonly" data-staff-total="${s.id}">${total}</td>`;
     body += '</tr>';
   });
 
   let foot = '<tr class="hours-footer-row"><td>TEAM TOTALS</td>';
-  dayTotals.forEach(t => foot += `<td>${t || ''}</td>`);
-  foot += `<td></td><td>${footOT > 0 ? footOT.toFixed(1)+'h' : ''}</td><td>${footTotal > 0 ? footTotal.toFixed(1) : ''}</td></tr>`;
+  dayTotals.forEach((t, i) => foot += `<td data-day-total="${i}">${t || ''}</td>`);
+  foot += `<td></td><td>${footOT > 0 ? footOT.toFixed(1)+'h' : ''}</td><td data-team-total>${footTotal > 0 ? footTotal.toFixed(1) : ''}</td></tr>`;
   foot += `<tr class="hours-footer-row"><td colspan="${PERIOD_DAYS + 1}" style="text-align:right">Advances £${footAdv.toFixed(2)} · Bonuses £${footBonus.toFixed(2)}</td><td colspan="2"></td></tr>`;
 
   table.innerHTML = head + body + foot;
+}
+
+function updateTotalCells() {
+  const dayTotals = periodDates.map(() => 0);
+  let footTotal = 0;
+  staff.forEach(s => {
+    const salaryHrs = SALARIED.get(s.name) || 0;
+    const total = rowTotal(s.id, s.name);
+    footTotal += total;
+    const el = document.querySelector(`[data-staff-total="${s.id}"]`);
+    if (el) el.textContent = total;
+    periodDates.forEach((date, i) => {
+      const c = cellFor(s.id, date);
+      if (c.kind === 'hours') dayTotals[i] += Number(c.value) || 0;
+      else if (c.kind === 'BH' || c.kind === 'H') dayTotals[i] += 8;
+      else if (c.kind === 'blank' && salaryHrs) dayTotals[i] += salaryHrs;
+    });
+  });
+  dayTotals.forEach((t, i) => {
+    const el = document.querySelector(`[data-day-total="${i}"]`);
+    if (el) el.textContent = t || '';
+  });
+  const teamEl = document.querySelector('[data-team-total]');
+  if (teamEl) teamEl.textContent = footTotal > 0 ? footTotal.toFixed(1) : '';
 }
 
 function scheduleSave(staffId, date, input) {
@@ -369,6 +393,7 @@ async function flushCell(staffId, date, input) {
       }
     }
     document.getElementById('hoursStatus').textContent = 'Saved ✓ ' + new Date().toLocaleTimeString('en-GB');
+    updateTotalCells();
   } catch (e) {
     document.getElementById('hoursStatus').textContent = 'Save failed — check connection';
     console.error(e);
