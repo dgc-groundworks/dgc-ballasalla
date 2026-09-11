@@ -404,10 +404,10 @@ function renderHours() {
         }
       } else {
         if (!excl && (c.kind === 'BH' || c.kind === 'H')) dayTotals[i] += 8;
-        if (isLocked || excl) {
+        if (excl) {
           body += `<td class="hours-readonly ${todayCls}">${c.kind}</td>`;
         } else {
-          // Editable BH/H cell — leave blank to keep full 8h pay, type 0 to not pay
+          // BH/H cells always editable — approval lock doesn't apply (admin correction)
           body += `<td class="${todayCls}"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" placeholder="${c.kind}" title="Blank = ${c.kind} (8h paid). Enter 0 = not paid." style="color:var(--accent-green);font-weight:600;width:100%;text-align:center;border:none;background:transparent;padding:0"></td>`;
         }
       }
