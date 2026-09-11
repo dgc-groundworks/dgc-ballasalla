@@ -33,7 +33,9 @@ function staffPeriodsOverlapping(adminFromVal, adminToVal) {
 }
 
 function sbHeaders(extra) {
-  return Object.assign({ apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, extra || {});
+  const sess = getStoredSession();
+  const token = (sess && sess.access_token) ? sess.access_token : SUPABASE_KEY;
+  return Object.assign({ apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, extra || {});
 }
 async function sbGet(path) {
   const r = await fetch(REST + path, { headers: sbHeaders() });
