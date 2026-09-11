@@ -1082,6 +1082,17 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
   const prevLabel = btn.textContent;
   btn.disabled = true;
 
+  // Flush any unsaved cells before building the workbook
+  const pendingFlushes = Object.entries(saveTimers).map(([key, timer]) => {
+    if (!timer) return Promise.resolve();
+    clearTimeout(timer);
+    delete saveTimers[key];
+    const [staffId, date] = key.split(/_(.+)/);
+    const input = document.querySelector(`tr[data-staff="${staffId}"] input[data-date="${date}"]`);
+    return input ? flushCell(staffId, date, input) : Promise.resolve();
+  });
+  if (pendingFlushes.length) await Promise.all(pendingFlushes);
+
   const from = periodDates[0], to = periodDates[PERIOD_DAYS - 1];
   const suggestedName = `Staff Hours ${from} to ${to}.xlsx`;
   const status = document.getElementById('hoursStatus');
