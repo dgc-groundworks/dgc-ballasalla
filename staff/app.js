@@ -408,6 +408,20 @@ document.getElementById('hoursTable').addEventListener('input', e => {
   scheduleSave(staffId, date, e.target);
 });
 
+// Save immediately when focus leaves a cell — prevents data loss on quick refresh
+document.getElementById('hoursTable').addEventListener('focusout', e => {
+  if (!e.target.classList.contains('hours-cell')) return;
+  const tr = e.target.closest('tr');
+  const staffId = tr.dataset.staff;
+  const date = e.target.dataset.date;
+  const key = staffId + '_' + date;
+  if (saveTimers[key]) {
+    clearTimeout(saveTimers[key]);
+    delete saveTimers[key];
+    flushCell(staffId, date, e.target);
+  }
+});
+
 document.getElementById('hoursTable').addEventListener('click', e => {
   if (e.target.classList.contains('row-fill-btn')) {
     toggleFillOnePerson(e.target.dataset.staff);
