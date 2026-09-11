@@ -800,10 +800,11 @@ async function buildWorkbook() {
   };
   const netFor = id => grossFor(id) - advancesFor(id);
 
-  // ── summary stats ───────────────────────────────────────────────────────────
-  const totalGross = staff.reduce((s, m) => s + grossFor(m.id), 0);
-  const totalAdv   = staff.reduce((s, m) => s + advancesFor(m.id), 0);
-  const totalNet   = staff.reduce((s, m) => s + netFor(m.id), 0);
+  // ── summary stats (excluded staff omitted) ──────────────────────────────────
+  const activeStaff = staff.filter(m => !isExcluded(m));
+  const totalGross = activeStaff.reduce((s, m) => s + grossFor(m.id), 0);
+  const totalAdv   = activeStaff.reduce((s, m) => s + advancesFor(m.id), 0);
+  const totalNet   = activeStaff.reduce((s, m) => s + netFor(m.id), 0);
   const otEntries  = advancesCache.filter(a => a.entry_type === 'Overtime').length;
   const onHoliday  = staff.filter(m => periodDates.some(d => { const c = cellFor(m.id, d); return c.kind === 'H' || c.kind === 'BH'; })).length;
   const unavail    = staff.filter(m => periodDates.some(d => cellFor(m.id, d).kind === 'U')).length;
@@ -930,8 +931,8 @@ async function buildWorkbook() {
     :                    fo(MUTED,  false, false, 9);
   });
 
-  // ── staff rows ──────────────────────────────────────────────────────────────
-  staff.forEach((s, idx) => {
+  // ── staff rows (excluded staff omitted from export) ─────────────────────────
+  activeStaff.forEach((s, idx) => {
     const dayVals = periodDates.map(date => {
       const c = cellFor(s.id, date);
       return c.kind === 'hours' ? Number(c.value) : (c.kind === 'weekend' || c.kind === 'blank') ? null : c.kind;
@@ -996,11 +997,11 @@ async function buildWorkbook() {
   const teamVals = ['TEAM TOTALS'];
   periodDates.forEach((date, di) => {
     let t = 0;
-    staff.forEach(s => { const c = cellFor(s.id, date); if (c.kind === 'hours') t += Number(c.value)||0; else if (c.kind === 'BH'||c.kind === 'H') t += 8; });
+    activeStaff.forEach(s => { const c = cellFor(s.id, date); if (c.kind === 'hours') t += Number(c.value)||0; else if (c.kind === 'BH'||c.kind === 'H') t += 8; });
     teamVals.push(t || null);
   });
-  teamVals.push(staff.reduce((s, m) => s + overtimeFor(m.id), 0) || null);
-  teamVals.push(staff.reduce((s, m) => s + rowTotal(m.id), 0) || null);
+  teamVals.push(activeStaff.reduce((s, m) => s + overtimeFor(m.id), 0) || null);
+  teamVals.push(activeStaff.reduce((s, m) => s + rowTotal(m.id), 0) || null);
   teamVals.push(null);          // Rate col — no team rate
   teamVals.push(totalGross);    // Gross
   teamVals.push(totalAdv);      // Advances
