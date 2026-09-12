@@ -62,6 +62,21 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .overview-table td{padding:12px 16px;border-bottom:1px solid var(--bord);font-size:0.9rem}
 .overview-table tr:last-child td{border-bottom:none}
 .overview-row{cursor:pointer;transition:background .15s}
+
+/* Ash, 12 Sep 2026: the week-ending breakdown collapses closed by
+   default — just the week + total hours showing — and opens on click
+   to reveal the name/hours tables underneath. Native <details> so no
+   extra JS is needed for the open/close behaviour itself. */
+.week-ending-block{margin-bottom:14px;border:1px solid var(--bord);border-radius:10px;overflow:hidden}
+.week-ending-block[open]{padding-bottom:16px}
+.week-summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;margin:0;padding:14px 18px;background:rgba(37,99,235,.08)}
+.week-summary::-webkit-details-marker{display:none}
+.week-summary::before{content:'\25B8';display:inline-block;font-size:0.8rem;color:var(--muted);transition:transform .15s}
+.week-ending-block[open] .week-summary::before{transform:rotate(90deg)}
+.week-summary .ws-label{font-weight:800;font-size:0.95rem;text-transform:uppercase;letter-spacing:.03em;color:var(--text)}
+.week-summary .ws-hours{margin-left:auto;color:var(--muted);font-size:0.8rem;font-weight:700}
+.week-ending-block .overview-section,.week-ending-block .overview-table{margin-left:18px;margin-right:18px;width:calc(100% - 36px)}
+.week-ending-block .overview-table.overview-total-table{margin-top:12px}
 .overview-row:hover td{background:var(--surf2)}
 .overview-row.active td{background:var(--accent);color:#1a1d27}
 .overview-row .or-hours{font-weight:800;color:var(--accent)}
@@ -696,8 +711,8 @@ function weekEndingTablesHtml(rows) {
     const wRows = byWeek[wk];
     const weekHours = wRows.reduce((s, e) => s + (e.hours || 0), 0);
     const wkLabel = wk === '(no date yet)' ? 'No date set' : fmtDate(wk);
-    html += `<div style="margin-bottom:28px">
-      <div class="overview-hdr" style="background:rgba(37,99,235,.08)">Week Ending ${i + 1} — ${wkLabel}<span class="oh-hours">${weekHours} hours</span></div>`;
+    html += `<details class="week-ending-block">
+      <summary class="week-summary"><span class="ws-label">Week Ending ${i + 1} — ${wkLabel}</span><span class="ws-hours">${weekHours} hours</span></summary>`;
 
     const byJob = {};
     wRows.forEach(e => { (byJob[baseJob(e.site)] = byJob[baseJob(e.site)] || []).push(e); });
@@ -736,7 +751,7 @@ function weekEndingTablesHtml(rows) {
         <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
         <tbody><tr class="overview-total-row"><td colspan="3">Week total:</td><td class="or-hours">${weekHours}h</td></tr></tbody>
       </table>
-    </div>`;
+    </details>`;
   });
 
   return html;
