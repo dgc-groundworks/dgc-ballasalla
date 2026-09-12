@@ -367,9 +367,16 @@ function jobDescription(site) {
 // person's own entry id -> the OTHER entries of theirs sharing the same
 // real date, so it can be flagged and shown side by side instead of
 // relying on a manual audit to ever notice.
+// Ash, 12 Sep 2026: an entry with a billed-hours override already has a
+// PM decision attached to it (that's what the override reason IS) — once
+// one side of a double-entry has been zeroed/adjusted with a reason, the
+// warning should stop nagging both it and its former conflict partner.
+// Resolved entries are excluded from the clash check entirely, on both
+// sides, rather than just hiding the banner on the one that got zeroed.
 function conflictsByDate(rows) {
+  const unresolved = rows.filter(r => r.billedHours === null || r.billedHours === undefined);
   const byDate = {};
-  rows.forEach(r => { if (r.date) (byDate[r.date] = byDate[r.date] || []).push(r); });
+  unresolved.forEach(r => { if (r.date) (byDate[r.date] = byDate[r.date] || []).push(r); });
   const map = {};
   Object.values(byDate).forEach(group => {
     if (group.length > 1) group.forEach(r => { map[r.id] = group.filter(x => x.id !== r.id); });
