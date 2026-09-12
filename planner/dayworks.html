@@ -754,6 +754,13 @@ function weekEndingTablesHtml(rows) {
     </details>`;
   });
 
+  const grandTotal = rows.reduce((s, e) => s + (e.hours || 0), 0);
+  html += `
+    <table class="overview-table overview-total-table">
+      <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
+      <tbody><tr class="overview-total-row"><td colspan="3">Total:</td><td class="or-hours">${grandTotal}h</td></tr></tbody>
+    </table>`;
+
   return html;
 }
 
