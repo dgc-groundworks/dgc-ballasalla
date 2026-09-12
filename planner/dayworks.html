@@ -59,6 +59,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .overview-hdr .oh-hours{margin-left:auto;color:var(--muted);font-size:0.8rem;font-weight:700;text-transform:none;letter-spacing:0}
 .overview-table{width:100%;border-collapse:collapse;background:var(--surf);border:1px solid var(--bord);border-radius:10px;overflow:hidden;table-layout:fixed}
 .overview-table th{text-align:left;padding:10px 16px;font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--bord);background:var(--surf2)}
+.overview-table th.sortable-th{cursor:pointer;user-select:none}
+.overview-table th.sortable-th:hover{color:var(--text)}
 .overview-table td{padding:12px 16px;border-bottom:1px solid var(--bord);font-size:0.9rem}
 .overview-table tr:last-child td{border-bottom:none}
 .overview-row{cursor:pointer;transition:background .15s}
@@ -408,6 +410,50 @@ function describeFlag(rs, conflicts) {
   if (rs.some(r => !r.confirmed)) return 'Not yet confirmed — check against the photo.';
   return 'Needs checking.';
 }
+
+// Ash, 13 Sep 2026: clickable Name / Date range headers on the overview
+// tables (by-site and by-week-ending both use this) — click a header to
+// sort by it, click again to flip direction. One shared sort state
+// since the same tables all sit on the same page.
+let overviewSort = { col: 'name', dir: 'asc' };
+function sortOverviewNames(byName) {
+  const dir = overviewSort.dir === 'desc' ? -1 : 1;
+  return Object.keys(byName).sort((a, b) => {
+    let cmp;
+    if (overviewSort.col === 'date') {
+      const da = byName[a].map(r => r.date).filter(Boolean).sort()[0] || '';
+      const db = byName[b].map(r => r.date).filter(Boolean).sort()[0] || '';
+      cmp = da.localeCompare(db);
+    } else {
+      cmp = a.localeCompare(b);
+    }
+    return cmp * dir;
+  });
+}
+function overviewHeaderHtml() {
+  const arrow = overviewSort.dir === 'desc' ? ' ▼' : ' ▲';
+  const nameArrow = overviewSort.col === 'name' ? arrow : '';
+  const dateArrow = overviewSort.col === 'date' ? arrow : '';
+  return `<thead><tr>
+    <th class="sortable-th" data-sort-col="name">Name${nameArrow}</th>
+    <th class="sortable-th" data-sort-col="date">Date range${dateArrow}</th>
+    <th>Ground Workers</th>
+    <th>Total hours</th>
+  </tr></thead>`;
+}
+function wireOverviewSort(main) {
+  main.querySelectorAll('[data-sort-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sortCol;
+      if (overviewSort.col === col) {
+        overviewSort.dir = overviewSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        overviewSort = { col, dir: 'asc' };
+      }
+      render();
+    });
+  });
+}
 // Every id (across the whole pool) that needs attention before a pack is
 // accurate: flagged/unconfirmed/unsplit, OR a same-person date clash.
 function unreadyIds(pool) {
@@ -679,6 +725,7 @@ function renderCurrent() {
       state.job = row.dataset.job; state.name = row.dataset.name; state.weekIndex = 0; render();
     });
   });
+  wireOverviewSort(main);
   main.querySelectorAll('[data-query-jump]').forEach(el => {
     el.addEventListener('click', () => {
       state.job = el.dataset.job; state.name = el.dataset.name; state.weekIndex = 0; render();
@@ -734,9 +781,9 @@ function overviewTablesHtml(rows) {
         <div class="overview-hdr">${esc(job)}<span class="oh-hours">${jobHours} hours</span></div>
         <table class="overview-table">
           <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
-          <thead><tr><th>Name</th><th>Date range</th><th>Ground Workers</th><th>Total hours</th></tr></thead>
+          ${overviewHeaderHtml()}
           <tbody>`;
-    Object.keys(byName).sort().forEach(name => {
+    sortOverviewNames(byName).forEach(name => {
       const rs = byName[name];
       const conflicts = conflictsByDate(byNameAll[name] || rs);
       const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site) || conflicts[r.id]);
@@ -796,9 +843,9 @@ function weekEndingTablesHtml(rows) {
           <div class="overview-hdr">${esc(job)}<span class="oh-hours">${jobHours} hours</span></div>
           <table class="overview-table">
             <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
-            <thead><tr><th>Name</th><th>Date range</th><th>Ground Workers</th><th>Total hours</th></tr></thead>
+            ${overviewHeaderHtml()}
             <tbody>`;
-      Object.keys(byName).sort().forEach(name => {
+      sortOverviewNames(byName).forEach(name => {
         const rs = byName[name];
         const conflicts = conflictsByDate(byNameAll[name] || rs);
         const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site) || conflicts[r.id]);
@@ -1581,6 +1628,7 @@ function renderHistoricBatch(rows, ref) {
   main.querySelectorAll('.overview-row').forEach(row => {
     row.addEventListener('click', () => { state.histJob = row.dataset.job; state.histName = row.dataset.name; render(); });
   });
+  wireOverviewSort(main);
 }
 
 // ---------------------------------------------------------------
