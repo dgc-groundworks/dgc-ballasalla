@@ -141,6 +141,21 @@ input:focus{border-color:var(--accent)}
 .day-row .dr-hours{font-weight:800;color:var(--accent);white-space:nowrap;padding-bottom:7px}
 .flag-note{background:rgba(245,158,11,.1);border:1px solid var(--accent);border-radius:6px;padding:7px 10px;font-size:0.76rem;color:var(--accent);margin-bottom:8px}
 
+/* Ash, 12 Sep 2026: billing a different number of hours than the
+   calculated/timesheet figure — a violet "attention" colour, kept
+   distinct from amber (needs checking) and red (conflict) so all three
+   read differently at a glance. */
+.day-row.hours-overridden{border-color:#7c3aed;background:rgba(124,58,237,.06)}
+.hours-override{margin-top:10px;border-top:1px dashed var(--bord);padding-top:10px}
+.hours-override .ho-current{background:rgba(124,58,237,.1);border:1px solid #7c3aed;border-radius:6px;padding:7px 10px;font-size:0.8rem;color:#7c3aed;margin-bottom:8px}
+.hours-override .ho-row{margin-bottom:8px}
+.hours-override .ho-row input{max-width:160px}
+.hours-override .ho-reason-wrap{margin-bottom:8px}
+.hours-override .ho-reason-wrap textarea{width:100%;min-height:50px;font-family:inherit;font-size:0.85rem;padding:6px 8px;border:1px solid var(--bord);border-radius:6px;background:var(--surf);color:var(--text);resize:vertical}
+.hours-override .ho-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ps-billed-row td{color:#7c3aed;font-weight:700}
+.ps-was{color:var(--muted);font-weight:400;font-size:0.85em}
+
 /* Person summary (top of the week/photo view) */
 .person-summary{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:18px 20px;margin-bottom:22px}
 .ps-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:14px}
@@ -360,6 +375,26 @@ function conflictsByDate(rows) {
   });
   return map;
 }
+// Ash, 12 Sep 2026: the homepage's orange dot used to just say "Needs
+// checking" for every kind of problem — a PM had to click through to a
+// person's whole page to find out what was actually wrong. This picks
+// the most useful specific reason (a genuine double entry names the
+// actual clashing dates) so hovering the dot on the homepage already
+// says what's wrong, before clicking through to fix it.
+function describeFlag(rs, conflicts) {
+  const conflictDates = new Set();
+  rs.forEach(r => { if (conflicts[r.id]) conflictDates.add(r.date); });
+  if (conflictDates.size) {
+    return 'Double entry — same day entered twice, check ' + Array.from(conflictDates).filter(Boolean).sort().map(fmtDate).join(', ');
+  }
+  if (rs.some(r => siteNamesMultipleJobs(r.site))) {
+    return 'One entry names more than one job — split it into a separate entry per job/day first.';
+  }
+  const flaggedRow = rs.find(r => r.flagged);
+  if (flaggedRow) return flaggedRow.note || 'Flagged for review — couldn\'t confidently read this one.';
+  if (rs.some(r => !r.confirmed)) return 'Not yet confirmed — check against the photo.';
+  return 'Needs checking.';
+}
 // Every id (across the whole pool) that needs attention before a pack is
 // accurate: flagged/unconfirmed/unsplit, OR a same-person date clash.
 function unreadyIds(pool) {
@@ -383,8 +418,23 @@ function rowToEntry(r) {
     lunch: r.lunch_mins == null ? null : Number(r.lunch_mins),
     sentAt: r.sent_at || null, sentBatchRef: r.sent_batch_ref || null,
     approvedBy: r.approved_by || null, approvedAt: r.approved_at || null,
-    removedAt: r.removed_at || null, removedNote: r.removed_note || null
+    removedAt: r.removed_at || null, removedNote: r.removed_note || null,
+    billedHours: r.billed_hours == null ? null : Number(r.billed_hours),
+    billedHoursReason: r.billed_hours_reason || null
   };
+}
+// Ash, 12 Sep 2026: a PM needs to be able to bill different hours than
+// what the timesheet/calculation says (a double entry that should be
+// zeroed, a couple of hours knocked off, etc.) WITHOUT touching the
+// original calculated `hours` value — that stays exactly as read off
+// the timesheet, a locked record of what it actually says. billedHours
+// is a separate override: when set, it's the number that counts
+// everywhere (totals, exports, the client site) regardless of what
+// `hours` says. See effectiveHours() below — every total in this file
+// reads through that, never raw `.hours`, so this one column change
+// doesn't need touching every sum site by hand.
+function effectiveHours(e) {
+  return (e.billedHours !== null && e.billedHours !== undefined) ? e.billedHours : (e.hours || 0);
 }
 // sent_at/sent_batch_ref/lunch_mins were each added after this table's
 // first version — detected once at boot so this still works before Ash
@@ -397,6 +447,7 @@ let descriptionColumnExists = true;
 let lunchColumnExists = true;
 let approvedColumnsExist = true;
 let removedColumnsExist = true;
+let billedHoursColumnsExist = true;
 async function detectSentColumns() {
   try {
     const r = await fetch(REST + '?select=sent_at&limit=1', { headers: sbHeaders() });
@@ -418,6 +469,10 @@ async function detectSentColumns() {
     const r5 = await fetch(REST + '?select=removed_at&limit=1', { headers: sbHeaders() });
     removedColumnsExist = r5.ok;
   } catch (e) { removedColumnsExist = false; }
+  try {
+    const r6 = await fetch(REST + '?select=billed_hours&limit=1', { headers: sbHeaders() });
+    billedHoursColumnsExist = r6.ok;
+  } catch (e) { billedHoursColumnsExist = false; }
 }
 
 function entryToRow(e) {
@@ -431,6 +486,7 @@ function entryToRow(e) {
   if (lunchColumnExists) { row.lunch_mins = e.lunch == null ? null : e.lunch; }
   if (approvedColumnsExist) { row.approved_by = e.approvedBy || null; row.approved_at = e.approvedAt || null; }
   if (removedColumnsExist) { row.removed_at = e.removedAt || null; row.removed_note = e.removedNote || null; }
+  if (billedHoursColumnsExist) { row.billed_hours = (e.billedHours === undefined ? null : e.billedHours); row.billed_hours_reason = e.billedHoursReason || null; }
   return row;
 }
 
@@ -527,7 +583,7 @@ function renderCurrent() {
   const dates = pool.map(e => e.date).filter(Boolean).sort();
   const from = dates[0], to = dates[dates.length - 1];
   const anyUnready = unreadyIds(pool).size > 0;
-  const totalHours = pool.reduce((s, e) => s + (e.hours || 0), 0);
+  const totalHours = pool.reduce((s, e) => s + effectiveHours(e), 0);
   // Missing/unchecked fields no longer block the button outright — clicking
   // with some still unready pops a warning (Save anyway / Cancel) instead.
   // Only a genuinely empty pool or a missing database column still disables it.
@@ -552,6 +608,7 @@ function renderCurrent() {
     ${!lunchColumnExists ? `<p class="flag-note" style="max-width:none">&#9888; The editable lunch field won't save yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists lunch_mins integer;</code></p>` : ''}
     ${!approvedColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Client approval won't be recorded yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists approved_by text;<br>alter table public.dgc_dayworks_entries add column if not exists approved_at timestamptz;</code></p>` : ''}
     ${!removedColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; "Remove" is switched off until this is run — without it, removing would have to permanently delete instead of just hiding with a reason. Run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists removed_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists removed_note text;</code></p>` : ''}
+    ${!billedHoursColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Billing a different number of hours than calculated isn't switched on yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists billed_hours numeric;<br>alter table public.dgc_dayworks_entries add column if not exists billed_hours_reason text;</code></p>` : ''}
   `;
 
   // Detail page for one person — replaces the list entirely.
@@ -652,13 +709,13 @@ function overviewTablesHtml(rows) {
   const byNameAll = {};
   rows.forEach(e => { (byNameAll[e.name || NO_NAME] = byNameAll[e.name || NO_NAME] || []).push(e); });
 
-  const totalHours = rows.reduce((s, e) => s + (e.hours || 0), 0);
+  const totalHours = rows.reduce((s, e) => s + effectiveHours(e), 0);
   let html = '';
   Object.keys(byJob).sort().forEach(job => {
     const jrows = byJob[job];
     const byName = {};
     jrows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
-    const jobHours = jrows.reduce((s, r) => s + (r.hours || 0), 0);
+    const jobHours = jrows.reduce((s, r) => s + effectiveHours(r), 0);
     html += `
       <div class="overview-section">
         <div class="overview-hdr">${esc(job)}<span class="oh-hours">${jobHours} hours</span></div>
@@ -670,12 +727,12 @@ function overviewTablesHtml(rows) {
       const rs = byName[name];
       const conflicts = conflictsByDate(byNameAll[name] || rs);
       const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site) || conflicts[r.id]);
-      const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
+      const hrs = rs.reduce((s, r) => s + effectiveHours(r), 0);
       const nDates = rs.map(r => r.date).filter(Boolean).sort();
       const range = nDates.length ? fmtDate(nDates[0]) + ' – ' + fmtDate(nDates[nDates.length - 1]) : 'No dates yet';
       html += `
             <tr class="overview-row" data-job="${esc(job)}" data-name="${esc(name)}">
-              <td>${flagged ? '<span class="alert-dot" title="Needs checking"></span> ' : ''}${esc(name)}</td>
+              <td>${flagged ? `<span class="alert-dot" title="${esc(describeFlag(rs, conflicts))}"></span> ` : ''}${esc(name)}</td>
               <td>${range}</td>
               <td>Ground Worker</td>
               <td class="or-hours">${hrs}h</td>
@@ -709,7 +766,7 @@ function weekEndingTablesHtml(rows) {
   let html = '<h2 style="margin:36px 0 12px;font-size:1.1rem">Same figures, by week ending</h2>';
   weekKeys.forEach((wk, i) => {
     const wRows = byWeek[wk];
-    const weekHours = wRows.reduce((s, e) => s + (e.hours || 0), 0);
+    const weekHours = wRows.reduce((s, e) => s + effectiveHours(e), 0);
     const wkLabel = wk === '(no date yet)' ? 'No date set' : fmtDate(wk);
     html += `<details class="week-ending-block">
       <summary class="week-summary"><span class="ws-label">Week Ending ${i + 1} — ${wkLabel}</span><span class="ws-hours">${weekHours} hours</span></summary>`;
@@ -720,7 +777,7 @@ function weekEndingTablesHtml(rows) {
       const jrows = byJob[job];
       const byName = {};
       jrows.forEach(e => { (byName[e.name || NO_NAME] = byName[e.name || NO_NAME] || []).push(e); });
-      const jobHours = jrows.reduce((s, r) => s + (r.hours || 0), 0);
+      const jobHours = jrows.reduce((s, r) => s + effectiveHours(r), 0);
       html += `
         <div class="overview-section">
           <div class="overview-hdr">${esc(job)}<span class="oh-hours">${jobHours} hours</span></div>
@@ -732,12 +789,12 @@ function weekEndingTablesHtml(rows) {
         const rs = byName[name];
         const conflicts = conflictsByDate(byNameAll[name] || rs);
         const flagged = rs.some(r => r.flagged || !r.confirmed || siteNamesMultipleJobs(r.site) || conflicts[r.id]);
-        const hrs = rs.reduce((s, r) => s + (r.hours || 0), 0);
+        const hrs = rs.reduce((s, r) => s + effectiveHours(r), 0);
         const nDates = rs.map(r => r.date).filter(Boolean).sort();
         const range = nDates.length ? fmtDate(nDates[0]) + ' – ' + fmtDate(nDates[nDates.length - 1]) : 'No dates yet';
         html += `
               <tr class="overview-row" data-job="${esc(job)}" data-name="${esc(name)}">
-                <td>${flagged ? '<span class="alert-dot" title="Needs checking"></span> ' : ''}${esc(name)}</td>
+                <td>${flagged ? `<span class="alert-dot" title="${esc(describeFlag(rs, conflicts))}"></span> ` : ''}${esc(name)}</td>
                 <td>${range}</td>
                 <td>Ground Worker</td>
                 <td class="or-hours">${hrs}h</td>
@@ -754,7 +811,7 @@ function weekEndingTablesHtml(rows) {
     </details>`;
   });
 
-  const grandTotal = rows.reduce((s, e) => s + (e.hours || 0), 0);
+  const grandTotal = rows.reduce((s, e) => s + effectiveHours(e), 0);
   html += `
     <table class="overview-table overview-total-table">
       <colgroup><col style="width:34%"><col style="width:24%"><col style="width:22%"><col style="width:20%"></colgroup>
@@ -772,7 +829,7 @@ function personDetailHtml(rows) {
   if (state.weekIndex < 0) state.weekIndex = 0;
   const wk = weekKeys[state.weekIndex];
   const weekRows = (byWeek[wk] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  const weekTotal = weekRows.reduce((s, r) => s + (r.hours || 0), 0);
+  const weekTotal = weekRows.reduce((s, r) => s + effectiveHours(r), 0);
   const images = [...new Set(weekRows.map(r => r.image))];
   const conflictMap = conflictsByDate(rows);
 
@@ -819,7 +876,7 @@ function personSummaryHtml(rows, name) {
   let body = '', grand = 0;
   weekKeys.forEach((wkKey, i) => {
     const wrows = byWeek[wkKey].slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    const total = wrows.reduce((s, r) => s + (r.hours || 0), 0);
+    const total = wrows.reduce((s, r) => s + effectiveHours(r), 0);
     grand += total;
     body += `
       <div class="ps-week">
@@ -832,7 +889,8 @@ function personSummaryHtml(rows, name) {
               const d = r.date ? new Date(r.date + 'T12:00:00') : null;
               const dayLabel = d ? d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }) : 'No date';
               const lunch = r.lunch == null ? defaultLunchMins(r.start, r.finish) : r.lunch;
-              return `<tr><td>${esc(dayLabel)}</td><td>${esc(r.start) || '—'}</td><td>${esc(r.finish) || '—'}</td><td>${(r.start && r.finish) ? lunch + ' min' : '—'}</td><td>${r.hours == null ? '—' : r.hours}</td><td>${esc(r.site) || '—'}</td></tr>`;
+              const billed = r.billedHours !== null && r.billedHours !== undefined;
+              return `<tr class="${billed ? 'ps-billed-row' : ''}"><td>${esc(dayLabel)}</td><td>${esc(r.start) || '—'}</td><td>${esc(r.finish) || '—'}</td><td>${(r.start && r.finish) ? lunch + ' min' : '—'}</td><td>${effectiveHours(r)}${billed ? ` <span class="ps-was">(was ${r.hours == null ? '—' : r.hours})</span>` : ''}</td><td>${esc(r.site) || '—'}</td></tr>`;
             }).join('')}
             <tr class="ps-total-row"><td colspan="4">Week ${i + 1} total</td><td colspan="2">${total}h</td></tr>
           </tbody>
@@ -853,8 +911,9 @@ function personSummaryHtml(rows, name) {
 function dayRowHtml(e, conflicts) {
   const area = jobDescription(e.site);
   const hasConflict = conflicts && conflicts.length > 0;
+  const isBilled = e.billedHours !== null && e.billedHours !== undefined;
   return `
-    <div class="day-row ${e.flagged ? 'flagged' : ''} ${hasConflict ? 'conflict' : ''}" data-id="${e.id}">
+    <div class="day-row ${e.flagged ? 'flagged' : ''} ${hasConflict ? 'conflict' : ''} ${isBilled ? 'hours-overridden' : ''}" data-id="${e.id}">
       ${e.flagged ? `<div class="flag-note">&#9888; ${esc(e.note || 'Check this against the photo.')}</div>` : ''}
       ${hasConflict ? `
         <div class="conflict-note">
@@ -894,6 +953,21 @@ function dayRowHtml(e, conflicts) {
         <button class="btn-secondary" data-reread title="Re-read this entry from the photo using AI" style="font-size:0.72rem;padding:6px 10px">&#8635; Re-read from photo</button>
         <span class="form-status" data-status style="font-size:0.76rem;color:var(--muted)"></span>
       </div>
+      ${billedHoursColumnsExist ? `
+      <div class="hours-override" data-override>
+        ${isBilled ? `<div class="ho-current">Billed <strong>${e.billedHours}h</strong> instead of the calculated ${e.hours == null ? '—' : e.hours}h &mdash; ${esc(e.billedHoursReason || 'no reason given')}</div>` : ''}
+        <div class="ho-row">
+          <label>Bill different hours than calculated?<input type="number" step="0.25" class="dr-input" data-override-input value="${isBilled ? e.billedHours : ''}" placeholder="Calculated: ${e.hours == null ? '—' : e.hours}h"></label>
+        </div>
+        <div class="ho-reason-wrap" data-override-reason-wrap ${isBilled ? '' : 'hidden'}>
+          <label>Why are you changing the hours?<textarea class="dr-input" data-override-reason placeholder="e.g. double entry, took a few hours off…">${esc(e.billedHoursReason || '')}</textarea></label>
+        </div>
+        <div class="ho-actions">
+          <button class="btn-secondary" data-override-save style="font-size:0.75rem;padding:6px 12px">Save &amp; recalculate</button>
+          ${isBilled ? '<button class="btn-secondary" data-override-clear style="font-size:0.75rem;padding:6px 12px">Clear override — use calculated</button>' : ''}
+          <span class="form-status" data-override-status style="font-size:0.76rem;color:var(--muted)"></span>
+        </div>
+      </div>` : ''}
     </div>`;
 }
 
@@ -999,6 +1073,48 @@ function wireDayRow(e) {
   row.querySelector('[data-reread]').addEventListener('click', () => {
     alert('Re-reading from the photo needs the Claude API set up first (your own Anthropic API key + a Supabase Edge Function) — not wired up yet.\n\nFor now, compare the fields on the left against the photo on the right and correct them by hand.');
   });
+
+  // Ash, 12 Sep 2026: bill a different number of hours than calculated —
+  // for a double entry that needs zeroing, or a few hours knocked off —
+  // without touching the original calculated `hours` (that stays a
+  // locked record of what the timesheet/calc says). See effectiveHours().
+  const overrideBox = row.querySelector('[data-override]');
+  if (overrideBox) {
+    const input = overrideBox.querySelector('[data-override-input]');
+    const reasonWrap = overrideBox.querySelector('[data-override-reason-wrap]');
+    const reasonEl = overrideBox.querySelector('[data-override-reason]');
+    const status = overrideBox.querySelector('[data-override-status]');
+    const calcNow = () => Number(row.querySelector('[data-hours]').textContent.replace('h', '')) || 0;
+    input.addEventListener('input', () => {
+      const val = input.value.trim();
+      const differs = val !== '' && Number(val) !== calcNow();
+      reasonWrap.hidden = !differs;
+    });
+    overrideBox.querySelector('[data-override-save]').addEventListener('click', async () => {
+      const val = input.value.trim();
+      if (val === '') { status.textContent = 'Enter a number of hours first, or use "Clear override" if one is already set.'; return; }
+      const reason = reasonEl.value.trim();
+      if (Number(val) !== calcNow() && !reason) {
+        status.textContent = 'Please explain why you\'re changing the hours first.';
+        return;
+      }
+      status.textContent = 'Saving…';
+      try {
+        await saveEntry(e.id, Object.assign({}, e, { billedHours: Number(val), billedHoursReason: reason }));
+        render();
+      } catch (err) { status.textContent = 'Could not save: ' + err.message; }
+    });
+    const clearBtn = overrideBox.querySelector('[data-override-clear]');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', async () => {
+        status.textContent = 'Saving…';
+        try {
+          await saveEntry(e.id, Object.assign({}, e, { billedHours: null, billedHoursReason: null }));
+          render();
+        } catch (err) { status.textContent = 'Could not save: ' + err.message; }
+      });
+    }
+  }
 }
 
 // ---------------------------------------------------------------
@@ -1015,12 +1131,12 @@ function buildPackHtml(rows, from, to, refNum) {
     bySite[site].forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
     Object.keys(byWeek).sort().forEach((wkStart, i) => {
       const wrows = byWeek[wkStart].sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.name.localeCompare(b.name));
-      const weekTotal = wrows.reduce((s, r) => s + (r.hours || 0), 0);
+      const weekTotal = wrows.reduce((s, r) => s + effectiveHours(r), 0);
       grandTotal += weekTotal;
       body += `<div class="week-hdr">Week ${i + 1} — w/c ${fmtDate(wkStart)}</div>
         <table class="dw-table"><thead><tr><th>Date</th><th>Name</th><th>Start</th><th>Finish</th><th>Hours</th><th>Role</th><th>Amount</th></tr></thead><tbody>`;
       wrows.forEach(r => {
-        body += `<tr><td>${fmtDate(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.start)}</td><td>${esc(r.finish)}</td><td>${r.hours}</td><td>Ground Worker</td><td>${fmtMoney((r.hours || 0) * DAYWORKS_RATE)}</td></tr>`;
+        body += `<tr><td>${fmtDate(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.start)}</td><td>${esc(r.finish)}</td><td>${effectiveHours(r)}</td><td>Ground Worker</td><td>${fmtMoney(effectiveHours(r) * DAYWORKS_RATE)}</td></tr>`;
       });
       body += `<tr class="week-total-row"><td colspan="4">Week ${i + 1} total</td><td>${weekTotal}</td><td></td><td>${fmtMoney(weekTotal * DAYWORKS_RATE)}</td></tr></tbody></table>`;
     });
@@ -1356,7 +1472,7 @@ function renderHistoric() {
   main.innerHTML = refs.map(ref => {
     const rows = byBatch[ref];
     const dates = rows.map(r => r.date).filter(Boolean).sort();
-    const hrs = rows.reduce((s, r) => s + (r.hours || 0), 0);
+    const hrs = rows.reduce((s, r) => s + effectiveHours(r), 0);
     const sentWhen = rows[0].sentAt ? new Date(rows[0].sentAt).toLocaleDateString('en-GB') : '—';
     return `<div class="hist-batch" data-ref="${esc(ref)}">
       <div class="hb-ref">${esc(ref)}</div>
@@ -1397,7 +1513,7 @@ function renderHistoricBatch(rows, ref) {
     <div class="send-bar">
       <div class="sb-info">
         <div class="sb-range">${fmtDate(from)} – ${fmtDate(to)}</div>
-        <div class="sb-sub">${rows.length} entries · ${rows.reduce((s, r) => s + (r.hours || 0), 0)} hours · sent ${rows[0].sentAt ? new Date(rows[0].sentAt).toLocaleDateString('en-GB') : '—'}</div>
+        <div class="sb-sub">${rows.length} entries · ${rows.reduce((s, r) => s + effectiveHours(r), 0)} hours · sent ${rows[0].sentAt ? new Date(rows[0].sentAt).toLocaleDateString('en-GB') : '—'}</div>
       </div>
       <button class="btn-secondary" id="downloadHistBtn">Download PDF + photos again</button>
     </div>
