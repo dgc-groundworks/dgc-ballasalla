@@ -270,6 +270,7 @@ const REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_entries';
 const QUERIES_REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_queries';
 const STORAGE_UPLOAD = SUPABASE_URL + '/storage/v1/object/dayworks-timesheets/';
 const STORAGE_PUBLIC = SUPABASE_URL + '/storage/v1/object/public/dayworks-timesheets/';
+const READ_PHOTO_FN = SUPABASE_URL + '/functions/v1/dayworks-read-photo';
 const NO_JOB = '(Needs a job assigned)';
 const NO_NAME = '(Needs a name)';
 const DAYWORKS_RATE = 29; // £/hr charged to Dandara — shown on the client export, matches the client site
@@ -1064,14 +1065,40 @@ function wireDayRow(e) {
     }
   });
 
-  // Placeholder for re-reading a single entry straight from its photo via
-  // the Claude API — the button Ash asked for as a safety net for when a
-  // transcription looks wrong. Not wired up yet: needs Ash's own Anthropic
-  // API key + a Supabase Edge Function first (see the Obsidian spec).
-  // Left visible (not hidden) so it's ready to connect the moment that's
-  // in place, instead of quietly doing nothing.
-  row.querySelector('[data-reread]').addEventListener('click', () => {
-    alert('Re-reading from the photo needs the Claude API set up first (your own Anthropic API key + a Supabase Edge Function) — not wired up yet.\n\nFor now, compare the fields on the left against the photo on the right and correct them by hand.');
+  // Ash, 12 Sep 2026: re-read a single entry straight from its photo via
+  // the Claude API (dayworks-read-photo Edge Function) — a safety net for
+  // when a transcription looks wrong. Fills the fields in for the PM to
+  // check against the photo, same as a human re-reading it; it never
+  // auto-saves or auto-confirms on its own.
+  row.querySelector('[data-reread]').addEventListener('click', async () => {
+    const btn = row.querySelector('[data-reread]');
+    const status = row.querySelector('[data-status]');
+    if (!dateEl.value) { status.textContent = 'Set a date first, so Claude knows which weekday row on the sheet to read.'; return; }
+    const weekday = new Date(dateEl.value + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
+    btn.disabled = true; const origLabel = btn.innerHTML; btn.innerHTML = 'Reading…'; status.textContent = '';
+    try {
+      const r = await fetch(READ_PHOTO_FN, {
+        method: 'POST',
+        headers: sbHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ imagePath: e.imagePath, weekday })
+      });
+      const result = await r.json();
+      if (!r.ok || !result.ok) {
+        status.textContent = 'Could not read the photo: ' + (result.error || ('HTTP ' + r.status));
+        return;
+      }
+      if (result.start) startEl.value = result.start;
+      if (result.finish) finishEl.value = result.finish;
+      if (result.description) descEl.value = result.description;
+      lunchEl.dataset.manual = '0';
+      lunchEl.value = defaultLunchMins(startEl.value, finishEl.value);
+      recalc();
+      status.textContent = (result.confident ? 'Read from photo — check it against the image, then Confirm & save.' : 'Read from photo, but not fully confident — check carefully against the image.') + (result.uncertainNote ? ' ' + result.uncertainNote : '');
+    } catch (err) {
+      status.textContent = 'Re-read failed: ' + err.message;
+    } finally {
+      btn.disabled = false; btn.innerHTML = origLabel;
+    }
   });
 
   // Ash, 12 Sep 2026: bill a different number of hours than calculated —
