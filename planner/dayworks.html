@@ -270,7 +270,12 @@ const REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_entries';
 const QUERIES_REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_queries';
 const STORAGE_UPLOAD = SUPABASE_URL + '/storage/v1/object/dayworks-timesheets/';
 const STORAGE_PUBLIC = SUPABASE_URL + '/storage/v1/object/public/dayworks-timesheets/';
-const READ_PHOTO_FN = SUPABASE_URL + '/functions/v1/dayworks-read-photo';
+// Ash, 12 Sep 2026: this function's dashboard display name is
+// "dayworks-read-photo" but its actual route/slug is "smart-service" —
+// Supabase fixes a function's slug at creation and only lets the
+// display name change afterward, so the URL never actually became
+// dayworks-read-photo despite the name shown in the dashboard.
+const READ_PHOTO_FN = SUPABASE_URL + '/functions/v1/smart-service';
 const NO_JOB = '(Needs a job assigned)';
 const NO_NAME = '(Needs a name)';
 const DAYWORKS_RATE = 29; // £/hr charged to Dandara — shown on the client export, matches the client site
@@ -1073,25 +1078,37 @@ function wireDayRow(e) {
   });
 
   // Ash, 12 Sep 2026: re-read a single entry straight from its photo via
-  // the Claude API (dayworks-read-photo Edge Function) — a safety net for
-  // when a transcription looks wrong. Fills the fields in for the PM to
-  // check against the photo, same as a human re-reading it; it never
-  // auto-saves or auto-confirms on its own.
+  // the Claude API (the "smart-service" Edge Function, shown in the
+  // Supabase dashboard as "dayworks-read-photo") — a safety net for when
+  // a transcription looks wrong. It reads the WHOLE sheet in one call and
+  // returns every day it can find, so this picks out just the day
+  // matching this row's date. Fills the fields for the PM to check
+  // against the photo; it never auto-saves or auto-confirms on its own.
   row.querySelector('[data-reread]').addEventListener('click', async () => {
     const btn = row.querySelector('[data-reread]');
     const status = row.querySelector('[data-status]');
-    if (!dateEl.value) { status.textContent = 'Set a date first, so Claude knows which weekday row on the sheet to read.'; return; }
-    const weekday = new Date(dateEl.value + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
+    if (!dateEl.value) { status.textContent = 'Set a date first, so I know which day on the sheet to match against.'; return; }
+    if (!e.image) { status.textContent = "No photo attached to this entry — can't re-read it."; return; }
     btn.disabled = true; const origLabel = btn.innerHTML; btn.innerHTML = 'Reading…'; status.textContent = '';
     try {
       const r = await fetch(READ_PHOTO_FN, {
         method: 'POST',
         headers: sbHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ imagePath: e.imagePath, weekday })
+        body: JSON.stringify({ imageUrl: e.image })
       });
-      const result = await r.json();
-      if (!r.ok || !result.ok) {
-        status.textContent = 'Could not read the photo: ' + (result.error || ('HTTP ' + r.status));
+      const body = await r.json();
+      if (!r.ok) {
+        status.textContent = 'Could not read the photo: ' + (body.error || ('HTTP ' + r.status));
+        return;
+      }
+      const days = Array.isArray(body) ? body : (Array.isArray(body.days) ? body.days : null);
+      if (!days) {
+        status.textContent = 'Read the photo, but got back something unexpected — check the Supabase function logs.';
+        return;
+      }
+      const result = days.find(d => d.date === dateEl.value);
+      if (!result) {
+        status.textContent = "Read the sheet, but couldn't find " + dateEl.value + " on it — check the date is right, or read it by eye instead.";
         return;
       }
       if (result.start) startEl.value = result.start;
@@ -1100,7 +1117,8 @@ function wireDayRow(e) {
       lunchEl.dataset.manual = '0';
       lunchEl.value = defaultLunchMins(startEl.value, finishEl.value);
       recalc();
-      status.textContent = (result.confident ? 'Read from photo — check it against the image, then Confirm & save.' : 'Read from photo, but not fully confident — check carefully against the image.') + (result.uncertainNote ? ' ' + result.uncertainNote : '');
+      const confident = result.confidence ? result.confidence !== 'low' : true;
+      status.textContent = (confident ? 'Read from photo — check it against the image, then Confirm & save.' : 'Read from photo, but not fully confident — check carefully against the image.') + (result.note ? ' ' + result.note : '');
     } catch (err) {
       status.textContent = 'Re-read failed: ' + err.message;
     } finally {
