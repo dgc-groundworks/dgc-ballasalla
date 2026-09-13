@@ -80,9 +80,12 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .env-page{width:220mm;height:110mm;padding:14mm 16mm;position:relative;background:#fff}
 .env-logo{position:absolute;left:16mm;top:13mm}
 .env-logo img{height:11mm;width:auto;display:block}
-.env-recipient{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;line-height:1.48}
+.env-recipient{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;line-height:1.48}
 .env-recipient .er-name{font-size:13.5pt;font-weight:600;letter-spacing:.01em;color:#141f30;margin-bottom:3pt}
 .env-recipient .er-line{font-size:11pt;font-weight:400;color:#3a4a60}
+.env-page.align-left .env-recipient{align-items:flex-start;text-align:left;left:16mm;right:16mm}
+.align-toggle{display:inline-flex;gap:6px;margin-left:10px}
+.align-toggle button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 @media print{
   .topbar,.nav,.row-actions,.stat-bar{display:none!important}
   body{background:#fff}
@@ -147,6 +150,7 @@ function toggleTheme(){
 const STANDING_EXCLUDE = ['manx utilities', 'hartford homes', 'dandara', 'excel'];
 const LS_LOG = 'silverdale_canvassing_processed';   // { ref: { date, name } }
 const LS_LEADS = 'silverdale_canvassing_leads';     // last-parsed batch, so a refresh doesn't lose work
+const LS_ENV_ALIGN = 'silverdale_canvassing_env_align';  // 'center' | 'left' — envelope address alignment
 
 // Starter batch — the most recent real pull (8 Sep 2026, 39 leads) — so
 // the tool shows real, working content the first time it's opened rather
@@ -204,6 +208,8 @@ function todayOrdinal(){
   return day + suf + ' ' + d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 }
 
+function getEnvAlign(){ try { return localStorage.getItem(LS_ENV_ALIGN) || 'center'; } catch { return 'center'; } }
+function setEnvAlign(v){ try { localStorage.setItem(LS_ENV_ALIGN, v); } catch {} }
 function getLog(){ try { return JSON.parse(localStorage.getItem(LS_LOG) || '{}'); } catch { return {}; } }
 function saveLog(log){ try { localStorage.setItem(LS_LOG, JSON.stringify(log)); } catch {} }
 function saveLeadsToStorage(){ try { localStorage.setItem(LS_LEADS, JSON.stringify(leads)); } catch {} }
@@ -508,7 +514,7 @@ function letterBody(){
   return [
     "Congratulations on your recent planning approval. It is a real milestone - the point where a project stops being a drawing and starts becoming real. We would like to help you build it.",
     "Silverdale is an Isle of Man property development and design company. We take a project from approved plans through to finished build: managing the works, coordinating architects and engineers, holding cost and programme, and carrying the detail so you do not have to. A single home, a commercial scheme or an extension - we can run the whole build, or step in exactly where you need us.",
-    "When a project calls for groundworks or drainage, our sister company, Drainage &amp; Groundwork Contractors Limited, delivers it in-house. DGC is trusted by the Isle of Man Government bodies - the DOI, DEFA and Manx Utilities - and by the island's largest developers to manage their drainage and civils works. It is the same management team that works alongside Silverdale to bring your project to completion.",
+    "When a project calls for groundworks or drainage, our sister company, Drainage &amp; Groundwork Contractors Limited, delivers it in-house. DGC (dgc.im) is trusted by the Isle of Man Government bodies - the DOI, DEFA and Manx Utilities - and by the island's largest developers to manage their drainage and civils works. It is the same management team that works alongside Silverdale to bring your project to completion.",
     "We are proud to be an Island business, and we treat every project, of every size, with the same care. If this is of interest, I would be glad to meet and talk it through. I look forward to hearing from you."
   ];
 }
@@ -523,16 +529,28 @@ function renderPrint(main, kind){
     return;
   }
 
+  const align = getEnvAlign();
+  const alignToggleHtml = kind === 'envelope' ? `
+      <span class="align-toggle">
+        <button class="btn-secondary${align === 'center' ? ' active' : ''}" id="alignCenterBtn">Centered</button>
+        <button class="btn-secondary${align === 'left' ? ' active' : ''}" id="alignLeftBtn">Left-aligned</button>
+      </span>` : '';
+
   main.innerHTML = `
     <div class="row-actions">
       <button class="btn" id="printBtn">&#128438; Print (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
       <button class="btn" id="savePdfBtn">&#11015; Save as PDF&hellip;</button>
       <button class="btn-secondary" id="markSentBtn">&#10003; Mark these ${batch.length} as sent (updates the processed log)</button>
+      ${alignToggleHtml}
       <span id="printMsg" style="color:var(--muted);font-size:0.82rem"></span>
     </div>
     <div id="pdfArea">${batch.map(l => kind === 'letter' ? letterHtml(l) : envelopeHtml(l)).join('')}</div>
   `;
   document.getElementById('printBtn').addEventListener('click', () => window.print());
+  if (kind === 'envelope') {
+    document.getElementById('alignCenterBtn').addEventListener('click', () => { setEnvAlign('center'); render(); });
+    document.getElementById('alignLeftBtn').addEventListener('click', () => { setEnvAlign('left'); render(); });
+  }
   document.getElementById('savePdfBtn').addEventListener('click', async () => {
     const btn = document.getElementById('savePdfBtn');
     const msg = document.getElementById('printMsg');
@@ -558,7 +576,7 @@ function renderPrint(main, kind){
         const safeHeight = rect.height - 3;
         const opt = {
           margin: 0,
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: rect.width, height: safeHeight, windowWidth: rect.width, windowHeight: safeHeight },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', height: safeHeight },
           jsPDF: { unit: 'mm', format, orientation }
         };
         if (i === 0) {
@@ -613,7 +631,8 @@ function letterHtml(l){
 }
 function envelopeHtml(l){
   const [name, ...addr] = l.recipientLines;
-  return `<div class="print-doc env-page">
+  const alignClass = getEnvAlign() === 'left' ? ' align-left' : '';
+  return `<div class="print-doc env-page${alignClass}">
     <div class="env-logo"><img src="assets/silverdale-logo.jpg" alt="Silverdale"></div>
     <div class="env-recipient">
       <div class="er-name">${esc(name)}</div>
