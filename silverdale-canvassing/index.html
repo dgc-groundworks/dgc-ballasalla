@@ -9,11 +9,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
+[data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
 .topbar{background:var(--surf);border-bottom:1px solid var(--bord);padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
 .topbar h1{font-size:1.05rem;font-weight:800;color:var(--accent)}
 .topbar .sub{font-size:0.78rem;color:var(--muted);margin-left:auto}
+.theme-toggle-btn{background:none;border:1px solid var(--bord);border-radius:6px;color:var(--muted);font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em;white-space:nowrap}
+.theme-toggle-btn:hover{border-color:var(--accent);color:var(--accent)}
 .nav{background:var(--surf);border-bottom:1px solid var(--bord);padding:0 20px;display:flex;gap:4px;position:sticky;top:49px;z-index:9}
 .navbtn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:0.85rem;font-weight:700;padding:10px 14px;cursor:pointer;font-family:inherit}
 .navbtn:hover{color:var(--text)}
@@ -90,6 +93,7 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 <header class="topbar">
   <h1>Silverdale Canvassing</h1>
   <span class="sub">Planning-leads intake &rarr; letters &amp; envelopes, ready to print</span>
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">Light Mode</button>
 </header>
 <nav class="nav">
   <button class="navbtn active" data-tab="import">Import</button>
@@ -117,6 +121,24 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 // the table from the Weekly List export (or the PDF) and paste it
 // in on the Import tab.
 // ---------------------------------------------------------------
+
+// ---- Theme (dark default, light optional, remembered per browser) ----
+const LS_THEME = 'silverdale_canvassing_theme';
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.textContent = theme === 'light' ? 'Dark Mode' : 'Light Mode';
+}
+function toggleTheme(){
+  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  applyTheme(next);
+  try { localStorage.setItem(LS_THEME, next); } catch {}
+}
+(function initTheme(){
+  let saved = 'dark';
+  try { saved = localStorage.getItem(LS_THEME) || 'dark'; } catch {}
+  applyTheme(saved);
+})();
 
 const STANDING_EXCLUDE = ['manx utilities', 'hartford homes', 'dandara', 'excel'];
 const LS_LOG = 'silverdale_canvassing_processed';   // { ref: { date, name } }
