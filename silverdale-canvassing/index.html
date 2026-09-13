@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -59,7 +60,12 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .tag-dupe{background:rgba(100,116,139,.2);color:var(--muted)}
 .tag-review{background:rgba(245,158,11,.18);color:var(--accent)}
 .print-doc{background:#fff;color:#1a2a3f;box-shadow:0 4px 32px rgba(0,0,0,.4);margin:0 auto 28px;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;font-variant-numeric:lining-nums proportional-nums;font-feature-settings:"lnum" 1,"pnum" 1}
-.letter-page{width:210mm;min-height:297mm;padding:30mm 30mm;position:relative}
+/* Page-to-page gap is for on-screen viewing only -- html2canvas
+   captures the full margin box, so it must collapse to 0 during a
+   PDF export or every captured page gains extra blank height and the
+   envelope's aspect ratio comes out wrong. */
+.pdf-exporting .print-doc{margin:0;box-shadow:none}
+.letter-page{width:210mm;min-height:297mm;padding:14mm 20mm;position:relative}
 .letter-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:10mm}
 .letter-logo img{height:16mm;width:auto;display:block}
 .letter-sender{text-align:right}
@@ -67,7 +73,7 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .letter-sender .addr{font-size:11.5pt;color:#3a4a60;margin-top:6px;line-height:1.6}
 .letter-date{font-size:13.5pt;text-align:right;color:#1e2c40;margin-top:0}
 .letter-addr{font-size:13.5pt;line-height:1.6;color:#1e2c40;margin-top:56px}
-.letter-body p{font-size:13.5pt;line-height:1.8;margin-top:18px;color:#1e2c40}
+.letter-body p{font-size:12.5pt;line-height:1.35;margin-top:9px;color:#1e2c40}
 .letter-sign{margin-top:14px}
 .letter-sign img{height:56px}
 .letter-body p:last-of-type{margin-top:0}
@@ -519,13 +525,60 @@ function renderPrint(main, kind){
 
   main.innerHTML = `
     <div class="row-actions">
-      <button class="btn" id="printBtn">&#128438; Print / Save PDF (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
+      <button class="btn" id="printBtn">&#128438; Print (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
+      <button class="btn" id="savePdfBtn">&#11015; Save as PDF&hellip;</button>
       <button class="btn-secondary" id="markSentBtn">&#10003; Mark these ${batch.length} as sent (updates the processed log)</button>
       <span id="printMsg" style="color:var(--muted);font-size:0.82rem"></span>
     </div>
-    ${batch.map(l => kind === 'letter' ? letterHtml(l) : envelopeHtml(l)).join('')}
+    <div id="pdfArea">${batch.map(l => kind === 'letter' ? letterHtml(l) : envelopeHtml(l)).join('')}</div>
   `;
   document.getElementById('printBtn').addEventListener('click', () => window.print());
+  document.getElementById('savePdfBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('savePdfBtn');
+    const msg = document.getElementById('printMsg');
+    const area = document.getElementById('pdfArea');
+    btn.disabled = true; const original = btn.innerHTML;
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const filename = `Silverdale ${kind === 'letter' ? 'Letters' : 'Envelopes'} - ${dateStr}.pdf`;
+    const format = kind === 'letter' ? 'a4' : [220, 110];
+    const orientation = kind === 'letter' ? 'portrait' : 'landscape';
+
+    area.classList.add('pdf-exporting');
+    const pages = Array.from(area.querySelectorAll('.print-doc'));
+    try {
+      let pdf = null;
+      for (let i = 0; i < pages.length; i++) {
+        btn.innerHTML = `Building PDF&hellip; (${i + 1}/${pages.length})`;
+        const pageEl = pages[i];
+        const rect = pageEl.getBoundingClientRect();
+        // Capture very slightly short of the page's true height: at the
+        // exact page-height boundary, sub-pixel rounding between
+        // html2canvas's px measurement and jsPDF's mm page size can tip
+        // a single row of pixels onto a spurious, near-blank extra page.
+        const safeHeight = rect.height - 3;
+        const opt = {
+          margin: 0,
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: rect.width, height: safeHeight, windowWidth: rect.width, windowHeight: safeHeight },
+          jsPDF: { unit: 'mm', format, orientation }
+        };
+        if (i === 0) {
+          pdf = await html2pdf().set(opt).from(pageEl).toPdf().get('pdf');
+        } else {
+          const canvas = await html2pdf().set(opt).from(pageEl).toCanvas().get('canvas');
+          pdf.addPage(format, orientation);
+          const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+          pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pw, ph);
+        }
+      }
+      pdf.save(filename);
+      if (msg) msg.textContent = `Saved — check your Downloads (or wherever your browser saves files) for "${filename}".`;
+    } catch (err) {
+      if (msg) msg.textContent = 'Could not build the PDF: ' + err.message;
+    } finally {
+      area.classList.remove('pdf-exporting');
+      btn.disabled = false; btn.innerHTML = original;
+    }
+  });
   document.getElementById('markSentBtn').addEventListener('click', () => {
     const log = getLog();
     const today = new Date().toISOString().slice(0,10);
