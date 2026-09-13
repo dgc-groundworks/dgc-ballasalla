@@ -894,6 +894,27 @@ function weekEndingTablesHtml(rows) {
   return html;
 }
 
+// Ash, 13 Sep 2026: a photo "belongs" to whichever calendar week most of
+// its own rows actually fall in — a stray one-day note dated into a
+// different week (like a Saturday scribbled on next week's sheet)
+// shouldn't drag that whole other sheet's photo into this week's view.
+// Only show a photo in a week where it's genuinely the majority sheet
+// for that week, not just referenced by one outlying row.
+function imageHomeWeeks(rows) {
+  const counts = {};
+  rows.forEach(r => {
+    if (!r.image || !r.date) return;
+    const wk = getMonday(r.date);
+    (counts[r.image] = counts[r.image] || {})[wk] = (counts[r.image][wk] || 0) + 1;
+  });
+  const home = {};
+  Object.keys(counts).forEach(img => {
+    let best = null, bestN = -1;
+    Object.entries(counts[img]).forEach(([wk, n]) => { if (n > bestN) { best = wk; bestN = n; } });
+    home[img] = best;
+  });
+  return home;
+}
 function personDetailHtml(rows) {
   const byWeek = {};
   rows.forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date yet)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
@@ -903,7 +924,8 @@ function personDetailHtml(rows) {
   const wk = weekKeys[state.weekIndex];
   const weekRows = (byWeek[wk] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const weekTotal = weekRows.reduce((s, r) => s + effectiveHours(r), 0);
-  const images = [...new Set(weekRows.map(r => r.image))];
+  const homeWeeks = imageHomeWeeks(rows);
+  const images = [...new Set(weekRows.map(r => r.image))].filter(img => homeWeeks[img] === wk);
   const conflictMap = conflictsByDate(rows);
 
   return `
