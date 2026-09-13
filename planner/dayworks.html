@@ -201,30 +201,35 @@ input:focus{border-color:var(--accent)}
 .hist-batch .hb-meta{font-size:0.8rem;color:var(--muted);margin-top:4px}
 
 /* ── Branded document (matches Site Diary) ── */
-.report-doc{background:#fff;color:#1a2a3f;border-radius:10px;padding:36px 40px;max-width:900px;box-shadow:0 4px 32px rgba(0,0,0,.45);font-family:'Segoe UI',Calibri,Arial,sans-serif;margin:0 auto}
-.lh-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:16px}
-.lh-logo{height:62px;width:auto}
+.report-doc{background:#fff;color:#1a2a3f;border-radius:10px;padding:28px 34px;max-width:900px;box-shadow:0 4px 32px rgba(0,0,0,.45);font-family:'Segoe UI',Calibri,Arial,sans-serif;margin:0 auto}
+.lh-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:12px}
+.lh-logo{height:52px;width:auto}
 .lh-right{text-align:right}
 .lh-company{font-size:1rem;font-weight:800;color:#1a2a3f;letter-spacing:-.2px;line-height:1.2}
 .lh-addr{font-size:0.76rem;color:#4a6080;margin-top:3px;line-height:1.5}
-.lh-rule{border:none;border-top:3px solid #1a2a3f;margin-bottom:18px}
-.report-title{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px}
+.lh-rule{border:none;border-top:3px solid #1a2a3f;margin-bottom:14px}
+.report-title{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
 .report-title h2{font-size:1.45rem;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#1a2a3f}
 .report-ref{font-size:0.75rem;color:#4a6080;font-weight:600;letter-spacing:.3px}
-.report-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1.5px solid #1a2a3f;border-radius:6px;overflow:hidden;margin-bottom:22px}
-.rm-cell{padding:10px 14px;border-right:1px solid #c8d4e0}
+.report-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1.5px solid #1a2a3f;border-radius:6px;overflow:hidden;margin-bottom:14px}
+.rm-cell{padding:8px 14px;border-right:1px solid #c8d4e0}
 .rm-cell:last-child{border-right:none}
-.rm-cell .rmc-label{font-size:0.63rem;text-transform:uppercase;letter-spacing:.08em;color:#4a6080;margin-bottom:3px;font-weight:700}
+.rm-cell .rmc-label{font-size:0.63rem;text-transform:uppercase;letter-spacing:.08em;color:#4a6080;margin-bottom:2px;font-weight:700}
 .rm-cell .rmc-val{font-size:0.9rem;font-weight:700;color:#1a2a3f;line-height:1.3}
-.site-block{border:1px solid #c8d4e0;border-radius:6px;overflow:hidden;margin-bottom:16px}
-.site-hdr{background:#1a2a3f;color:#fff;font-size:0.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:9px 14px}
-.week-hdr{background:#e4ecf4;color:#1a2a3f;font-size:0.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:6px 14px;border-top:1px solid #c8d4e0}
-.dw-table{width:100%;border-collapse:collapse;font-size:0.82rem}
-.dw-table th{text-align:left;padding:6px 14px;font-size:0.65rem;text-transform:uppercase;letter-spacing:.05em;color:#4a6080;border-bottom:1px solid #c8d4e0}
-.dw-table td{padding:6px 14px;border-bottom:1px solid #eef2f7;color:#1a2a3f}
+.site-block{border:1px solid #c8d4e0;border-radius:6px;overflow:hidden;margin-bottom:10px}
+.site-hdr{background:#1a2a3f;color:#fff;font-size:0.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:7px 14px}
+.week-hdr{background:#e4ecf4;color:#1a2a3f;font-size:0.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 14px;border-top:1px solid #c8d4e0}
+.dw-table{width:100%;border-collapse:collapse;font-size:0.8rem}
+.dw-table th{text-align:left;padding:4px 14px;font-size:0.65rem;text-transform:uppercase;letter-spacing:.05em;color:#4a6080;border-bottom:1px solid #c8d4e0}
+.dw-table td{padding:3px 14px;border-bottom:1px solid #eef2f7;color:#1a2a3f}
 .dw-table tr:last-child td{border-bottom:none}
 .week-total-row td{font-weight:800;background:#f7fafc;border-top:1.5px solid #c8d4e0}
-.grand-total{margin-top:8px;text-align:right;font-size:1rem;font-weight:900;color:#1a2a3f}
+.grand-total-box{display:flex;background:#1a2a3f;border-radius:8px;overflow:hidden;margin-bottom:14px}
+.gtb-item{flex:1;padding:10px 18px;border-right:1px solid rgba(255,255,255,.15)}
+.gtb-item:last-child{border-right:none}
+.gtb-label{font-size:0.63rem;text-transform:uppercase;letter-spacing:.08em;color:#9fb0c8;margin-bottom:5px;font-weight:700}
+.gtb-val{font-size:1.3rem;font-weight:900;color:#fff;line-height:1.2}
+.gtb-due .gtb-val{color:#ff9d3d}
 .report-footer{margin-top:18px;padding-top:14px;border-top:1px solid #c8d4e0;font-size:0.7rem;color:#8a9ab0;line-height:1.5;text-align:center}
 .report-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;max-width:900px;margin-left:auto;margin-right:auto}
 .btn-print{background:#1a2a3f;color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
@@ -1325,18 +1330,25 @@ function buildPackHtml(rows, from, to, refNum) {
         <div class="rm-cell"><div class="rmc-label">Entries</div><div class="rmc-val">${rows.length}</div></div>
         <div class="rm-cell"><div class="rmc-label">Prepared</div><div class="rmc-val">${fmtDate(new Date().toISOString().slice(0,10))}</div></div>
       </div>
+      ${grandTotalsBoxHtml(grandTotal, to)}
       ${body}
-      <div class="grand-total">Total hours, all sites: ${grandTotal}${grandTotalsHtml(to)}</div>
     </div>`;
 }
-// Ash, 13 Sep 2026: the pack's own hours total above is just this batch
-// — "Total paid" / "Total due" need to reconcile against everything ever
-// confirmed, same figure the public site shows, not just this one pack.
-function grandTotalsHtml(to) {
+// Ash, 13 Sep 2026: the totals used to sit as one line at the very
+// bottom of the document — easy to miss, and on a long pack it fell
+// onto a trailing page of its own with nothing else on it. This is the
+// most important line in the whole pack, so it now runs as a banner
+// right at the top, seen first, and nothing is left dangling below it.
+function grandTotalsBoxHtml(grandTotal, to) {
   const allTimeHours = entries.filter(e => e.confirmed && !e.flagged && !e.removedAt).reduce((s, e) => s + effectiveHours(e), 0);
   const allTimeAmount = allTimeHours * DAYWORKS_RATE;
   const dueAmount = Math.max(0, allTimeAmount - totalPaid);
-  return ` &nbsp;&middot;&nbsp; Total paid: ${fmtMoney(totalPaid)} &nbsp;&middot;&nbsp; Total due, as of ${fmtDate(to)}: ${fmtMoney(dueAmount)}`;
+  return `
+    <div class="grand-total-box">
+      <div class="gtb-item"><div class="gtb-label">Total hours, all sites</div><div class="gtb-val">${grandTotal}</div></div>
+      <div class="gtb-item"><div class="gtb-label">Total paid</div><div class="gtb-val">${fmtMoney(totalPaid)}</div></div>
+      <div class="gtb-item gtb-due"><div class="gtb-label">Total due, as of ${fmtDate(to)}</div><div class="gtb-val">${fmtMoney(dueAmount)}</div></div>
+    </div>`;
 }
 
 // A static page can't write straight to the shared drive on its own — no
