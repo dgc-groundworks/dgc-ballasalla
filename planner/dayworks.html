@@ -903,7 +903,11 @@ function weekEndingTablesHtml(rows) {
 function imageHomeWeeks(rows) {
   const counts = {};
   rows.forEach(r => {
-    if (!r.image || !r.date) return;
+    // Ash, 13 Sep 2026: "should only be one timesheet per guy per week
+    // view" — a resolved double-entry (billed_hours = 0) is evidence of
+    // the mistake, not a second real timesheet for that week, so it
+    // doesn't get a vote in which photo belongs where.
+    if (!r.image || !r.date || effectiveHours(r) === 0) return;
     const wk = getMonday(r.date);
     (counts[r.image] = counts[r.image] || {})[wk] = (counts[r.image][wk] || 0) + 1;
   });
@@ -1305,7 +1309,6 @@ function buildPackHtml(rows, from, to, refNum) {
       </div>
       ${body}
       <div class="grand-total">Total hours, all sites: ${grandTotal}${grandTotalsHtml(to)}</div>
-      <div class="report-footer">This document summarises dayworks hours recorded by Drainage &amp; Groundwork Contractors Limited operatives, evidenced by the original signed timesheets, at a rate of ${fmtMoney(DAYWORKS_RATE)}/hr. Ref: ${esc(refNum)}</div>
     </div>`;
 }
 // Ash, 13 Sep 2026: the pack's own hours total above is just this batch
