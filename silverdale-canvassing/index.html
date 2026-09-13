@@ -332,9 +332,20 @@ function classify(lead){
   }
 
   // Send by default — homeowners and businesses alike — unless it's on
-  // the standing never-contact list, already sent before, or flagged
-  // for a manual look (illegible/agent-only/genuinely unresolved name).
-  lead.include = !lead.excludedReason && !lead.alreadyProcessed && !lead.needsReview;
+  // the standing never-contact list or flagged for a manual look
+  // (illegible/agent-only/genuinely unresolved name). "Already sent" is
+  // shown as a warning tag, not an automatic exclude — saving/archiving
+  // a batch must never silently make leads disappear from Print/Review.
+  // Only set on first classification of a lead — classify() re-runs on
+  // every stored lead on every reload, so once a value exists here it
+  // must be left alone, or a manual Send/Don't-send toggle in Review
+  // would get silently reverted the next time the page loads.
+  if (lead.include === undefined) {
+    lead.include = !lead.excludedReason && !lead.needsReview;
+  }
+  // The standing never-contact list is a hard business rule, not a
+  // suggestion — always enforced, even over a manual toggle.
+  if (lead.excludedReason) lead.include = false;
   return lead;
 }
 
@@ -480,7 +491,9 @@ function renderReview(main){
       : l.alreadyProcessed ? { cls: 'tag-dupe', label: 'Already sent', title: '' }
       : l.needsReview ? { cls: 'tag-review', label: 'Check', title: l.reviewNote }
       : null;
-    const locked = !!(l.excludedReason || l.alreadyProcessed);
+    // Only the standing never-contact list locks the toggle — "already
+    // sent" is a warning, not a lock, so it can always be flipped back.
+    const locked = !!l.excludedReason;
     return `
       <div class="lead-row ${flag ? 'flagged' : ''}" data-i="${i}">
         <div class="lr-main">
@@ -539,7 +552,7 @@ function renderPrint(main, kind){
   const batch = leads.filter(l => l.include);
   if (!batch.length) {
     const msg = leads.length
-      ? `Nothing set to Send right now — ${leads.length} leads are loaded, but they're all either already marked sent, excluded, or flagged for a check. Go to Review to see them and flip anything back to Send.`
+      ? `Nothing set to Send right now — ${leads.length} leads are loaded, but they're all either standing-excluded or flagged for a check. Go to Review to see them and flip anything back to Send.`
       : `Nothing parsed yet — go to Import and paste this week's leads.`;
     main.innerHTML = `<p class="empty-state">${esc(msg)}</p>`;
     return;
@@ -636,11 +649,14 @@ function renderPrint(main, kind){
     return ok;
   }
   function archiveBatch(){
+    // Tags leads as "already sent" for the record (and to warn about
+    // resending them on a future pull) — never hides or locks them.
+    // Nothing about pressing Save/Archive should make a lead disappear
+    // from Print or Review; that stays entirely under manual control.
     const log = getLog();
     const today = new Date().toISOString().slice(0,10);
-    batch.forEach(l => { if (l.ref) log[l.ref] = { date: today, name: l.applicant }; });
+    batch.forEach(l => { if (l.ref) log[l.ref] = { date: today, name: l.applicant }; l.alreadyProcessed = true; });
     saveLog(log);
-    batch.forEach(l => { l.alreadyProcessed = true; l.include = false; });
     saveLeadsToStorage();
   }
   document.getElementById('savePdfBtn').addEventListener('click', () => buildAndSavePdf(document.getElementById('savePdfBtn')));
