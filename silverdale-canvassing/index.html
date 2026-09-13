@@ -318,11 +318,17 @@ function classify(lead){
   const mainText = lead.applicant.replace(/\([^)]*\)/g, '').trim();
   lead.type = TITLE_RE.test(mainText) ? 'Homeowner' : (COMPANY_WORDS.test(mainText) ? 'Company' : 'Homeowner');
 
-  lead.recipientLines = buildAddressBlock(lead);
-  lead.salutation = buildSalutation(lead);
-  if (lead.salutation === 'Dear Sir/Madam,' && lead.type === 'Homeowner') {
-    lead.needsReview = true;
-    lead.reviewNote = lead.reviewNote || 'Joint applicants with different surnames — check the salutation before sending.';
+  // Skip recomputing these if the recipient/salutation were hand-edited
+  // via the "Edit this one" facility on the Print tabs — otherwise the
+  // next reload (which re-runs classify() on every stored lead) would
+  // silently overwrite the correction with the auto-generated version.
+  if (!lead.edited) {
+    lead.recipientLines = buildAddressBlock(lead);
+    lead.salutation = buildSalutation(lead);
+    if (lead.salutation === 'Dear Sir/Madam,' && lead.type === 'Homeowner') {
+      lead.needsReview = true;
+      lead.reviewNote = lead.reviewNote || 'Joint applicants with different surnames — check the salutation before sending.';
+    }
   }
 
   // Send by default — homeowners and businesses alike — unless it's on
@@ -550,6 +556,7 @@ function renderPrint(main, kind){
     <div class="row-actions">
       <button class="btn" id="printBtn">&#128438; Print (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
       <button class="btn" id="savePdfBtn">&#11015; Save as PDF&hellip;</button>
+      <button class="btn" id="saveArchiveBtn">&#128190; Save &amp; Archive&hellip;</button>
       <button class="btn-secondary" id="markSentBtn">&#10003; Mark these ${batch.length} as sent (updates the processed log)</button>
       ${alignToggleHtml}
       <span id="printMsg" style="color:var(--muted);font-size:0.82rem"></span>
@@ -571,6 +578,7 @@ function renderPrint(main, kind){
       if (lines.length) lead.recipientLines = lines;
       const salInput = wrap.querySelector('.edit-salutation');
       if (salInput) lead.salutation = salInput.value.trim();
+      lead.edited = true;
       saveLeadsToStorage();
       wrap.outerHTML = docWrapHtml(lead, Number(wrap.dataset.idx), kind);
     }
@@ -579,8 +587,7 @@ function renderPrint(main, kind){
     document.getElementById('alignCenterBtn').addEventListener('click', () => { setEnvAlign('center'); render(); });
     document.getElementById('alignLeftBtn').addEventListener('click', () => { setEnvAlign('left'); render(); });
   }
-  document.getElementById('savePdfBtn').addEventListener('click', async () => {
-    const btn = document.getElementById('savePdfBtn');
+  async function buildAndSavePdf(btn){
     const msg = document.getElementById('printMsg');
     const area = document.getElementById('pdfArea');
     btn.disabled = true; const original = btn.innerHTML;
@@ -591,6 +598,7 @@ function renderPrint(main, kind){
 
     area.classList.add('pdf-exporting');
     const pages = Array.from(area.querySelectorAll('.print-doc'));
+    let ok = false;
     try {
       let pdf = null;
       for (let i = 0; i < pages.length; i++) {
@@ -618,20 +626,36 @@ function renderPrint(main, kind){
       }
       pdf.save(filename);
       if (msg) msg.textContent = `Saved — check your Downloads (or wherever your browser saves files) for "${filename}".`;
+      ok = true;
     } catch (err) {
       if (msg) msg.textContent = 'Could not build the PDF: ' + err.message;
     } finally {
       area.classList.remove('pdf-exporting');
       btn.disabled = false; btn.innerHTML = original;
     }
-  });
-  document.getElementById('markSentBtn').addEventListener('click', () => {
+    return ok;
+  }
+  function archiveBatch(){
     const log = getLog();
     const today = new Date().toISOString().slice(0,10);
     batch.forEach(l => { if (l.ref) log[l.ref] = { date: today, name: l.applicant }; });
     saveLog(log);
     batch.forEach(l => { l.alreadyProcessed = true; l.include = false; });
     saveLeadsToStorage();
+  }
+  document.getElementById('savePdfBtn').addEventListener('click', () => buildAndSavePdf(document.getElementById('savePdfBtn')));
+  document.getElementById('saveArchiveBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('saveArchiveBtn');
+    const ok = await buildAndSavePdf(btn);
+    if (!ok) return;
+    archiveBatch();
+    const msg = document.getElementById('printMsg');
+    if (msg) msg.textContent += ` Archived — these ${batch.length} are now marked as sent.`;
+    document.getElementById('markSentBtn').textContent = '✓ Logged';
+    document.getElementById('markSentBtn').disabled = true;
+  });
+  document.getElementById('markSentBtn').addEventListener('click', () => {
+    archiveBatch();
     document.getElementById('markSentBtn').textContent = '✓ Logged';
     document.getElementById('markSentBtn').disabled = true;
   });
@@ -698,12 +722,22 @@ function renderLog(main){
   if (!refs.length) { main.innerHTML = '<p class="empty-state">Nothing logged as sent yet.</p>'; return; }
   main.innerHTML = `
     <div class="row-actions"><button class="btn-danger" id="clearLogBtn">Clear entire log</button></div>
-    <table class="leads"><thead><tr><th>Reference</th><th>Applicant</th><th>Date logged</th></tr></thead><tbody>
-    ${refs.map(ref => `<tr><td>${esc(ref)}</td><td>${esc(log[ref].name)}</td><td>${esc(log[ref].date)}</td></tr>`).join('')}
+    <table class="leads"><thead><tr><th>Reference</th><th>Applicant</th><th>Date logged</th><th></th></tr></thead><tbody>
+    ${refs.map(ref => `<tr><td>${esc(ref)}</td><td>${esc(log[ref].name)}</td><td>${esc(log[ref].date)}</td><td><button class="btn-secondary restore-btn" data-ref="${esc(ref)}">&#8617; Restore to Send</button></td></tr>`).join('')}
     </tbody></table>`;
   document.getElementById('clearLogBtn').addEventListener('click', () => {
     if (!confirm('Clear the whole processed-log? This will make every past reference look new again next import.')) return;
     saveLog({}); render();
+  });
+  main.querySelectorAll('.restore-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const log = getLog();
+      delete log[btn.dataset.ref];
+      saveLog(log);
+      leads = leads.map(classify);
+      saveLeadsToStorage();
+      renderLog(main);
+    });
   });
 }
 
