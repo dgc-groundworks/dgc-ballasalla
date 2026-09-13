@@ -1220,7 +1220,15 @@ function wireDayRow(e) {
 // Send to client — builds the branded pack from everything unsent,
 // then on confirmation marks it all sent and files it into Historic.
 // ---------------------------------------------------------------
+// Ash, 13 Sep 2026: the client-facing pack should never show a £0 row —
+// a resolved double-entry or a Bank Holiday zeroed in the app is real
+// audit trail for us, but just clutter/confusion for Kal. Filtered out
+// here only — the internal app still shows them with their reason.
+function packRows(rows) {
+  return rows.filter(r => effectiveHours(r) !== 0);
+}
 function buildPackHtml(rows, from, to, refNum) {
+  rows = packRows(rows);
   const bySite = {};
   rows.forEach(e => { (bySite[baseJob(e.site)] = bySite[baseJob(e.site)] || []).push(e); });
   let body = '', grandTotal = 0;
@@ -1229,7 +1237,10 @@ function buildPackHtml(rows, from, to, refNum) {
     const byWeek = {};
     bySite[site].forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
     Object.keys(byWeek).sort().forEach((wkStart, i) => {
-      const wrows = byWeek[wkStart].sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.name.localeCompare(b.name));
+      // Grouped by name first, then date within that name — Ash, 13 Sep
+      // 2026: everyone's own days together, not interleaved by date
+      // across different people.
+      const wrows = byWeek[wkStart].sort((a, b) => a.name.localeCompare(b.name) || (a.date || '').localeCompare(b.date || ''));
       const weekTotal = wrows.reduce((s, r) => s + effectiveHours(r), 0);
       grandTotal += weekTotal;
       body += `<div class="week-hdr">Week ${i + 1} — w/c ${fmtDate(wkStart)}</div>
@@ -1347,10 +1358,61 @@ async function writeFileToDir(dirHandle, name, blob) {
   await w.write(blob);
   await w.close();
 }
+// Ash, 13 Sep 2026: loads an image and hands back both its natural
+// (EXIF-corrected — browsers already rotate for display) pixel size and
+// a same-size canvas so it can be re-encoded as a data URL for jsPDF,
+// which can't just take a plain image URL.
+function loadImageInfo(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('image failed to load'));
+    img.src = url;
+  });
+}
+function imgToDataUrl(img) {
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+  canvas.getContext('2d').drawImage(img, 0, 0);
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+// One combined PDF: the summary tables (already on the page) followed by
+// every timesheet photo, one per page, in the same site → name → date
+// order as the tables above — so Kal can flip through a single document
+// and check hours against evidence without ever opening the app.
+async function addEvidencePages(pdf, rows) {
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 15;
+  const maxW = pageW - margin * 2;
+  const maxH = pageH - margin * 2 - 12;
+
+  const sorted = rows.slice().sort((a, b) =>
+    baseJob(a.site).localeCompare(baseJob(b.site)) || a.name.localeCompare(b.name) || (a.date || '').localeCompare(b.date || ''));
+
+  const seen = new Set();
+  for (const r of sorted) {
+    if (!r.image || seen.has(r.image)) continue;
+    seen.add(r.image);
+    let img;
+    try { img = await loadImageInfo(r.image); }
+    catch (e) { continue; } // a photo that fails to load shouldn't break the whole export
+    const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
+    const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+    const x = margin + (maxW - w) / 2;
+    pdf.addPage();
+    pdf.setFontSize(11);
+    pdf.text(`${r.name} — ${baseJob(r.site)} — week ending ${fmtDate(getWeekEnding(r.date))}`, margin, margin);
+    pdf.addImage(imgToDataUrl(img), 'JPEG', x, margin + 8, w, h);
+  }
+}
 // Renders the branded summary off-screen at full size, rasterises it
 // (html2canvas), then slices that image across as many A4 pages as
-// needed (the standard "negative-offset" trick for a tall single image).
+// needed (the standard "negative-offset" trick for a tall single image),
+// then appends the evidence photos as further pages of the same PDF.
 async function buildClientPdfBlob(rows, from, to, refLabel) {
+  rows = packRows(rows);
   const holder = document.createElement('div');
   holder.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px;background:#fff';
   holder.innerHTML = buildPackHtml(rows, from, to, refLabel);
@@ -1375,6 +1437,7 @@ async function buildClientPdfBlob(rows, from, to, refLabel) {
       pdf.addImage(imgData, 'JPEG', 0, y, imgW, imgH);
       heightLeft -= pageH;
     }
+    await addEvidencePages(pdf, rows);
     return pdf.output('blob');
   } finally {
     holder.remove();
