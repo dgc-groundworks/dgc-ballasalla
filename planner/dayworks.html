@@ -270,6 +270,7 @@ input:focus{border-color:var(--accent)}
 
 const REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_entries';
 const QUERIES_REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_queries';
+const PAYMENTS_REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_payments';
 const STORAGE_UPLOAD = SUPABASE_URL + '/storage/v1/object/dayworks-timesheets/';
 const STORAGE_PUBLIC = SUPABASE_URL + '/storage/v1/object/public/dayworks-timesheets/';
 // Ash, 12 Sep 2026: this function's dashboard display name is
@@ -569,6 +570,18 @@ async function loadQueries() {
     queriesTableExists = r.ok;
     queries = r.ok ? await r.json() : [];
   } catch (e) { queriesTableExists = false; queries = []; }
+}
+// Ash, 13 Sep 2026: what Dandara has actually paid so far, logged by
+// hand against real certificates as they arrive — used for the "Total
+// paid" / "Total due" lines on the client pack. Degrades to £0 rather
+// than breaking anything if the table isn't there yet.
+let totalPaid = 0;
+async function loadTotalPaid() {
+  try {
+    const r = await fetch(PAYMENTS_REST + '?select=amount', { headers: sbHeaders() });
+    const rows = r.ok ? await r.json() : [];
+    totalPaid = rows.reduce((s, p) => s + Number(p.amount || 0), 0);
+  } catch (e) { totalPaid = 0; }
 }
 // No anon UPDATE (same platform quirk as everywhere else) — resolving a
 // query is delete-then-reinsert with resolved:true, same pattern as
@@ -1269,9 +1282,18 @@ function buildPackHtml(rows, from, to, refNum) {
         <div class="rm-cell"><div class="rmc-label">Prepared</div><div class="rmc-val">${fmtDate(new Date().toISOString().slice(0,10))}</div></div>
       </div>
       ${body}
-      <div class="grand-total">Total hours, all sites: ${grandTotal} &nbsp;&middot;&nbsp; Total due at ${fmtMoney(DAYWORKS_RATE)}/hr: ${fmtMoney(grandTotal * DAYWORKS_RATE)}</div>
+      <div class="grand-total">Total hours, all sites: ${grandTotal}${grandTotalsHtml(to)}</div>
       <div class="report-footer">This document summarises dayworks hours recorded by Drainage &amp; Groundwork Contractors Limited operatives, evidenced by the original signed timesheets, at a rate of ${fmtMoney(DAYWORKS_RATE)}/hr. Ref: ${esc(refNum)}</div>
     </div>`;
+}
+// Ash, 13 Sep 2026: the pack's own hours total above is just this batch
+// — "Total paid" / "Total due" need to reconcile against everything ever
+// confirmed, same figure the public site shows, not just this one pack.
+function grandTotalsHtml(to) {
+  const allTimeHours = entries.filter(e => e.confirmed && !e.flagged && !e.removedAt).reduce((s, e) => s + effectiveHours(e), 0);
+  const allTimeAmount = allTimeHours * DAYWORKS_RATE;
+  const dueAmount = Math.max(0, allTimeAmount - totalPaid);
+  return ` &nbsp;&middot;&nbsp; Total paid: ${fmtMoney(totalPaid)} &nbsp;&middot;&nbsp; Total due, as of ${fmtDate(to)}: ${fmtMoney(dueAmount)}`;
 }
 
 // A static page can't write straight to the shared drive on its own — no
@@ -1707,6 +1729,7 @@ document.querySelectorAll('.dw-navbtn').forEach(btn => {
     await detectSentColumns();
     await loadEntries();
     await loadQueries();
+    await loadTotalPaid();
     render();
   } catch (err) {
     document.getElementById('mainArea').innerHTML =
