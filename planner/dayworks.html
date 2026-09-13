@@ -915,15 +915,32 @@ function personDetailHtml(rows) {
   const weekTotal = weekRows.reduce((s, r) => s + effectiveHours(r), 0);
   const conflictMap = conflictsByDate(rows);
 
-  // Ash, 13 Sep 2026: show every photo that any row this week actually
-  // points to, not just whichever sheet has the most rows — but caption
-  // each one with exactly which date(s) it's evidence for. A stray day
-  // dated into this week from a different physical sheet (a Saturday
-  // note scribbled on next week's timesheet) still needs its own real
-  // evidence visible, not hidden — the confusion was never having two
-  // photos, it was having a second one with no explanation of why.
+  // Ash, 13 Sep 2026: a photo attached to one stray day can belong, by
+  // volume, to a totally different week's sheet — e.g. a Saturday note
+  // scribbled at the bottom of NEXT week's timesheet, which is real
+  // evidence for that one day but is 90% a photo of an unrelated week.
+  // Showing that whole other week's sheet under THIS week just confuses
+  // ("this has nothing to do with anything, it shouldn't be there") —
+  // so a photo only displays under whichever week most of its own rows
+  // actually belong to (its "home" week). It still displays there in
+  // full, so no evidence is ever lost, it's just not duplicated under a
+  // week it barely touches.
+  const imageWeekCounts = {};
+  rows.forEach(r => {
+    if (!r.image || !r.date) return;
+    const rw = getMonday(r.date);
+    imageWeekCounts[r.image] = imageWeekCounts[r.image] || {};
+    imageWeekCounts[r.image][rw] = (imageWeekCounts[r.image][rw] || 0) + 1;
+  });
+  const imageHomeWeek = {};
+  Object.keys(imageWeekCounts).forEach(img => {
+    const counts = imageWeekCounts[img];
+    let best = null, bestCount = -1;
+    Object.keys(counts).forEach(w => { if (counts[w] > bestCount) { best = w; bestCount = counts[w]; } });
+    imageHomeWeek[img] = best;
+  });
   const byImage = {};
-  weekRows.forEach(r => { if (r.image) (byImage[r.image] = byImage[r.image] || []).push(r); });
+  weekRows.forEach(r => { if (r.image && imageHomeWeek[r.image] === wk) (byImage[r.image] = byImage[r.image] || []).push(r); });
   const photoBlocks = Object.keys(byImage).map(img => {
     const forRows = byImage[img];
     const dates = [...new Set(forRows.map(r => fmtDate(r.date)))].join(', ');
