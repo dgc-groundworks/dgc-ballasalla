@@ -74,6 +74,7 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .letter-date{font-size:13.5pt;text-align:right;color:#1e2c40;margin-top:0}
 .letter-addr{font-size:13.5pt;line-height:1.6;color:#1e2c40;margin-top:56px}
 .letter-body p{font-size:12.5pt;line-height:1.35;margin-top:9px;color:#1e2c40}
+.letter-body p:first-of-type{margin-top:45px}
 .letter-sign{margin-top:14px}
 .letter-sign img{height:56px}
 .letter-body p:last-of-type{margin-top:0}
@@ -616,7 +617,7 @@ function letterHtml(l){
       <div class="letter-logo"><img src="assets/silverdale-logo.jpg" alt="Silverdale"></div>
       <div class="letter-sender">
         <div class="name">Silverdale Limited</div>
-        <div class="addr">23 Circular Road, Douglas, Isle of Man, IM1 1AF<br>+44 016 246 14845 &nbsp;|&nbsp; info@silverdale.im</div>
+        <div class="addr">23 Circular Road, Douglas, Isle of Man, IM1 1AF<br>+44 016 246 14845 &nbsp;|&nbsp; info@silverdale.im &nbsp;|&nbsp; silverdale.im</div>
       </div>
     </div>
     <div class="letter-date">${todayOrdinal()}</div>
