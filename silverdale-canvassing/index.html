@@ -88,8 +88,15 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .env-page.align-left .env-recipient .er-block{text-align:left}
 .align-toggle{display:inline-flex;gap:6px;margin-left:10px}
 .align-toggle button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.doc-wrap{max-width:820px;margin:0 auto}
+.doc-toolbar{display:flex;justify-content:flex-end;max-width:210mm;margin:0 auto}
+.doc-edit-btn{font-size:0.78rem;padding:5px 10px;border-radius:5px;border:1px solid var(--bord);background:var(--surf2);color:var(--text);cursor:pointer;font-family:inherit}
+.doc-edit-panel{max-width:210mm;margin:8px auto 20px;padding:12px 16px;border:1px solid var(--bord);border-radius:8px;background:var(--surf)}
+.doc-edit-panel label{display:block;font-size:0.78rem;color:var(--muted);margin:8px 0 3px;font-weight:700}
+.doc-edit-panel textarea,.doc-edit-panel input{width:100%;box-sizing:border-box;font-family:inherit;font-size:0.85rem;padding:6px 8px;border:1px solid var(--bord);border-radius:5px;background:var(--bg);color:var(--text)}
+.doc-edit-actions{display:flex;gap:8px;margin-top:10px}
 @media print{
-  .topbar,.nav,.row-actions,.stat-bar{display:none!important}
+  .topbar,.nav,.row-actions,.stat-bar,.doc-toolbar,.doc-edit-panel{display:none!important}
   body{background:#fff}
   .main{padding:0;max-width:100%}
   .print-doc{box-shadow:none;margin:0}
@@ -546,9 +553,27 @@ function renderPrint(main, kind){
       ${alignToggleHtml}
       <span id="printMsg" style="color:var(--muted);font-size:0.82rem"></span>
     </div>
-    <div id="pdfArea">${batch.map(l => kind === 'letter' ? letterHtml(l) : envelopeHtml(l)).join('')}</div>
+    <div id="pdfArea">${batch.map((l, i) => docWrapHtml(l, i, kind)).join('')}</div>
   `;
   document.getElementById('printBtn').addEventListener('click', () => window.print());
+  document.getElementById('pdfArea').addEventListener('click', (e) => {
+    const wrap = e.target.closest('.doc-wrap');
+    if (!wrap) return;
+    const lead = batch[Number(wrap.dataset.idx)];
+    const panel = wrap.querySelector('.doc-edit-panel');
+    if (e.target.classList.contains('doc-edit-btn')) {
+      panel.hidden = !panel.hidden;
+    } else if (e.target.classList.contains('edit-cancel-btn')) {
+      panel.hidden = true;
+    } else if (e.target.classList.contains('edit-save-btn')) {
+      const lines = wrap.querySelector('.edit-recipient').value.split('\n').map(s => s.trim()).filter(Boolean);
+      if (lines.length) lead.recipientLines = lines;
+      const salInput = wrap.querySelector('.edit-salutation');
+      if (salInput) lead.salutation = salInput.value.trim();
+      saveLeadsToStorage();
+      wrap.outerHTML = docWrapHtml(lead, Number(wrap.dataset.idx), kind);
+    }
+  });
   if (kind === 'envelope') {
     document.getElementById('alignCenterBtn').addEventListener('click', () => { setEnvAlign('center'); render(); });
     document.getElementById('alignLeftBtn').addEventListener('click', () => { setEnvAlign('left'); render(); });
@@ -611,6 +636,27 @@ function renderPrint(main, kind){
   });
 }
 
+function docWrapHtml(l, idx, kind){
+  const docHtml = kind === 'letter' ? letterHtml(l) : envelopeHtml(l);
+  const salutationField = kind === 'letter'
+    ? `<label>Salutation</label><input class="edit-salutation" type="text" value="${esc(l.salutation)}">`
+    : '';
+  return `<div class="doc-wrap" data-idx="${idx}">
+    <div class="doc-toolbar no-print">
+      <button class="doc-edit-btn" type="button">&#9998; Edit this one</button>
+    </div>
+    ${docHtml}
+    <div class="doc-edit-panel no-print" hidden>
+      <label>Recipient name &amp; address (one line each)</label>
+      <textarea class="edit-recipient" rows="5">${esc(l.recipientLines.join('\n'))}</textarea>
+      ${salutationField}
+      <div class="doc-edit-actions">
+        <button class="edit-save-btn" type="button">Save changes</button>
+        <button class="edit-cancel-btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+}
 function letterHtml(l){
   return `<div class="print-doc letter-page">
     <div class="letter-head">
