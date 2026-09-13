@@ -71,7 +71,6 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .letter-sign{margin-top:14px}
 .letter-sign img{height:56px}
 .letter-body p:last-of-type{margin-top:0}
-.letter-ref{position:absolute;bottom:10mm;left:30mm;font-size:7pt;font-family:-apple-system,sans-serif;color:#aaa;font-style:italic}
 .env-page{width:220mm;height:110mm;padding:14mm 16mm;position:relative;background:#fff}
 .env-logo{position:absolute;left:16mm;top:13mm}
 .env-logo img{height:11mm;width:auto;display:block}
@@ -557,7 +556,6 @@ function letterHtml(l){
       <div class="letter-sign"><img src="assets/harry-signature.jpeg" alt="Signature"></div>
       <p style="margin-top:0">Andrew Harrison<br>Director, Silverdale Limited</p>
     </div>
-    <div class="letter-ref">Ref: ${esc(l.ref)} (admin use only, not for print)</div>
   </div>`;
 }
 function envelopeHtml(l){
