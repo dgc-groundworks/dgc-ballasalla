@@ -80,10 +80,11 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .env-page{width:220mm;height:110mm;padding:14mm 16mm;position:relative;background:#fff}
 .env-logo{position:absolute;left:16mm;top:13mm}
 .env-logo img{height:11mm;width:auto;display:block}
-.env-recipient{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;line-height:1.48}
+.env-recipient{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;line-height:1.48}
+.env-recipient .er-block{text-align:center}
 .env-recipient .er-name{font-size:13.5pt;font-weight:600;letter-spacing:.01em;color:#141f30;margin-bottom:3pt}
 .env-recipient .er-line{font-size:11pt;font-weight:400;color:#3a4a60}
-.env-page.align-left .env-recipient{align-items:flex-start;text-align:left;left:16mm;right:16mm}
+.env-page.align-left .env-recipient .er-block{text-align:left}
 .align-toggle{display:inline-flex;gap:6px;margin-left:10px}
 .align-toggle button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 @media print{
@@ -635,8 +636,10 @@ function envelopeHtml(l){
   return `<div class="print-doc env-page${alignClass}">
     <div class="env-logo"><img src="assets/silverdale-logo.jpg" alt="Silverdale"></div>
     <div class="env-recipient">
-      <div class="er-name">${esc(name)}</div>
-      ${addr.map(line => `<div class="er-line">${esc(line)}</div>`).join('')}
+      <div class="er-block">
+        <div class="er-name">${esc(name)}</div>
+        ${addr.map(line => `<div class="er-line">${esc(line)}</div>`).join('')}
+      </div>
     </div>
   </div>`;
 }
