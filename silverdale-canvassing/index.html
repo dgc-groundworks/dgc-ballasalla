@@ -67,8 +67,7 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .letter-sender .addr{font-size:11.5pt;color:#3a4a60;margin-top:6px;line-height:1.6}
 .letter-date{font-size:13.5pt;text-align:right;color:#1e2c40;margin-top:0}
 .letter-addr{font-size:13.5pt;line-height:1.6;color:#1e2c40;margin-top:56px}
-.letter-subject,.letter-body p{font-size:13.5pt;line-height:1.8;margin-top:18px;color:#1e2c40}
-.letter-subject b{font-weight:700;letter-spacing:.01em}
+.letter-body p{font-size:13.5pt;line-height:1.8;margin-top:18px;color:#1e2c40}
 .letter-sign{margin-top:14px}
 .letter-sign img{height:56px}
 .letter-body p:last-of-type{margin-top:0}
@@ -415,7 +414,6 @@ function buildSalutation(lead){
   }
   return 'Dear Sir/Madam,';
 }
-function closingLine(sal){ return (sal === 'Dear Sir/Madam,' || /Team,$/.test(sal)) ? 'Yours faithfully,' : 'Yours sincerely,'; }
 
 // ---- Rendering ----
 function render(){
@@ -503,10 +501,10 @@ function renderReview(main){
 
 function letterBody(){
   return [
-    "We noticed your recent planning application on the Isle of Man and wanted to take the opportunity to introduce Silverdale Limited.",
-    "Silverdale is an Isle of Man-based property development company, working across residential and commercial land and development opportunities on the Island. We work with landowners, developers and investors to bring projects forward, from initial planning and design through to delivery.",
-    "We're part of the same group as Drainage &amp; Groundwork Contractors Ltd (DGC), which gives us direct, in-house access to groundworks, drainage and civils delivery alongside our development and planning expertise, helping keep costs under control and projects on programme from the outset.",
-    "If it would ever be useful to talk, or if there's anything Silverdale could help with, we'd be glad to hear from you. Thank you for your time, and best of luck with your project."
+    "Congratulations on your recent planning approval. It is a real milestone - the point where a project stops being a drawing and starts becoming real. We would like to help you build it.",
+    "Silverdale is an Isle of Man property development and design company. We take a project from approved plans through to finished build: managing the works, coordinating architects and engineers, holding cost and programme, and carrying the detail so you do not have to. A single home, a commercial scheme or an extension - we can run the whole build, or step in exactly where you need us.",
+    "When a project calls for groundworks or drainage, our sister company, Drainage &amp; Groundwork Contractors Limited, delivers it in-house. DGC is trusted by the Isle of Man Government bodies - the DOI, DEFA and Manx Utilities - and by the island's largest developers to manage their drainage and civils works. It is the same management team that works alongside Silverdale to bring your project to completion.",
+    "We are proud to be an Island business, and we treat every project, of every size, with the same care. If this is of interest, I would be glad to meet and talk it through. I look forward to hearing from you."
   ];
 }
 
@@ -552,13 +550,12 @@ function letterHtml(l){
     </div>
     <div class="letter-date">${todayOrdinal()}</div>
     <div class="letter-addr">${l.recipientLines.map(esc).join('<br>')}</div>
-    <div class="letter-subject"><b>Subject:</b> Introducing Silverdale</div>
     <div class="letter-body">
       <p>${esc(l.salutation)}</p>
       ${letterBody().map(p => `<p>${p}</p>`).join('')}
-      <p>${closingLine(l.salutation)}</p>
+      <p>Kind regards,</p>
       <div class="letter-sign"><img src="assets/harry-signature.jpeg" alt="Signature"></div>
-      <p style="margin-top:0">Harry Harrison &ndash; Director<br>Silverdale Limited</p>
+      <p style="margin-top:0">Andrew Harrison<br>Director, Silverdale Limited</p>
     </div>
     <div class="letter-ref">Ref: ${esc(l.ref)} (admin use only, not for print)</div>
   </div>`;
