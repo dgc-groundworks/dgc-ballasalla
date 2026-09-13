@@ -721,13 +721,26 @@ function renderLog(main){
   const refs = Object.keys(log).sort().reverse();
   if (!refs.length) { main.innerHTML = '<p class="empty-state">Nothing logged as sent yet.</p>'; return; }
   main.innerHTML = `
-    <div class="row-actions"><button class="btn-danger" id="clearLogBtn">Clear entire log</button></div>
-    <table class="leads"><thead><tr><th>Reference</th><th>Applicant</th><th>Date logged</th><th></th></tr></thead><tbody>
-    ${refs.map(ref => `<tr><td>${esc(ref)}</td><td>${esc(log[ref].name)}</td><td>${esc(log[ref].date)}</td><td><button class="btn-secondary restore-btn" data-ref="${esc(ref)}">&#8617; Restore to Send</button></td></tr>`).join('')}
+    <div class="row-actions">
+      <button class="btn" id="restoreAllBtn">&#8617; Restore all ${refs.length} to Send</button>
+      <button class="btn-danger" id="clearLogBtn">Clear entire log</button>
+    </div>
+    <table class="leads"><thead><tr><th></th><th>Reference</th><th>Applicant</th><th>Date logged</th></tr></thead><tbody>
+    ${refs.map(ref => `<tr><td><button class="btn-secondary restore-btn" data-ref="${esc(ref)}">&#8617; Restore</button></td><td>${esc(ref)}</td><td>${esc(log[ref].name)}</td><td>${esc(log[ref].date)}</td></tr>`).join('')}
     </tbody></table>`;
   document.getElementById('clearLogBtn').addEventListener('click', () => {
     if (!confirm('Clear the whole processed-log? This will make every past reference look new again next import.')) return;
-    saveLog({}); render();
+    saveLog({});
+    leads = leads.map(classify);
+    saveLeadsToStorage();
+    render();
+  });
+  document.getElementById('restoreAllBtn').addEventListener('click', () => {
+    if (!confirm(`Restore all ${refs.length} logged leads back to Send?`)) return;
+    saveLog({});
+    leads = leads.map(classify);
+    saveLeadsToStorage();
+    renderLog(main);
   });
   main.querySelectorAll('.restore-btn').forEach(btn => {
     btn.addEventListener('click', () => {
