@@ -1429,7 +1429,12 @@ function imgToDataUrl(img) {
 // every timesheet photo, one per page, in the same site → name → date
 // order as the tables above — so Kal can flip through a single document
 // and check hours against evidence without ever opening the app.
-async function addEvidencePages(pdf, rows) {
+// Ash, 13 Sep 2026: one photo per unique sheet, in site -> name -> date
+// order, each captioned. startFresh=true means this is building its OWN
+// standalone PDF (the brand-new document's first page is used directly,
+// no leading blank page); false means it's being appended after other
+// pages already in the document (not currently used, kept in case).
+async function addEvidencePages(pdf, rows, startFresh) {
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
   const margin = 15;
@@ -1440,6 +1445,7 @@ async function addEvidencePages(pdf, rows) {
     baseJob(a.site).localeCompare(baseJob(b.site)) || a.name.localeCompare(b.name) || (a.date || '').localeCompare(b.date || ''));
 
   const seen = new Set();
+  let first = true;
   for (const r of sorted) {
     if (!r.image || seen.has(r.image)) continue;
     seen.add(r.image);
@@ -1449,7 +1455,8 @@ async function addEvidencePages(pdf, rows) {
     const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
     const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
     const x = margin + (maxW - w) / 2;
-    pdf.addPage();
+    if (!(startFresh && first)) pdf.addPage();
+    first = false;
     pdf.setFontSize(11);
     pdf.text(`${r.name} — ${baseJob(r.site)} — week ending ${fmtDate(getWeekEnding(r.date))}`, margin, margin);
     pdf.addImage(imgToDataUrl(img), 'JPEG', x, margin + 8, w, h);
@@ -1457,9 +1464,8 @@ async function addEvidencePages(pdf, rows) {
 }
 // Renders the branded summary off-screen at full size, rasterises it
 // (html2canvas), then slices that image across as many A4 pages as
-// needed (the standard "negative-offset" trick for a tall single image),
-// then appends the evidence photos as further pages of the same PDF.
-async function buildClientPdfBlob(rows, from, to, refLabel) {
+// needed (the standard "negative-offset" trick for a tall single image).
+async function buildSummaryPdfBlob(rows, from, to, refLabel) {
   rows = packRows(rows);
   const holder = document.createElement('div');
   holder.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px;background:#fff';
@@ -1485,41 +1491,40 @@ async function buildClientPdfBlob(rows, from, to, refLabel) {
       pdf.addImage(imgData, 'JPEG', 0, y, imgW, imgH);
       heightLeft -= pageH;
     }
-    await addEvidencePages(pdf, rows);
     return pdf.output('blob');
   } finally {
     holder.remove();
   }
 }
-// Builds the PDF + gathers the photos, then either writes everything
-// straight into Daywork/Dandara/[range] (Chrome/Edge, once a folder is
-// chosen) or downloads one zip with the same contents for Safari/Firefox
+// Ash, 13 Sep 2026: the photos as their own separate PDF, not folded
+// into the hours summary — one document, one photo per unique sheet.
+async function buildEvidencePdfBlob(rows) {
+  rows = packRows(rows);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  await addEvidencePages(pdf, rows, true);
+  return pdf.output('blob');
+}
+// Builds both PDFs (hours summary, evidence photos), then either writes
+// them straight into Daywork/Dandara/[range] (Chrome/Edge, once a folder
+// is chosen) or downloads one zip containing both for Safari/Firefox
 // (and for anyone who cancels the folder picker) to extract into place.
 async function saveClientPackToDisk(rows, from, to, opts) {
   const range = rangeLabel(from, to);
   const dirHandle = await getDandaraFolderHandle(opts); // first, while the click is still fresh
 
-  const pdfBlob = await buildClientPdfBlob(rows, from, to, `DGC Dayworks Hours ${range}`);
-  const images = [...new Set(rows.map(r => r.image))];
-  const photos = [];
-  for (let i = 0; i < images.length; i++) {
-    const blob = await fetch(images[i]).then(r => r.blob());
-    const ext = (images[i].split('.').pop() || 'jpg').split('?')[0];
-    photos.push({ name: `Timesheet ${i + 1}.${ext}`, blob });
-  }
+  const hoursBlob = await buildSummaryPdfBlob(rows, from, to, `DGC Dayworks Hours ${range}`);
+  const photosBlob = await buildEvidencePdfBlob(rows);
 
   const zip = new JSZip();
-  zip.file(`DGC Dayworks ${range}.pdf`, pdfBlob);
-  const tsFolder = zip.folder(`DGC Timesheets ${range}`);
-  photos.forEach(p => tsFolder.file(p.name, p.blob));
+  zip.file(`DGC Dayworks Hours ${range}.pdf`, hoursBlob);
+  zip.file(`DGC Dayworks Photos ${range}.pdf`, photosBlob);
   const zipBlob = await zip.generateAsync({ type: 'blob' });
 
   if (dirHandle) {
     const dated = await dirHandle.getDirectoryHandle(range, { create: true });
-    await writeFileToDir(dated, `DGC Dayworks ${range}.pdf`, pdfBlob);
-    const tsDir = await dated.getDirectoryHandle(`DGC Timesheets ${range}`, { create: true });
-    for (const p of photos) await writeFileToDir(tsDir, p.name, p.blob);
-    await writeFileToDir(dated, `DGC Dayworks ${range}.zip`, zipBlob);
+    await writeFileToDir(dated, `DGC Dayworks Hours ${range}.pdf`, hoursBlob);
+    await writeFileToDir(dated, `DGC Dayworks Photos ${range}.pdf`, photosBlob);
     return { wroteToDisk: true, range };
   }
 
