@@ -321,7 +321,15 @@ function daySummaryLine(e) {
   const lunch = e.lunch == null ? defaultLunchMins(e.start, e.finish) : e.lunch;
   const lunchStr = (e.start && e.finish) ? `, ${lunch} min lunch` : '';
   const hoursStr = e.hours == null ? '—' : e.hours;
-  return `${dayLabel} — ${timeStr}${lunchStr} — ${hoursStr} hours${e.description ? ' — ' + esc(e.description) : ''}`;
+  // Ash, 13 Sep 2026: this is the very first line read on a card — if an
+  // override is active it must say so here, up front, not just in the
+  // separate box further down. Otherwise it still reads as "7.75 hours"
+  // even though nothing is actually being billed for the day.
+  const isBilled = e.billedHours !== null && e.billedHours !== undefined;
+  const hoursPart = isBilled
+    ? `NOT COUNTED — billed ${e.billedHours} hours instead of ${hoursStr}`
+    : `${hoursStr} hours`;
+  return `${dayLabel} — ${timeStr}${lunchStr} — ${hoursPart}${e.description ? ' — ' + esc(e.description) : ''}`;
 }
 function getMonday(iso) {
   const d = new Date(iso + 'T12:00:00');
