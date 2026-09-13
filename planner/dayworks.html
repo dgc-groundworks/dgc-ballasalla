@@ -111,6 +111,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .week-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
 @media(max-width:800px){.week-grid{grid-template-columns:1fr}}
 .week-photos img{width:100%;border-radius:8px;border:1px solid var(--bord);margin-bottom:10px}
+.week-photo-block{margin-bottom:18px}
+.week-photo-caption{font-size:0.78rem;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em}
 .day-row{background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px 14px;margin-bottom:8px}
 .day-row.flagged{border-color:var(--accent);background:rgba(245,158,11,.06)}
 /* Stacked flagged rows for the same photo look almost identical (same
@@ -902,31 +904,6 @@ function weekEndingTablesHtml(rows) {
   return html;
 }
 
-// Ash, 13 Sep 2026: a photo "belongs" to whichever calendar week most of
-// its own rows actually fall in — a stray one-day note dated into a
-// different week (like a Saturday scribbled on next week's sheet)
-// shouldn't drag that whole other sheet's photo into this week's view.
-// Only show a photo in a week where it's genuinely the majority sheet
-// for that week, not just referenced by one outlying row.
-function imageHomeWeeks(rows) {
-  const counts = {};
-  rows.forEach(r => {
-    // Ash, 13 Sep 2026: "should only be one timesheet per guy per week
-    // view" — a resolved double-entry (billed_hours = 0) is evidence of
-    // the mistake, not a second real timesheet for that week, so it
-    // doesn't get a vote in which photo belongs where.
-    if (!r.image || !r.date || effectiveHours(r) === 0) return;
-    const wk = getMonday(r.date);
-    (counts[r.image] = counts[r.image] || {})[wk] = (counts[r.image][wk] || 0) + 1;
-  });
-  const home = {};
-  Object.keys(counts).forEach(img => {
-    let best = null, bestN = -1;
-    Object.entries(counts[img]).forEach(([wk, n]) => { if (n > bestN) { best = wk; bestN = n; } });
-    home[img] = best;
-  });
-  return home;
-}
 function personDetailHtml(rows) {
   const byWeek = {};
   rows.forEach(e => { const wk = e.date ? getMonday(e.date) : '(no date yet)'; (byWeek[wk] = byWeek[wk] || []).push(e); });
@@ -936,9 +913,25 @@ function personDetailHtml(rows) {
   const wk = weekKeys[state.weekIndex];
   const weekRows = (byWeek[wk] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const weekTotal = weekRows.reduce((s, r) => s + effectiveHours(r), 0);
-  const homeWeeks = imageHomeWeeks(rows);
-  const images = [...new Set(weekRows.map(r => r.image))].filter(img => homeWeeks[img] === wk);
   const conflictMap = conflictsByDate(rows);
+
+  // Ash, 13 Sep 2026: show every photo that any row this week actually
+  // points to, not just whichever sheet has the most rows — but caption
+  // each one with exactly which date(s) it's evidence for. A stray day
+  // dated into this week from a different physical sheet (a Saturday
+  // note scribbled on next week's timesheet) still needs its own real
+  // evidence visible, not hidden — the confusion was never having two
+  // photos, it was having a second one with no explanation of why.
+  const byImage = {};
+  weekRows.forEach(r => { if (r.image) (byImage[r.image] = byImage[r.image] || []).push(r); });
+  const photoBlocks = Object.keys(byImage).map(img => {
+    const forRows = byImage[img];
+    const dates = [...new Set(forRows.map(r => fmtDate(r.date)))].join(', ');
+    return `<div class="week-photo-block">
+      <div class="week-photo-caption">Evidence for: ${esc(dates)}</div>
+      <img src="${img}" alt="Timesheet photo">
+    </div>`;
+  }).join('');
 
   return `
     ${personSummaryHtml(rows, state.name)}
@@ -952,7 +945,7 @@ function personDetailHtml(rows) {
         ${weekRows.map(e => dayRowHtml(e, conflictMap[e.id] || [])).join('')}
       </div>
       <div class="week-photos">
-        ${images.map(img => `<img src="${img}" alt="Timesheet photo">`).join('')}
+        ${photoBlocks}
       </div>
     </div>
   `;
