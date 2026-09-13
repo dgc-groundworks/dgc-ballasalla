@@ -1570,56 +1570,84 @@ function showSendPreview(pool, from, to) {
   const main = document.getElementById('mainArea');
   main.innerHTML = buildPackHtml(pool, from, to, batchRef) + `
     <div class="report-actions">
-      <button class="btn-primary" id="confirmSendBtn">&#10003; Save for client</button>
+      <button class="btn-secondary" id="justSaveBtn">Save</button>
       <button class="btn-secondary" id="saveAsBtn">Save As&hellip;</button>
+      <button class="btn-primary" id="archiveBtn">&#128451; Save to Archive</button>
       <button class="btn-print" id="printPackBtn">&#128438; Print / Save PDF manually</button>
       <button class="btn-secondary" id="cancelSendBtn">Cancel</button>
     </div>
+    <p class="flag-note" style="max-width:none;background:none;border:none;color:var(--muted);padding:4px 0 0">"Save" / "Save As" only writes the PDFs — nothing is marked as sent to the client until you click "Save to Archive".</p>
     <p class="flag-note" id="saveStatus" style="max-width:none;display:none"></p>`;
   document.getElementById('printPackBtn').addEventListener('click', () => printPack(from, to));
   document.getElementById('cancelSendBtn').addEventListener('click', render);
 
-  // Both buttons do the same save-and-file-to-Historic action — "Save As"
-  // just always opens the folder picker fresh (and remembers that new
-  // choice), instead of quietly reusing whatever folder was picked last.
+  const buttons = () => [
+    document.getElementById('justSaveBtn'),
+    document.getElementById('saveAsBtn'),
+    document.getElementById('archiveBtn'),
+  ];
+
+  // Ash, 13 Sep 2026: "Save"/"Save As" only ever writes the two PDFs to
+  // disk — it must NEVER mark anything as sent on its own. Archiving
+  // (stamping sent_at/approved_by, moving the batch to Historic) only
+  // happens from the separate "Save to Archive" button below. These were
+  // one combined action before, which kept accidentally archiving a
+  // batch Ash only meant to export.
   const doSave = async (forceAs) => {
+    const [justSaveBtn, saveAsBtn] = buttons();
+    const status = document.getElementById('saveStatus');
+    status.style.display = 'block';
+    buttons().forEach(b => b.disabled = true);
+    (forceAs ? saveAsBtn : justSaveBtn).textContent = 'Saving…';
+    status.textContent = forceAs ? 'Pick a folder, then building the PDFs…' : 'Building the PDFs…';
+    try {
+      const result = await saveClientPackToDisk(pool, from, to, { forcePick: forceAs });
+      status.textContent = result.wroteToDisk
+        ? `Saved into the "${range}" folder in ${forceAs ? 'the folder you picked' : 'Daywork/Dandara'} — nothing has been sent to the client, this was just the files.`
+        : `Downloaded "DGC Dayworks ${range}.zip" — nothing has been sent to the client, this was just the files.`;
+    } catch (err) {
+      status.textContent = 'Save failed: ' + err.message;
+    } finally {
+      buttons().forEach(b => b.disabled = false);
+      justSaveBtn.textContent = 'Save'; saveAsBtn.textContent = 'Save As…';
+    }
+  };
+  document.getElementById('justSaveBtn').addEventListener('click', () => doSave(false));
+  document.getElementById('saveAsBtn').addEventListener('click', () => doSave(true));
+
+  document.getElementById('archiveBtn').addEventListener('click', async () => {
     // Ash, 10 Sep 2026: "approved by John" on the client site — there's no
     // login system anywhere in this stack (deliberately), so this is a
     // lightweight name prompt at the exact moment a batch is filed, which
     // is already the closest thing to a formal sign-off in this flow.
-    // Runs synchronously, before any await, so it doesn't cost the
-    // "user activation" the folder picker below needs.
     const lastApprover = localStorage.getItem('dwApprover') || '';
-    const typed = prompt("Who's approving this for the client?", lastApprover);
-    if (typed === null) return; // cancelled — do nothing
+    const typed = prompt("Archiving this batch — who's approving it for the client?", lastApprover);
+    if (typed === null) return; // cancelled — do nothing, nothing archived
     const approvedBy = typed.trim() || 'DGC';
     localStorage.setItem('dwApprover', approvedBy);
     const approvedAt = new Date().toISOString();
 
-    const confirmBtn = document.getElementById('confirmSendBtn');
-    const asBtn = document.getElementById('saveAsBtn');
+    const archiveBtn = document.getElementById('archiveBtn');
     const status = document.getElementById('saveStatus');
     status.style.display = 'block';
-    confirmBtn.disabled = true; asBtn.disabled = true;
-    (forceAs ? asBtn : confirmBtn).textContent = 'Saving…';
-    status.textContent = forceAs ? 'Pick a folder, then building the PDF and gathering photos…' : 'Building the PDF and gathering photos…';
+    buttons().forEach(b => b.disabled = true);
+    archiveBtn.textContent = 'Archiving…';
+    status.textContent = 'Building the PDFs and archiving this batch…';
     try {
-      const result = await saveClientPackToDisk(pool, from, to, { forcePick: forceAs });
-      status.textContent = result.wroteToDisk
-        ? `Saved straight into the "${range}" folder in ${forceAs ? 'the folder you picked' : 'Daywork/Dandara'}.`
-        : `Downloaded "DGC Dayworks ${range}.zip" — extract it into a new folder named "${range}" inside Daywork/Dandara.`;
+      const result = await saveClientPackToDisk(pool, from, to, {});
       for (const e of pool) {
         await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: batchRef, approvedBy, approvedAt }));
       }
-      setTimeout(() => { state.job = null; state.name = null; state.tab = 'current'; render(); }, result.wroteToDisk ? 500 : 2200);
+      status.textContent = (result.wroteToDisk
+        ? `Saved into the "${range}" folder in Daywork/Dandara`
+        : `Downloaded "DGC Dayworks ${range}.zip"`) + ` and archived — this batch is now in Historic.`;
+      setTimeout(() => { state.job = null; state.name = null; state.tab = 'current'; render(); }, 1200);
     } catch (err) {
-      confirmBtn.disabled = false; asBtn.disabled = false;
-      confirmBtn.textContent = '✓ Save for client'; asBtn.textContent = 'Save As…';
-      status.textContent = 'Save failed: ' + err.message + ' — nothing has been marked as sent, safe to retry.';
+      buttons().forEach(b => b.disabled = false);
+      archiveBtn.textContent = '\u{1F5C4} Save to Archive';
+      status.textContent = 'Archive failed: ' + err.message + ' — nothing has been marked as sent, safe to retry.';
     }
-  };
-  document.getElementById('confirmSendBtn').addEventListener('click', () => doSave(false));
-  document.getElementById('saveAsBtn').addEventListener('click', () => doSave(true));
+  });
 }
 
 // ---------------------------------------------------------------
