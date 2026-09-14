@@ -646,6 +646,17 @@ function letterBody(){
     "We are proud to be an Island business, and we treat every project, of every size, with the same care. If this is of interest, I would be glad to meet and talk it through. I look forward to hearing from you."
   ];
 }
+// For architects, engineers and other local trades — a introduction as
+// a potential working partner, not a homeowner/developer sales pitch,
+// since these contacts haven't just had a planning application approved.
+function businessLetterBody(){
+  return [
+    "We are writing to introduce Silverdale and our sister company, Drainage &amp; Groundwork Contractors Limited (dgc.im), as a team based right here on the Isle of Man that works alongside architects and engineers to help bring projects from approved plans through to a finished build.",
+    "Silverdale is an Isle of Man property development and design company. Our sister company, DGC, delivers groundworks, drainage and civils in-house, and is trusted by the Isle of Man Government bodies - the DOI, DEFA and Manx Utilities - and by the island's largest developers to manage that side of their projects.",
+    "We would welcome the opportunity to work alongside you - whether that is as the contractor delivering groundworks and drainage on a scheme you are designing, or simply as a reliable point of contact for when a client of yours needs support turning approved plans into a finished build.",
+    "We are proud to be an Island business, and we would be glad to meet and talk through how we might work together. I look forward to hearing from you."
+  ];
+}
 
 function renderPrint(main, kind){
   const batch = leads.filter(l => l.include);
@@ -810,7 +821,7 @@ function letterHtml(l){
     <div class="letter-addr">${l.recipientLines.map(esc).join('<br>')}</div>
     <div class="letter-body">
       <p>${esc(l.salutation)}</p>
-      ${letterBody().map(p => `<p>${p}</p>`).join('')}
+      ${(l.source === 'business' ? businessLetterBody() : letterBody()).map(p => `<p>${p}</p>`).join('')}
       <p>Kind regards,</p>
       <div class="letter-sign"><img src="assets/harry-signature.jpeg" alt="Signature"></div>
       <p style="margin-top:0">Andrew Harrison<br>Director, Silverdale Limited</p>
