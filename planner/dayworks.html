@@ -1470,8 +1470,13 @@ async function addEvidencePages(pdf, rows, startFresh) {
   const maxW = pageW - margin * 2;
   const maxH = pageH - margin * 2 - 12;
 
+  // Ash, 14 Sep 2026: same order as the hours summary (site, then week,
+  // then name, then date) so the two PDFs can be read side by side line
+  // by line — not "find the name, then go hunting for their sheet".
   const sorted = rows.slice().sort((a, b) =>
-    baseJob(a.site).localeCompare(baseJob(b.site)) || a.name.localeCompare(b.name) || (a.date || '').localeCompare(b.date || ''));
+    baseJob(a.site).localeCompare(baseJob(b.site)) ||
+    (a.date ? getMonday(a.date) : '').localeCompare(b.date ? getMonday(b.date) : '') ||
+    a.name.localeCompare(b.name) || (a.date || '').localeCompare(b.date || ''));
 
   const seen = new Set();
   let first = true;
