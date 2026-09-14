@@ -716,10 +716,15 @@ function businessLetterBody(){
 }
 
 function renderPrint(main, kind){
-  const batch = leads.filter(l => l.include);
+  // Already-sent leads never belong in Print, even if `include` is
+  // somehow still true (e.g. a fresh re-import of the same list sets
+  // its own default before knowing it's a repeat) — this is the same
+  // filter Review uses to hide them, applied here so an archived lead
+  // can never silently get printed/sent again.
+  const batch = leads.filter(l => l.include && !l.alreadyProcessed);
   if (!batch.length) {
     const msg = leads.length
-      ? `Nothing set to Send right now — ${leads.length} leads are loaded, but they're all either standing-excluded or flagged for a check. Go to Review to see them and flip anything back to Send.`
+      ? `Nothing set to Send right now — ${leads.length} leads are loaded, but they're all either standing-excluded, flagged for a check, or already sent. Go to Review to see them and flip anything back to Send.`
       : `Nothing parsed yet — go to Import and paste this week's leads.`;
     main.innerHTML = `<p class="empty-state">${esc(msg)}</p>`;
     return;
@@ -978,16 +983,20 @@ function renderLog(main){
       refsToRestore.forEach(r => delete log[r]);
       saveLog(log);
       leads = leads.map(classify);
+      leads.forEach(l => { if (refsToRestore.includes(l.ref)) l.include = true; });
       saveLeadsToStorage();
       renderLog(main);
     });
   });
   main.querySelectorAll('.restore-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      const ref = btn.dataset.ref;
       const log = getLog();
-      delete log[btn.dataset.ref];
+      delete log[ref];
       saveLog(log);
       leads = leads.map(classify);
+      const restored = leads.find(l => l.ref === ref);
+      if (restored) restored.include = true;
       saveLeadsToStorage();
       renderLog(main);
     });
