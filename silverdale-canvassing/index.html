@@ -26,6 +26,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .empty-state{padding:60px 20px;text-align:center;color:var(--muted)}
 textarea{width:100%;min-height:220px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--text);padding:14px;font-family:ui-monospace,Menlo,monospace;font-size:0.8rem;resize:vertical}
 .hint{font-size:0.8rem;color:var(--muted);margin:10px 0 16px}
+.bulk-add-log{margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--bord)}
+.bulk-add-log textarea{min-height:90px}
 .btn{background:var(--accent);color:#1a1d27;border:none;padding:10px 20px;border-radius:6px;font-size:0.88rem;font-weight:800;cursor:pointer;font-family:inherit}
 .btn:disabled{opacity:.4;cursor:default}
 .btn-secondary{background:var(--surf2);color:var(--text);border:1px solid var(--bord);padding:9px 18px;border-radius:6px;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit}
@@ -113,7 +115,8 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
   <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">Light Mode</button>
 </header>
 <nav class="nav">
-  <button class="navbtn active" data-tab="import">Import</button>
+  <button class="navbtn active" data-tab="import">Import &mdash; Planning</button>
+  <button class="navbtn" data-tab="importBiz">Import &mdash; Businesses</button>
   <button class="navbtn" data-tab="review">Review</button>
   <button class="navbtn" data-tab="letters">Print — Letters</button>
   <button class="navbtn" data-tab="envelopes">Print — Envelopes</button>
@@ -233,6 +236,101 @@ function loadLeadsFromStorage(){ try { return JSON.parse(localStorage.getItem(LS
 // possible; falls back to positional guessing otherwise.
 // Matches a planning reference like "26/00465/B" or "25/91215/B".
 function looksLikeRef(s){ return /^\d{2}\/\d{3,6}\/[A-Za-z]$/.test((s || '').trim()); }
+
+// ---- Local businesses (architects, engineers, etc.) ----
+// A second, independent lead source alongside the planning-register pull.
+// These are appended to the same working `leads` array (not a wholesale
+// replace, since the business list is built up over time rather than
+// refreshed weekly) so they share Review/Print/Edit/Archive and the same
+// processed-log dedup as planning leads, per Ash's ask that it "be
+// handled the same" and never send the same letter twice.
+function parseCsvLine(line){
+  const fields = [];
+  let cur = '', inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false; }
+      else cur += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { fields.push(cur); cur = ''; }
+      else cur += c;
+    }
+  }
+  fields.push(cur);
+  return fields.map(f => f.trim());
+}
+function slugify(s){ return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
+
+function parseBusinessCSV(text){
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+  if (!lines.length) return [];
+  const header = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+  const col = name => header.indexOf(name);
+  const iName = col('name'), iPractice = col('practice name'), iAddr1 = col('address line 1'),
+        iAddr2 = col('address line 2'), iTown = col('town'), iPostcode = col('postcode'), iReg = col('iom reg number');
+  const out = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]);
+    if (!cols.some(c => c && c.trim())) continue;
+    const name = iName >= 0 ? cols[iName] || '' : '';
+    if (!name) continue;
+    const practice = iPractice >= 0 ? cols[iPractice] || '' : '';
+    const addr1 = iAddr1 >= 0 ? cols[iAddr1] || '' : '';
+    const addr2 = iAddr2 >= 0 ? cols[iAddr2] || '' : '';
+    const town = iTown >= 0 ? cols[iTown] || '' : '';
+    const postcode = iPostcode >= 0 ? cols[iPostcode] || '' : '';
+    const reg = iReg >= 0 ? cols[iReg] || '' : '';
+    const firstName = name.split(' ')[0];
+    out.push({
+      ref: 'ARCH-' + (reg || slugify(name + '-' + practice)),
+      applicant: name,
+      site: practice + (town ? ', ' + town : ''),
+      recipientLines: [name, practice, addr1, addr2, town, postcode].map(s => s.trim()).filter(Boolean),
+      salutation: `Dear ${firstName},`,
+      edited: true,    // protects our clean CSV-built address/salutation from classify()'s auto-rebuild
+      include: false,  // opt-in — Ash picks which businesses to actually approach in Review
+      hasAddress: !!(addr1 && addr1.toLowerCase() !== 'redacted' && postcode)
+    });
+  }
+  return out;
+}
+
+function renderImportBiz(main){
+  main.innerHTML = `
+    <p class="hint">Paste a CSV list of local businesses to add to the working batch — architects and engineers to start, more trades later. Expected columns: Name, Practice Name, Address Line 1, Address Line 2, Town, Postcode, IOM Reg Number (extra columns like Qualifications/UK ARB Number are ignored). This <b>adds</b> to whatever's already loaded rather than replacing it, so the list can build up over time. Everyone comes in set to "Don't send" by default — go to Review and flip on only the ones you actually want to approach (skip the ones you already know).</p>
+    <textarea id="bizPasteBox" placeholder="Name,Qualifications,Practice Name,Address Line 1,Address Line 2,Town,Postcode,IOM Reg Number,UK ARB Number"></textarea>
+    <div class="row-actions" style="margin-top:14px">
+      <button class="btn" id="bizParseBtn">Add businesses</button>
+      <span id="bizParseMsg" style="color:var(--muted);font-size:0.82rem"></span>
+    </div>`;
+  document.getElementById('bizParseBtn').addEventListener('click', () => {
+    const text = document.getElementById('bizPasteBox').value;
+    const rawRows = parseBusinessCSV(text);
+    const existingRefs = new Set(leads.map(l => l.ref));
+    const added = [];
+    rawRows.forEach(raw => {
+      if (existingRefs.has(raw.ref)) return; // already in the working batch — skip the dupe
+      const lead = classify(raw);
+      lead.type = 'Company';
+      lead.source = 'business';
+      if (!raw.hasAddress) {
+        lead.needsReview = true;
+        lead.reviewNote = lead.reviewNote || 'No usable postal address on file — check before sending.';
+      }
+      added.push(lead);
+      existingRefs.add(lead.ref);
+    });
+    leads = leads.concat(added);
+    saveLeadsToStorage();
+    const msg = document.getElementById('bizParseMsg');
+    if (msg) msg.textContent = added.length
+      ? `Added ${added.length} businesses — go to Review to pick which to send.`
+      : 'Nothing new to add — check the paste has the expected columns, or these are already in the batch.';
+    if (added.length) { state.tab = 'review'; render(); }
+  });
+}
 
 function parseInput(text){
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -461,6 +559,7 @@ function render(){
   if (state.tab === 'letters') return renderPrint(main, 'letter');
   if (state.tab === 'envelopes') return renderPrint(main, 'envelope');
   if (state.tab === 'log') return renderLog(main);
+  if (state.tab === 'importBiz') return renderImportBiz(main);
   renderImport(main);
 }
 
@@ -735,15 +834,46 @@ function envelopeHtml(l){
 function renderLog(main){
   const log = getLog();
   const refs = Object.keys(log).sort().reverse();
-  if (!refs.length) { main.innerHTML = '<p class="empty-state">Nothing logged as sent yet.</p>'; return; }
-  main.innerHTML = `
+  const bulkAddHtml = `
+    <div class="bulk-add-log">
+      <p class="hint">Already sent these outside the tool, or restoring history after a browser reset? Paste one per line — <code>Reference&#9;Name</code> (tab-separated) or just the reference on its own — and they'll be logged as sent from today, so they're flagged if they ever come up again.</p>
+      <textarea id="bulkLogBox" rows="4" placeholder="26/00465/B&#9;Mr & Mrs W. Philip & Norma Richards"></textarea>
+      <div class="row-actions" style="margin-top:10px">
+        <button class="btn" id="bulkLogBtn">Add to log</button>
+        <span id="bulkLogMsg" style="color:var(--muted);font-size:0.82rem"></span>
+      </div>
+    </div>`;
+  const tableHtml = refs.length ? `
     <div class="row-actions">
       <button class="btn" id="restoreAllBtn">&#8617; Restore all ${refs.length} to Send</button>
       <button class="btn-danger" id="clearLogBtn">Clear entire log</button>
     </div>
     <table class="leads"><thead><tr><th></th><th>Reference</th><th>Applicant</th><th>Date logged</th></tr></thead><tbody>
     ${refs.map(ref => `<tr><td><button class="btn-secondary restore-btn" data-ref="${esc(ref)}">&#8617; Restore</button></td><td>${esc(ref)}</td><td>${esc(log[ref].name)}</td><td>${esc(log[ref].date)}</td></tr>`).join('')}
-    </tbody></table>`;
+    </tbody></table>` : '<p class="empty-state">Nothing logged as sent yet.</p>';
+  main.innerHTML = bulkAddHtml + tableHtml;
+
+  document.getElementById('bulkLogBtn').addEventListener('click', () => {
+    const lines = document.getElementById('bulkLogBox').value.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!lines.length) return;
+    const log = getLog();
+    const today = new Date().toISOString().slice(0,10);
+    let count = 0;
+    lines.forEach(line => {
+      const [ref, name] = line.split('\t').map(s => (s || '').trim());
+      if (!ref) return;
+      log[ref] = { date: today, name: name || '' };
+      count++;
+    });
+    saveLog(log);
+    leads = leads.map(classify);
+    saveLeadsToStorage();
+    renderLog(main);
+    const msg = document.getElementById('bulkLogMsg');
+    if (msg) msg.textContent = `Added ${count} to the log.`;
+  });
+
+  if (!refs.length) return;
   document.getElementById('clearLogBtn').addEventListener('click', () => {
     if (!confirm('Clear the whole processed-log? This will make every past reference look new again next import.')) return;
     saveLog({});
