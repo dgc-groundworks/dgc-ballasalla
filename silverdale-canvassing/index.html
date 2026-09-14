@@ -795,14 +795,21 @@ function renderPrint(main, kind){
     }
     return ok;
   }
-  function archiveBatch(){
+  function archiveBatch(hide){
     // Tags leads as "already sent" for the record (and to warn about
-    // resending them on a future pull) — never hides or locks them.
-    // Nothing about pressing Save/Archive should make a lead disappear
-    // from Print or Review; that stays entirely under manual control.
+    // resending them on a future pull). Plain "Mark as sent" never
+    // hides or locks them — that was the whole point of the earlier
+    // fix, since an accidental click shouldn't make a lead vanish.
+    // "Save & Archive" is different: it's a deliberate, unambiguous
+    // "this batch is done" action, so it also clears the batch out of
+    // Print — pass hide=true only from there.
     const log = getLog();
     const today = new Date().toISOString().slice(0,10);
-    batch.forEach(l => { if (l.ref) log[l.ref] = { date: today, name: l.applicant, source: l.source || 'planning' }; l.alreadyProcessed = true; });
+    batch.forEach(l => {
+      if (l.ref) log[l.ref] = { date: today, name: l.applicant, source: l.source || 'planning' };
+      l.alreadyProcessed = true;
+      if (hide) l.include = false;
+    });
     saveLog(log);
     saveLeadsToStorage();
   }
@@ -811,14 +818,11 @@ function renderPrint(main, kind){
     const btn = document.getElementById('saveArchiveBtn');
     const ok = await buildAndSavePdf(btn);
     if (!ok) return;
-    archiveBatch();
-    const msg = document.getElementById('printMsg');
-    if (msg) msg.textContent += ` Archived — these ${batch.length} are now marked as sent.`;
-    document.getElementById('markSentBtn').textContent = '✓ Logged';
-    document.getElementById('markSentBtn').disabled = true;
+    archiveBatch(true);
+    render();
   });
   document.getElementById('markSentBtn').addEventListener('click', () => {
-    archiveBatch();
+    archiveBatch(false);
     document.getElementById('markSentBtn').textContent = '✓ Logged';
     document.getElementById('markSentBtn').disabled = true;
   });
