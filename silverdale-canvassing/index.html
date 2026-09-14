@@ -26,6 +26,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .empty-state{padding:60px 20px;text-align:center;color:var(--muted)}
 textarea{width:100%;min-height:220px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--text);padding:14px;font-family:ui-monospace,Menlo,monospace;font-size:0.8rem;resize:vertical}
 .hint{font-size:0.8rem;color:var(--muted);margin:10px 0 16px}
+.drop-zone.dragover textarea{border-color:var(--accent);border-style:dashed}
+.drop-hint{font-size:0.78rem;color:var(--muted);margin-top:6px}
+.link-btn{background:none;border:none;color:var(--accent);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .bulk-add-log{margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--bord)}
 .bulk-add-log textarea{min-height:90px}
 .btn{background:var(--accent);color:#1a1d27;border:none;padding:10px 20px;border-radius:6px;font-size:0.88rem;font-weight:800;cursor:pointer;font-family:inherit}
@@ -214,6 +217,30 @@ let leads = [];      // working batch
 let state = { tab: 'import' };
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// Lets a paste box also accept a dropped or picked file — reads it as
+// text and fills the textarea, since dropping a file onto a plain
+// <textarea> just inserts its filename, not its contents.
+function wireFileDrop(dropZoneId, fileInputId, fileBtnId, textareaId){
+  const dropZone = document.getElementById(dropZoneId);
+  const fileInput = document.getElementById(fileInputId);
+  const textarea = document.getElementById(textareaId);
+  const readFile = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { textarea.value = reader.result; };
+    reader.readAsText(file);
+  };
+  document.getElementById(fileBtnId).addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => readFile(fileInput.files[0]));
+  ['dragover', 'dragleave', 'drop'].forEach(evt => dropZone.addEventListener(evt, e => e.preventDefault()));
+  dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    dropZone.classList.remove('dragover');
+    readFile(e.dataTransfer.files[0]);
+  });
+}
 function todayOrdinal(){
   const d = new Date();
   const day = d.getDate();
@@ -300,11 +327,16 @@ function parseBusinessCSV(text){
 function renderImportBiz(main){
   main.innerHTML = `
     <p class="hint">Paste a CSV list of local businesses to add to the working batch — architects and engineers to start, more trades later. Expected columns: Name, Practice Name, Address Line 1, Address Line 2, Town, Postcode, IOM Reg Number (extra columns like Qualifications/UK ARB Number are ignored). This <b>adds</b> to whatever's already loaded rather than replacing it, so the list can build up over time. Everyone comes in set to "Don't send" by default — go to Review and flip on only the ones you actually want to approach (skip the ones you already know).</p>
-    <textarea id="bizPasteBox" placeholder="Name,Qualifications,Practice Name,Address Line 1,Address Line 2,Town,Postcode,IOM Reg Number,UK ARB Number"></textarea>
+    <div class="drop-zone" id="bizDropZone">
+      <textarea id="bizPasteBox" placeholder="Name,Qualifications,Practice Name,Address Line 1,Address Line 2,Town,Postcode,IOM Reg Number,UK ARB Number"></textarea>
+      <div class="drop-hint">or drag a .csv file here, or <button type="button" class="link-btn" id="bizFileBtn">choose a file</button></div>
+      <input type="file" id="bizFileInput" accept=".csv,text/csv" style="display:none">
+    </div>
     <div class="row-actions" style="margin-top:14px">
       <button class="btn" id="bizParseBtn">Add businesses</button>
       <span id="bizParseMsg" style="color:var(--muted);font-size:0.82rem"></span>
     </div>`;
+  wireFileDrop('bizDropZone', 'bizFileInput', 'bizFileBtn', 'bizPasteBox');
   document.getElementById('bizParseBtn').addEventListener('click', () => {
     const text = document.getElementById('bizPasteBox').value;
     const rawRows = parseBusinessCSV(text);
@@ -566,11 +598,16 @@ function render(){
 function renderImport(main){
   main.innerHTML = `
     <p class="hint">Paste the leads table here — straight copy from the Weekly List export or the extracted PDF table (columns: Reference, Site Address, Applicant/Developer, Type, Local Authority; a header row is fine, tab-separated). Each pull replaces the working batch below, but the processed-log and excluded rows carry over.</p>
-    <textarea id="pasteBox" placeholder="Reference&#9;Site Address&#9;Applicant / Developer&#9;Type of Development&#9;Local Authority"></textarea>
+    <div class="drop-zone" id="planDropZone">
+      <textarea id="pasteBox" placeholder="Reference&#9;Site Address&#9;Applicant / Developer&#9;Type of Development&#9;Local Authority"></textarea>
+      <div class="drop-hint">or drag a file here, or <button type="button" class="link-btn" id="planFileBtn">choose a file</button></div>
+      <input type="file" id="planFileInput" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" style="display:none">
+    </div>
     <div class="row-actions" style="margin-top:14px">
       <button class="btn" id="parseBtn">Parse leads</button>
       <span id="parseMsg" style="color:var(--muted);font-size:0.82rem"></span>
     </div>`;
+  wireFileDrop('planDropZone', 'planFileInput', 'planFileBtn', 'pasteBox');
   document.getElementById('parseBtn').addEventListener('click', () => {
     const text = document.getElementById('pasteBox').value;
     leads = parseInput(text);
@@ -765,7 +802,7 @@ function renderPrint(main, kind){
     // from Print or Review; that stays entirely under manual control.
     const log = getLog();
     const today = new Date().toISOString().slice(0,10);
-    batch.forEach(l => { if (l.ref) log[l.ref] = { date: today, name: l.applicant }; l.alreadyProcessed = true; });
+    batch.forEach(l => { if (l.ref) log[l.ref] = { date: today, name: l.applicant, source: l.source || 'planning' }; l.alreadyProcessed = true; });
     saveLog(log);
     saveLeadsToStorage();
   }
@@ -844,25 +881,41 @@ function envelopeHtml(l){
 
 function renderLog(main){
   const log = getLog();
-  const refs = Object.keys(log).sort().reverse();
+  // Split by source so planning and business history read as two
+  // separate archives, not one merged list — an entry's own `source`
+  // wins, falling back to the ARCH- ref prefix for rows logged before
+  // that field existed.
+  const isBiz = ref => log[ref].source === 'business' || ref.startsWith('ARCH-');
+  const allRefs = Object.keys(log).sort().reverse();
+  const planningRefs = allRefs.filter(r => !isBiz(r));
+  const businessRefs = allRefs.filter(isBiz);
+
   const bulkAddHtml = `
     <div class="bulk-add-log">
-      <p class="hint">Already sent these outside the tool, or restoring history after a browser reset? Paste one per line — <code>Reference&#9;Name</code> (tab-separated) or just the reference on its own — and they'll be logged as sent from today, so they're flagged if they ever come up again.</p>
+      <p class="hint">Already sent these outside the tool, or restoring history after a browser reset? Paste one per line — <code>Reference&#9;Name</code> (tab-separated) or just the reference on its own — and they'll be logged as sent from today (as planning history, unless the reference already looks like a business one), so they're flagged if they ever come up again.</p>
       <textarea id="bulkLogBox" rows="4" placeholder="26/00465/B&#9;Mr & Mrs W. Philip & Norma Richards"></textarea>
       <div class="row-actions" style="margin-top:10px">
         <button class="btn" id="bulkLogBtn">Add to log</button>
         <span id="bulkLogMsg" style="color:var(--muted);font-size:0.82rem"></span>
       </div>
     </div>`;
-  const tableHtml = refs.length ? `
-    <div class="row-actions">
-      <button class="btn" id="restoreAllBtn">&#8617; Restore all ${refs.length} to Send</button>
-      <button class="btn-danger" id="clearLogBtn">Clear entire log</button>
-    </div>
-    <table class="leads"><thead><tr><th></th><th>Reference</th><th>Applicant</th><th>Date logged</th></tr></thead><tbody>
-    ${refs.map(ref => `<tr><td><button class="btn-secondary restore-btn" data-ref="${esc(ref)}">&#8617; Restore</button></td><td>${esc(ref)}</td><td>${esc(log[ref].name)}</td><td>${esc(log[ref].date)}</td></tr>`).join('')}
-    </tbody></table>` : '<p class="empty-state">Nothing logged as sent yet.</p>';
-  main.innerHTML = bulkAddHtml + tableHtml;
+
+  function section(title, refs){
+    const header = `<h3 class="lead-section-hdr">${esc(title)} &middot; ${refs.length}</h3>`;
+    if (!refs.length) return header + '<p class="empty-state">Nothing logged here yet.</p>';
+    return header + `
+      <div class="row-actions">
+        <button class="btn restore-all-btn" data-scope="${esc(title)}">&#8617; Restore all ${refs.length} to Send</button>
+      </div>
+      <table class="leads"><thead><tr><th></th><th>Reference</th><th>Applicant</th><th>Date logged</th></tr></thead><tbody>
+      ${refs.map(ref => `<tr><td><button class="btn-secondary restore-btn" data-ref="${esc(ref)}">&#8617; Restore</button></td><td>${esc(ref)}</td><td>${esc(log[ref].name)}</td><td>${esc(log[ref].date)}</td></tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  main.innerHTML = bulkAddHtml
+    + (allRefs.length ? `<div class="row-actions"><button class="btn-danger" id="clearLogBtn">Clear entire log</button></div>` : '')
+    + section('Planning archive', planningRefs)
+    + section('Business archive', businessRefs);
 
   document.getElementById('bulkLogBtn').addEventListener('click', () => {
     const lines = document.getElementById('bulkLogBox').value.split('\n').map(s => s.trim()).filter(Boolean);
@@ -873,7 +926,7 @@ function renderLog(main){
     lines.forEach(line => {
       const [ref, name] = line.split('\t').map(s => (s || '').trim());
       if (!ref) return;
-      log[ref] = { date: today, name: name || '' };
+      log[ref] = { date: today, name: name || '', source: ref.startsWith('ARCH-') ? 'business' : 'planning' };
       count++;
     });
     saveLog(log);
@@ -884,7 +937,7 @@ function renderLog(main){
     if (msg) msg.textContent = `Added ${count} to the log.`;
   });
 
-  if (!refs.length) return;
+  if (!allRefs.length) return;
   document.getElementById('clearLogBtn').addEventListener('click', () => {
     if (!confirm('Clear the whole processed-log? This will make every past reference look new again next import.')) return;
     saveLog({});
@@ -892,12 +945,18 @@ function renderLog(main){
     saveLeadsToStorage();
     render();
   });
-  document.getElementById('restoreAllBtn').addEventListener('click', () => {
-    if (!confirm(`Restore all ${refs.length} logged leads back to Send?`)) return;
-    saveLog({});
-    leads = leads.map(classify);
-    saveLeadsToStorage();
-    renderLog(main);
+  main.querySelectorAll('.restore-all-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const scope = btn.dataset.scope;
+      const refsToRestore = scope === 'Planning archive' ? planningRefs : businessRefs;
+      if (!confirm(`Restore all ${refsToRestore.length} in the ${scope} back to Send?`)) return;
+      const log = getLog();
+      refsToRestore.forEach(r => delete log[r]);
+      saveLog(log);
+      leads = leads.map(classify);
+      saveLeadsToStorage();
+      renderLog(main);
+    });
   });
   main.querySelectorAll('.restore-btn').forEach(btn => {
     btn.addEventListener('click', () => {
