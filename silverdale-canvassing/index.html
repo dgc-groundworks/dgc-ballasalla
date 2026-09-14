@@ -120,7 +120,8 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 <nav class="nav">
   <button class="navbtn active" data-tab="import">Import &mdash; Planning</button>
   <button class="navbtn" data-tab="importBiz">Import &mdash; Businesses</button>
-  <button class="navbtn" data-tab="review">Review</button>
+  <button class="navbtn" data-tab="review">Review &mdash; Planning</button>
+  <button class="navbtn" data-tab="reviewBiz">Review &mdash; Businesses</button>
   <button class="navbtn" data-tab="letters">Print — Letters</button>
   <button class="navbtn" data-tab="envelopes">Print — Envelopes</button>
   <button class="navbtn" data-tab="log">Processed Log</button>
@@ -360,7 +361,7 @@ function renderImportBiz(main){
     if (msg) msg.textContent = added.length
       ? `Added ${added.length} businesses — go to Review to pick which to send.`
       : 'Nothing new to add — check the paste has the expected columns, or these are already in the batch.';
-    if (added.length) { state.tab = 'review'; render(); }
+    if (added.length) { state.tab = 'reviewBiz'; render(); }
   });
 }
 
@@ -587,7 +588,8 @@ function buildSalutation(lead){
 function render(){
   document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
   const main = document.getElementById('mainArea');
-  if (state.tab === 'review') return renderReview(main);
+  if (state.tab === 'review') return renderReview(main, 'planning');
+  if (state.tab === 'reviewBiz') return renderReview(main, 'business');
   if (state.tab === 'letters') return renderPrint(main, 'letter');
   if (state.tab === 'envelopes') return renderPrint(main, 'envelope');
   if (state.tab === 'log') return renderLog(main);
@@ -617,18 +619,25 @@ function renderImport(main){
   });
 }
 
-function renderReview(main){
-  if (!leads.length) { main.innerHTML = '<p class="empty-state">Nothing parsed yet — go to Import and paste this week\'s leads.</p>'; return; }
-  const included = leads.filter(l => l.include).length;
-  const companies = leads.filter(l => l.type === 'Company').length;
+function renderReview(main, source){
+  const scoped = leads.map((l, i) => ({ l, i })).filter(x => source === 'business' ? x.l.source === 'business' : x.l.source !== 'business');
+  const label = source === 'business' ? 'businesses' : 'planning leads';
+  if (!scoped.length) {
+    main.innerHTML = leads.length
+      ? `<p class="empty-state">No ${label} in the working batch. ${source === 'business' ? 'Go to Import — Businesses to add some.' : 'Go to Import — Planning to paste this week\'s leads.'}</p>`
+      : '<p class="empty-state">Nothing parsed yet — go to Import and paste this week\'s leads.</p>';
+    return;
+  }
+  const active = scoped.filter(x => !x.l.alreadyProcessed);
+  const alreadySent = scoped.filter(x => x.l.alreadyProcessed);
+  const included = active.filter(x => x.l.include).length;
+  const companies = active.filter(x => x.l.type === 'Company').length;
 
   function leadRow(l, i){
     const flag = l.excludedReason ? { cls: 'tag-excl', label: 'Excluded', title: l.excludedReason }
-      : l.alreadyProcessed ? { cls: 'tag-dupe', label: 'Already sent', title: '' }
       : l.needsReview ? { cls: 'tag-review', label: 'Check', title: l.reviewNote }
       : null;
-    // Only the standing never-contact list locks the toggle — "already
-    // sent" is a warning, not a lock, so it can always be flipped back.
+    // Only the standing never-contact list locks the toggle.
     const locked = !!l.excludedReason;
     return `
       <div class="lead-row ${flag ? 'flagged' : ''}" data-i="${i}">
@@ -644,23 +653,34 @@ function renderReview(main){
       </div>`;
   }
 
-  const homeowners = leads.map((l,i)=>({l,i})).filter(x => x.l.type === 'Homeowner');
-  const businesses = leads.map((l,i)=>({l,i})).filter(x => x.l.type === 'Company');
+  const alreadySentNote = alreadySent.length
+    ? `<p class="hint">${alreadySent.length} already sent before, hidden from this list — see the ${source === 'business' ? 'Business' : 'Planning'} archive on the Processed Log tab to restore one.</p>`
+    : '';
 
-  main.innerHTML = `
+  const statBar = `
     <div class="stat-bar">
-      <span><b>${leads.length}</b> total</span>
-      <span><b>${leads.filter(l=>l.excludedReason).length}</b> standing-excluded</span>
-      <span><b>${leads.filter(l=>l.alreadyProcessed).length}</b> already sent before</span>
-      <span><b>${leads.filter(l=>l.needsReview).length}</b> flagged for a manual look</span>
-      <span><b>${leads.length-companies}</b> homeowners &middot; <b>${companies}</b> businesses</span>
+      <span><b>${scoped.length}</b> total</span>
+      <span><b>${active.filter(l=>l.l.excludedReason).length}</b> standing-excluded</span>
+      <span><b>${alreadySent.length}</b> already sent before</span>
+      <span><b>${active.filter(x=>x.l.needsReview).length}</b> flagged for a manual look</span>
       <span style="color:var(--accent)"><b>${included}</b> set to send</span>
-    </div>
-    <h3 class="lead-section-hdr">Homeowners &middot; ${homeowners.length}</h3>
-    <div class="lead-list">${homeowners.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None in this batch.</p>'}</div>
-    <h3 class="lead-section-hdr">Businesses &middot; ${businesses.length}</h3>
-    <div class="lead-list">${businesses.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None in this batch.</p>'}</div>
-  `;
+    </div>${alreadySentNote}`;
+
+  if (source === 'business') {
+    main.innerHTML = statBar + `
+      <h3 class="lead-section-hdr">Local businesses &middot; ${active.length}</h3>
+      <div class="lead-list">${active.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None currently active in this batch.</p>'}</div>
+    `;
+  } else {
+    const homeowners = active.filter(x => x.l.type === 'Homeowner');
+    const businesses = active.filter(x => x.l.type === 'Company');
+    main.innerHTML = statBar + `
+      <h3 class="lead-section-hdr">Homeowners &middot; ${homeowners.length}</h3>
+      <div class="lead-list">${homeowners.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None in this batch.</p>'}</div>
+      <h3 class="lead-section-hdr">Businesses &middot; ${businesses.length}</h3>
+      <div class="lead-list">${businesses.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None in this batch.</p>'}</div>
+    `;
+  }
 
   main.querySelectorAll('.lead-row[data-i]').forEach(row => {
     const i = +row.dataset.i;
@@ -668,9 +688,9 @@ function renderReview(main){
     if (!toggle.disabled) toggle.addEventListener('click', () => {
       leads[i].include = !leads[i].include;
       saveLeadsToStorage();
-      renderReview(main);
+      renderReview(main, source);
     });
-    row.querySelector('.type-sel').addEventListener('change', e => { leads[i].type = e.target.value; saveLeadsToStorage(); renderReview(main); });
+    row.querySelector('.type-sel').addEventListener('change', e => { leads[i].type = e.target.value; saveLeadsToStorage(); renderReview(main, source); });
     row.querySelector('.sal-input').addEventListener('change', e => { leads[i].salutation = e.target.value; saveLeadsToStorage(); });
   });
 }
