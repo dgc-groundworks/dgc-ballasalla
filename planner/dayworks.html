@@ -1623,10 +1623,21 @@ function showUnreadyModal(count, onSaveAnyway) {
   overlay.querySelector('#modalCancel').addEventListener('click', close);
   overlay.querySelector('#modalSaveAnyway').addEventListener('click', () => { close(); onSaveAnyway(); });
 }
-function attemptSaveForClient(pool, from, to, anyUnready) {
-  if (!anyUnready) { showSendPreview(pool, from, to); return; }
-  const count = unreadyIds(pool).size;
-  showUnreadyModal(count, () => showSendPreview(pool, from, to));
+// Ash, 18 Sep 2026: a tab left open across an external change (a batch
+// archived from another session, e.g.) still held the old entries in
+// memory, so "Save" built a pack out of stale data — old, already-sent
+// weeks showed up again next to the new ones. The pool/from/to/anyUnready
+// passed in here can be that stale — always re-pull from the database
+// first and rebuild them fresh, right before anything gets written.
+async function attemptSaveForClient(pool, from, to, anyUnready) {
+  await loadEntries();
+  const freshPool = unsent();
+  const dates = freshPool.map(e => e.date).filter(Boolean).sort();
+  const freshFrom = dates[0], freshTo = dates[dates.length - 1];
+  const freshAnyUnready = unreadyIds(freshPool).size > 0;
+  if (!freshAnyUnready) { showSendPreview(freshPool, freshFrom, freshTo); return; }
+  const count = unreadyIds(freshPool).size;
+  showUnreadyModal(count, () => showSendPreview(freshPool, freshFrom, freshTo));
 }
 
 function showSendPreview(pool, from, to) {
