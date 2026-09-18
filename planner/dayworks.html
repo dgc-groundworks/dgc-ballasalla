@@ -1587,7 +1587,13 @@ async function saveClientPackToDisk(rows, from, to, opts) {
   const zipBlob = await zip.generateAsync({ type: 'blob' });
 
   if (dirHandle) {
-    const dated = await dirHandle.getDirectoryHandle(range, { create: true });
+    // Ash, 18 Sep 2026: pick the week's own raw-photos folder (e.g.
+    // "Week Ending 2026-09-20") and everything sent to the client for
+    // that week lands inside it, under "Client Copies" — never mixed in
+    // with the raw timesheet photos, and never overwriting an earlier
+    // pay run's copy since each one gets its own date-range folder.
+    const clientCopies = await dirHandle.getDirectoryHandle('Client Copies', { create: true });
+    const dated = await clientCopies.getDirectoryHandle(range, { create: true });
     await writeFileToDir(dated, `DGC Dayworks Hours ${range}.pdf`, hoursBlob);
     await writeFileToDir(dated, `DGC Dayworks Photos ${range}.pdf`, photosBlob);
     return { wroteToDisk: true, range };
@@ -1679,7 +1685,7 @@ function showSendPreview(pool, from, to) {
     try {
       const result = await saveClientPackToDisk(pool, from, to, { forcePick: forceAs });
       status.textContent = result.wroteToDisk
-        ? `Saved into the "${range}" folder in ${forceAs ? 'the folder you picked' : 'Daywork/Dandara'} — nothing has been sent to the client, this was just the files.`
+        ? `Saved into "Client Copies/${range}" inside ${forceAs ? 'the folder you picked' : 'the remembered folder'} — nothing has been sent to the client, this was just the files.`
         : `Downloaded "DGC Dayworks ${range}.zip" — nothing has been sent to the client, this was just the files.`;
     } catch (err) {
       status.textContent = 'Save failed: ' + err.message;
@@ -1715,7 +1721,7 @@ function showSendPreview(pool, from, to) {
         await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: batchRef, approvedBy, approvedAt }));
       }
       status.textContent = (result.wroteToDisk
-        ? `Saved into the "${range}" folder in Daywork/Dandara`
+        ? `Saved into "Client Copies/${range}" inside the remembered folder`
         : `Downloaded "DGC Dayworks ${range}.zip"`) + ` and archived — this batch is now in Historic.`;
       setTimeout(() => { state.job = null; state.name = null; state.tab = 'current'; render(); }, 1200);
     } catch (err) {
