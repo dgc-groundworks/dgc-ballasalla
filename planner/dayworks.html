@@ -644,7 +644,18 @@ async function uploadImageFile(file) {
 }
 
 function unsent() { return entries.filter(e => !e.sentAt && !e.removedAt); }
-function removedEntries() { return entries.filter(e => !!e.removedAt); }
+// Ash, 18 Sep 2026: once a period's been archived to Historic, a removed
+// row from back in that same period is resolved too — it shouldn't keep
+// showing on the Current homepage forever. A removed row never gets
+// sentAt itself (it was never part of any pack), so "resolved" here
+// means its date falls on or before the latest date anything has
+// actually been archived up to — still kept on record in the database
+// either way, just not surfaced once its whole period is done.
+function removedEntries() {
+  const sentDates = entries.filter(e => e.sentAt && e.date).map(e => e.date);
+  const maxSent = sentDates.length ? sentDates.sort().pop() : null;
+  return entries.filter(e => e.removedAt && (!maxSent || !e.date || e.date > maxSent));
+}
 
 // ---------------------------------------------------------------
 // Rendering — one dispatcher into #mainArea based on `state`.
