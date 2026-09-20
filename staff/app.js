@@ -30,6 +30,19 @@ function estimateAnnualTax(annualGross) {
   return lower + higher;
 }
 
+// IoM Class 1 employee NI 2026/27 (gov.im verified):
+// 0% below PT (£176/wk), 11% PT→UEL (£1,082/wk), 1% above UEL.
+const IOM_NI_PT  = 176;
+const IOM_NI_UEL = 1082;
+const IOM_NI_MAIN_RATE = 0.11;
+const IOM_NI_ADDL_RATE = 0.01;
+function estimateWeeklyNI(weeklyGross) {
+  if (weeklyGross <= IOM_NI_PT) return 0;
+  const main = (Math.min(weeklyGross, IOM_NI_UEL) - IOM_NI_PT) * IOM_NI_MAIN_RATE;
+  const addl = Math.max(0, weeklyGross - IOM_NI_UEL) * IOM_NI_ADDL_RATE;
+  return main + addl;
+}
+
 // The staff-facing Timesheet app runs its own Monday-anchored fortnight
 // (2026-08-31) — 2 days offset from this Saturday-anchored admin grid.
 // That's deliberate on both sides (staff get a Mon-Sun window with a
@@ -832,6 +845,7 @@ async function buildWorkbook() {
   const GROSS_FG = 'FFD4A72C';   // gold — gross (hours × rate)
   const NET_FG   = 'FF4AC26B';   // green — net pay (gross − advances)
   const TAX_FG      = 'FFF85149'; // red — estimated tax
+  const NI_FG       = 'FFFF9B72'; // orange — estimated NI
   const AFTERTAX_FG = 'FF79C0FF'; // blue — estimated take-home
   const TEAM_BG  = 'FF21262D', TEAM_FG = 'FFCDD9E5';
   const WKND_BG  = 'FF0A0F15', WKND_FG = 'FF3D444C';
@@ -855,9 +869,10 @@ async function buildWorkbook() {
   const GROSS_COL = N_DAYS + 5;        // 12 — hours × rate
   const ADV_COL   = N_DAYS + 6;        // 13 — advances taken
   const NET_COL   = N_DAYS + 7;        // 14 — gross − advances
-  const TAX_COL   = N_DAYS + 8;        // 15 — estimated tax on a normal week
-  const AFTERTAX_COL = N_DAYS + 9;     // 16 — estimated take-home on a normal week
-  const LAST_COL  = AFTERTAX_COL;      // 16
+  const TAX_COL      = N_DAYS + 8;     // 15 — estimated income tax
+  const NI_COL       = N_DAYS + 9;     // 16 — estimated NI
+  const AFTERTAX_COL = N_DAYS + 10;    // 17 — estimated take-home (gross - tax - NI)
+  const LAST_COL     = AFTERTAX_COL;   // 17
 
   // ── per-person wages ────────────────────────────────────────────────────────
   const advancesFor = id => advancesCache
@@ -903,7 +918,8 @@ async function buildWorkbook() {
   // Weekly slice of the annual estimate — a normal week's gross × 52,
   // taxed against the IoM allowance/bands, divided back down to a week.
   const estimateTaxFor = id => estimateAnnualTax(averagedWeeklyGrossFor(id) * 52) / 52;
-  const estimateAfterTaxFor = id => averagedWeeklyGrossFor(id) - estimateTaxFor(id);
+  const estimateNIFor  = id => estimateWeeklyNI(averagedWeeklyGrossFor(id));
+  const estimateAfterTaxFor = id => averagedWeeklyGrossFor(id) - estimateTaxFor(id) - estimateNIFor(id);
 
   // ── summary stats (excluded staff omitted) ──────────────────────────────────
   const activeStaff = staff.filter(m => !isExcluded(m));
@@ -911,6 +927,7 @@ async function buildWorkbook() {
   const totalAdv   = activeStaff.reduce((s, m) => s + advancesFor(m.id), 0);
   const totalNet   = activeStaff.reduce((s, m) => s + netFor(m.id), 0);
   const totalTax      = activeStaff.reduce((s, m) => s + estimateTaxFor(m.id), 0);
+  const totalNI       = activeStaff.reduce((s, m) => s + estimateNIFor(m.id), 0);
   const totalAfterTax = activeStaff.reduce((s, m) => s + estimateAfterTaxFor(m.id), 0);
   const otEntries  = advancesCache.filter(a => a.entry_type === 'Overtime').length;
   const onHoliday  = staff.filter(m => periodDates.some(d => { const c = cellFor(m.id, d); return c.kind === 'H' || c.kind === 'BH'; })).length;
@@ -1004,7 +1021,7 @@ async function buildWorkbook() {
   for (let ci = 1; ci <= LAST_COL; ci++) {
     const cell = legRow.getCell(ci);
     if (ci === 1) {
-      cell.value     = '    H = Paid Holiday (8h)    ·    BH = Bank Holiday (8h)    ·    U = Unavailable    ·    [8] = Hours worked    ·    Est. Tax/After Tax = rough IoM estimate on a normal week, not a real payslip figure';
+      cell.value     = '    H = Paid Holiday (8h)    ·    BH = Bank Holiday (8h)    ·    [8] = Hours worked    ·    Est. Tax = IoM income tax estimate    ·    Est. NI = IoM Class 1 employee NI (2026/27: 11% PT→UEL, 1% above)    ·    Est. After Tax = gross − tax − NI    ·    Not a real payslip — no individual tax codes, no employer NI';
       cell.fill      = fl(SURF);
       cell.font      = { color: { argb: MUTED }, size: 8, name: 'Calibri' };
       cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 2 };
@@ -1019,7 +1036,7 @@ async function buildWorkbook() {
   for (let ci = 1; ci <= LAST_COL; ci++) hiddenCell(sepRow.getCell(ci), BG);
 
   // ── ROW 9: column headers ───────────────────────────────────────────────────
-  const hdr = ws.addRow(['Name', ...dateLabels, 'OT (h)', 'Total Hrs', 'Rate', 'Gross', 'Advances', 'Net Pay', 'Est. Tax', 'Est. After Tax']);
+  const hdr = ws.addRow(['Name', ...dateLabels, 'OT (h)', 'Total Hrs', 'Rate', 'Gross', 'Advances', 'Net Pay', 'Est. Tax', 'Est. NI', 'Est. After Tax']);
   hdr.height = 22;
   hdr.eachCell({ includeEmpty: true }, (cell, ci) => {
     const wk = ci >= 2 && ci < OT_COL && isWknd[ci - 2];
@@ -1034,7 +1051,8 @@ async function buildWorkbook() {
     : ci === GROSS_COL ? fo(GROSS_FG, true, false, 9)
     : ci === ADV_COL   ? fo(ADV_FG, true,  false, 9)
     : ci === NET_COL   ? fo(NET_FG, true,  false, 9)
-    : ci === TAX_COL   ? fo(TAX_FG, true,  false, 9)
+    : ci === TAX_COL      ? fo(TAX_FG,      true, false, 9)
+    : ci === NI_COL       ? fo(NI_FG,       true, false, 9)
     : ci === AFTERTAX_COL ? fo(AFTERTAX_FG, true, false, 9)
     : wk               ? fo(FAINT,  false, false, 8)
     :                    fo(MUTED,  false, false, 9);
@@ -1053,8 +1071,9 @@ async function buildWorkbook() {
     const adv   = advancesFor(s.id);
     const net   = netFor(s.id);
     const tax      = estimateTaxFor(s.id);
+    const ni       = estimateNIFor(s.id);
     const afterTax = estimateAfterTaxFor(s.id);
-    const row   = ws.addRow([s.name, ...dayVals, ot || null, tot || null, rate || null, gross || null, adv || null, net || null, tax || null, afterTax || null]);
+    const row   = ws.addRow([s.name, ...dayVals, ot || null, tot || null, rate || null, gross || null, adv || null, net || null, tax || null, ni || null, afterTax || null]);
     row.height  = 21;
     const rbg   = (idx % 2 === 0) ? SURF2 : SURF;
 
@@ -1084,6 +1103,10 @@ async function buildWorkbook() {
       } else if (ci === TAX_COL) {
         cell.fill = fl(rbg); cell.font = tax ? fo(TAX_FG, true, false, 11) : fo(FAINT, false, false, 9);
         if (tax) cell.numFmt = '"£"#,##0.00';
+        cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
+      } else if (ci === NI_COL) {
+        cell.fill = fl(rbg); cell.font = ni ? fo(NI_FG, true, false, 11) : fo(FAINT, false, false, 9);
+        if (ni) cell.numFmt = '"£"#,##0.00';
         cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
       } else if (ci === AFTERTAX_COL) {
         cell.fill = fl(rbg); cell.font = afterTax ? fo(AFTERTAX_FG, true, false, 11) : fo(FAINT, false, false, 9);
@@ -1126,6 +1149,7 @@ async function buildWorkbook() {
   teamVals.push(totalAdv);      // Advances
   teamVals.push(totalNet);      // Net Pay
   teamVals.push(totalTax);      // Est. Tax
+  teamVals.push(totalNI);       // Est. NI
   teamVals.push(totalAfterTax); // Est. After Tax
 
   const tr = ws.addRow(teamVals);
@@ -1140,7 +1164,8 @@ async function buildWorkbook() {
     : ci === GROSS_COL ? fo(GROSS_FG, true,  false, 12)
     : ci === ADV_COL   ? fo(ADV_FG,  true,  false, 12)
     : ci === NET_COL   ? fo(NET_FG,  true,  false, 12)
-    : ci === TAX_COL   ? fo(TAX_FG,  true,  false, 12)
+    : ci === TAX_COL   ? fo(TAX_FG,      true, false, 12)
+    : ci === NI_COL    ? fo(NI_FG,       true, false, 12)
     : ci === AFTERTAX_COL ? fo(AFTERTAX_FG, true, false, 12)
     : ci === TOT_COL   ? fo(TOT_FG,  true,  false, 12)
     : ci === OT_COL    ? fo(OT_FG,   true,  false, 11)
@@ -1148,10 +1173,10 @@ async function buildWorkbook() {
     : v                ? fo(TEAM_FG, true,  false, 10)
     :                    fo(FAINT,   false, false, 9);
     if (v && ci > 1) {
-      if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL || ci === TAX_COL || ci === AFTERTAX_COL) cell.numFmt = '"£"#,##0.00';
+      if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL || ci === TAX_COL || ci === NI_COL || ci === AFTERTAX_COL) cell.numFmt = '"£"#,##0.00';
       else cell.numFmt = '0.##';
     }
-    if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL || ci === TAX_COL || ci === AFTERTAX_COL)
+    if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL || ci === TAX_COL || ci === NI_COL || ci === AFTERTAX_COL)
       cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
   });
 
