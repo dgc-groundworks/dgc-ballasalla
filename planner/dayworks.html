@@ -691,22 +691,6 @@ function renderCurrent() {
   // with some still unready pops a warning (Save anyway / Cancel) instead.
   // Only a genuinely empty pool or a missing database column still disables it.
   const canSend = pool.length > 0 && sentColumnsExist;
-  // Ash, 20 Sep 2026: pay runs are weekly now — Current should only ever
-  // hold one week's worth of unsent timesheets at a time. If it doesn't
-  // (a week got missed, or this week's photos landed before last week
-  // was archived), say so plainly rather than letting it drift into a
-  // multi-week pack again.
-  const unsentWeeks = new Set(pool.map(e => e.date ? getMonday(e.date) : null).filter(Boolean));
-  const spansMultipleWeeks = unsentWeeks.size > 1;
-  // Once a week's been archived it's paid and locked — nothing in the UI
-  // lets you edit an archived row (Historic is read-only), but a NEW row
-  // dated back into an already-paid week (a late photo, a correction
-  // typed in as a fresh entry) could still slip into Current unnoticed.
-  // Surface it plainly instead of letting it quietly go out as if it
-  // were part of this week's pay run.
-  const sentDatesSoFar = entries.filter(e => e.sentAt && e.date).map(e => e.date);
-  const maxArchivedDate = sentDatesSoFar.length ? sentDatesSoFar.sort().pop() : null;
-  const backdatedIntoArchived = maxArchivedDate ? pool.filter(e => e.date && e.date <= maxArchivedDate) : [];
 
   // If whatever was selected has since been sent/removed, drop back to
   // the picker rather than showing an empty detail page.
@@ -723,8 +707,6 @@ function renderCurrent() {
       </div>
       <button class="btn-primary" id="sendBtn" ${canSend ? '' : 'disabled'}>Save for client</button>
     </div>
-    ${spansMultipleWeeks ? `<p class="flag-note" style="max-width:none">&#9888; These ${pool.length} entries span ${unsentWeeks.size} different weeks — pay runs are weekly now, so archive the earlier week(s) first (Save to Archive), then add this week's timesheets on their own.</p>` : ''}
-    ${backdatedIntoArchived.length ? `<p class="flag-note" style="max-width:none">&#9888; ${backdatedIntoArchived.length} ${backdatedIntoArchived.length === 1 ? 'entry is' : 'entries are'} dated on or before ${fmtDate(maxArchivedDate)}, a week that's already been archived and paid: ${backdatedIntoArchived.map(e => `${esc(e.name || NO_NAME)} (${fmtDate(e.date)})`).join(', ')}. Double-check these belong here before saving — a paid week shouldn't change.</p>` : ''}
     ${!sentColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Can't file saved packs into Historic yet — run this in the Job Planner's SQL Editor first:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists sent_at timestamptz;<br>alter table public.dgc_dayworks_entries add column if not exists sent_batch_ref text;</code></p>` : ''}
     ${!lunchColumnExists ? `<p class="flag-note" style="max-width:none">&#9888; The editable lunch field won't save yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists lunch_mins integer;</code></p>` : ''}
     ${!approvedColumnsExist ? `<p class="flag-note" style="max-width:none">&#9888; Client approval won't be recorded yet — run this in the Job Planner's SQL Editor:<br><code style="font-family:monospace">alter table public.dgc_dayworks_entries add column if not exists approved_by text;<br>alter table public.dgc_dayworks_entries add column if not exists approved_at timestamptz;</code></p>` : ''}
@@ -990,7 +972,7 @@ function personDetailHtml(rows) {
   }).join('');
 
   return `
-    ${personSummaryHtml(weekRows, state.name)}
+    ${personSummaryHtml(rows, state.name)}
     <div class="week-nav">
       <button id="wkPrev" ${state.weekIndex <= 0 ? 'disabled' : ''}>&lsaquo; Previous week</button>
       <div class="wn-label">${wk === '(no date yet)' ? 'No date set' : 'Week of ' + fmtDate(wk)} (${state.weekIndex + 1} of ${weekKeys.length}) — ${weekTotal}h</div>
@@ -1017,16 +999,12 @@ function wirePersonDetail(rows) {
   (byWeek[wk] || []).forEach(e => wireDayRow(e));
 }
 
-// Summary block at the top of a person's page: name + date range, a
-// Mon-Fri style table (start/finish/lunch/hours/jobsite), and a total.
-// Ash, 20 Sep 2026: pay runs are weekly now, so from personDetailHtml
-// this is only ever handed the ONE week currently on screen (weekRows)
-// — one week, one page, matching the paginated editor below it exactly,
-// not a stacked recap of every unsent week. renderHistoricBatch still
-// hands it a whole (already-archived, read-only) batch's rows, which
-// can legitimately span several weeks — that's a fixed historic record,
-// not a live pay-run view, so it keeps the multi-week "Week 1/2/3…"
-// layout below.
+// Summary block at the top of a person's page: name + overall date
+// range, then every week (1, 2, 3…) as its own Mon-Fri style table
+// (start/finish/lunch/hours/jobsite), a total per week, then one grand
+// total for the whole payment cycle — before the week-by-week photo
+// editor underneath. Always covers ALL of this person's unsent weeks,
+// not just whichever week the editor below is currently showing.
 function personSummaryHtml(rows, name) {
   const dated = rows.filter(r => r.date).map(r => r.date).sort();
   const from = dated[0] || null, to = dated.length ? dated[dated.length - 1] : null;
