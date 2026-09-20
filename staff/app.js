@@ -13,6 +13,23 @@ const BANK_HOLIDAYS = new Set([
 const ANCHOR_VAL = Date.UTC(2026, 7, 3); // Mon 3 Aug 2026 — weekly grid anchor
 const PERIOD_DAYS = 7;
 
+// Isle of Man personal income tax, 2026/27 (single person — verified
+// gov.im/PwC, see reference_iom_tax memory): £17,000 tax-free allowance,
+// then 10% on the next £6,500, then 21% above that. Never UK rates/bands.
+// This is a rough weekly ESTIMATE for the export only — not a real
+// payslip: no National Insurance, no actual individual tax code, no
+// joint assessment, no other income considered.
+const IOM_PERSONAL_ALLOWANCE = 17000;
+const IOM_LOWER_BAND = 6500;
+const IOM_LOWER_RATE = 0.10;
+const IOM_HIGHER_RATE = 0.21;
+function estimateAnnualTax(annualGross) {
+  const taxable = Math.max(0, annualGross - IOM_PERSONAL_ALLOWANCE);
+  const lower = Math.min(taxable, IOM_LOWER_BAND) * IOM_LOWER_RATE;
+  const higher = Math.max(0, taxable - IOM_LOWER_BAND) * IOM_HIGHER_RATE;
+  return lower + higher;
+}
+
 // The staff-facing Timesheet app runs its own Monday-anchored fortnight
 // (2026-08-31) — 2 days offset from this Saturday-anchored admin grid.
 // That's deliberate on both sides (staff get a Mon-Sun window with a
@@ -814,6 +831,8 @@ async function buildWorkbook() {
   const TOT_FG   = 'FFE6883C', OT_FG  = 'FFBC8CFF', ADV_FG  = 'FFD29922';
   const GROSS_FG = 'FFD4A72C';   // gold — gross (hours × rate)
   const NET_FG   = 'FF4AC26B';   // green — net pay (gross − advances)
+  const TAX_FG      = 'FFF85149'; // red — estimated tax
+  const AFTERTAX_FG = 'FF79C0FF'; // blue — estimated take-home
   const TEAM_BG  = 'FF21262D', TEAM_FG = 'FFCDD9E5';
   const WKND_BG  = 'FF0A0F15', WKND_FG = 'FF3D444C';
 
@@ -836,7 +855,9 @@ async function buildWorkbook() {
   const GROSS_COL = N_DAYS + 5;        // 12 — hours × rate
   const ADV_COL   = N_DAYS + 6;        // 13 — advances taken
   const NET_COL   = N_DAYS + 7;        // 14 — gross − advances
-  const LAST_COL  = NET_COL;           // 14
+  const TAX_COL   = N_DAYS + 8;        // 15 — estimated tax on a normal week
+  const AFTERTAX_COL = N_DAYS + 9;     // 16 — estimated take-home on a normal week
+  const LAST_COL  = AFTERTAX_COL;      // 16
 
   // ── per-person wages ────────────────────────────────────────────────────────
   const advancesFor = id => advancesCache
@@ -849,11 +870,48 @@ async function buildWorkbook() {
   };
   const netFor = id => grossFor(id) - advancesFor(id);
 
+  // Ash, 20 Sep 2026: "average out if they have a day off" — a day off
+  // this particular week would make someone's annualised income (and so
+  // their tax estimate) look artificially low. Average this week's daily
+  // rate across the WEEKDAYS they actually worked/were on paid leave (Mon-
+  // Fri only), then scale that up to a normal 5-day week before
+  // annualising. Weekend hours and OT are added back on top exactly as
+  // logged rather than blended into the daily average — otherwise someone
+  // who did a Saturday shift on top of a full Mon-Fri week would have that
+  // extra day wrongly averaged back down, understating their real pay.
+  const averagedWeeklyGrossFor = id => {
+    const s = staffById[id];
+    const rate = s ? (Number(s.rate) || 0) : 0;
+    if (!rate) return 0;
+    let daysPresent = 0, weekdayHours = 0, extraHours = 0;
+    periodDates.forEach(date => {
+      const c = cellFor(id, date);
+      const weekday = isWeekday(date);
+      if (c.kind === 'hours') {
+        if (weekday) { daysPresent++; weekdayHours += Number(c.value) || 0; }
+        else extraHours += Number(c.value) || 0;
+      } else if ((c.kind === 'H' || c.kind === 'BH') && weekday) {
+        daysPresent++; weekdayHours += 8;
+      }
+    });
+    const salaryHrs = SALARIED.get(s ? s.name : '') || 0;
+    if (!daysPresent && salaryHrs) { daysPresent = 5; weekdayHours = salaryHrs * 5; }
+    if (!daysPresent) return (extraHours + overtimeFor(id)) * rate;
+    const avgDailyHours = weekdayHours / daysPresent;
+    return (avgDailyHours * 5 + extraHours + overtimeFor(id)) * rate;
+  };
+  // Weekly slice of the annual estimate — a normal week's gross × 52,
+  // taxed against the IoM allowance/bands, divided back down to a week.
+  const estimateTaxFor = id => estimateAnnualTax(averagedWeeklyGrossFor(id) * 52) / 52;
+  const estimateAfterTaxFor = id => averagedWeeklyGrossFor(id) - estimateTaxFor(id);
+
   // ── summary stats (excluded staff omitted) ──────────────────────────────────
   const activeStaff = staff.filter(m => !isExcluded(m));
   const totalGross = activeStaff.reduce((s, m) => s + grossFor(m.id), 0);
   const totalAdv   = activeStaff.reduce((s, m) => s + advancesFor(m.id), 0);
   const totalNet   = activeStaff.reduce((s, m) => s + netFor(m.id), 0);
+  const totalTax      = activeStaff.reduce((s, m) => s + estimateTaxFor(m.id), 0);
+  const totalAfterTax = activeStaff.reduce((s, m) => s + estimateAfterTaxFor(m.id), 0);
   const otEntries  = advancesCache.filter(a => a.entry_type === 'Overtime').length;
   const onHoliday  = staff.filter(m => periodDates.some(d => { const c = cellFor(m.id, d); return c.kind === 'H' || c.kind === 'BH'; })).length;
   const unavail    = staff.filter(m => periodDates.some(d => cellFor(m.id, d).kind === 'U')).length;
@@ -892,7 +950,7 @@ async function buildWorkbook() {
   // ── header helper ─────────────────────────────────────────────────────────────
   // ExcelJS silently skips cells whose value is '' or ' ' (whitespace = empty).
   // Fix: use numeric 0 as the filler value with numFmt=';;;' (hides all display).
-  // A number is NEVER treated as empty, so all 21 cells are guaranteed serialised.
+  // A number is NEVER treated as empty, so all LAST_COL cells are guaranteed serialised.
   const HIDE = ';;;';  // Excel format that hides any value
   const hiddenCell = (cell, fillArgb) => {
     cell.value  = 0;
@@ -900,11 +958,11 @@ async function buildWorkbook() {
     cell.fill   = fl(fillArgb);
     cell.font   = { color: { argb: fillArgb }, size: 1, name: 'Calibri' };
   };
-  // Build a 21-element array of 0s (for addRow — forces all cells into sheetData)
+  // Build a LAST_COL-element array of 0s (for addRow — forces all cells into sheetData)
   const zeros = () => new Array(LAST_COL).fill(0);
 
   // ── ROWS 1-4: dark header block ───────────────────────────────────────────────
-  // Row 1: logo bar — all 21 cells explicitly created and filled dark
+  // Row 1: logo bar — all LAST_COL cells explicitly created and filled dark
   const logoRow = ws.addRow(zeros());
   logoRow.height = 49;
   for (let ci = 1; ci <= LAST_COL; ci++) hiddenCell(logoRow.getCell(ci), BG);
@@ -946,7 +1004,7 @@ async function buildWorkbook() {
   for (let ci = 1; ci <= LAST_COL; ci++) {
     const cell = legRow.getCell(ci);
     if (ci === 1) {
-      cell.value     = '    H = Paid Holiday (8h)    ·    BH = Bank Holiday (8h)    ·    U = Unavailable    ·    [8] = Hours worked';
+      cell.value     = '    H = Paid Holiday (8h)    ·    BH = Bank Holiday (8h)    ·    U = Unavailable    ·    [8] = Hours worked    ·    Est. Tax/After Tax = rough IoM estimate on a normal week, not a real payslip figure';
       cell.fill      = fl(SURF);
       cell.font      = { color: { argb: MUTED }, size: 8, name: 'Calibri' };
       cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 2 };
@@ -961,7 +1019,7 @@ async function buildWorkbook() {
   for (let ci = 1; ci <= LAST_COL; ci++) hiddenCell(sepRow.getCell(ci), BG);
 
   // ── ROW 9: column headers ───────────────────────────────────────────────────
-  const hdr = ws.addRow(['Name', ...dateLabels, 'OT (h)', 'Total Hrs', 'Rate', 'Gross', 'Advances', 'Net Pay']);
+  const hdr = ws.addRow(['Name', ...dateLabels, 'OT (h)', 'Total Hrs', 'Rate', 'Gross', 'Advances', 'Net Pay', 'Est. Tax', 'Est. After Tax']);
   hdr.height = 22;
   hdr.eachCell({ includeEmpty: true }, (cell, ci) => {
     const wk = ci >= 2 && ci < OT_COL && isWknd[ci - 2];
@@ -976,6 +1034,8 @@ async function buildWorkbook() {
     : ci === GROSS_COL ? fo(GROSS_FG, true, false, 9)
     : ci === ADV_COL   ? fo(ADV_FG, true,  false, 9)
     : ci === NET_COL   ? fo(NET_FG, true,  false, 9)
+    : ci === TAX_COL   ? fo(TAX_FG, true,  false, 9)
+    : ci === AFTERTAX_COL ? fo(AFTERTAX_FG, true, false, 9)
     : wk               ? fo(FAINT,  false, false, 8)
     :                    fo(MUTED,  false, false, 9);
   });
@@ -992,7 +1052,9 @@ async function buildWorkbook() {
     const gross = grossFor(s.id);
     const adv   = advancesFor(s.id);
     const net   = netFor(s.id);
-    const row   = ws.addRow([s.name, ...dayVals, ot || null, tot || null, rate || null, gross || null, adv || null, net || null]);
+    const tax      = estimateTaxFor(s.id);
+    const afterTax = estimateAfterTaxFor(s.id);
+    const row   = ws.addRow([s.name, ...dayVals, ot || null, tot || null, rate || null, gross || null, adv || null, net || null, tax || null, afterTax || null]);
     row.height  = 21;
     const rbg   = (idx % 2 === 0) ? SURF2 : SURF;
 
@@ -1018,6 +1080,14 @@ async function buildWorkbook() {
       } else if (ci === NET_COL) {
         cell.fill = fl(rbg); cell.font = net ? fo(NET_FG, true, false, 11) : fo(FAINT, false, false, 9);
         if (net) cell.numFmt = '"£"#,##0.00';
+        cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
+      } else if (ci === TAX_COL) {
+        cell.fill = fl(rbg); cell.font = tax ? fo(TAX_FG, true, false, 11) : fo(FAINT, false, false, 9);
+        if (tax) cell.numFmt = '"£"#,##0.00';
+        cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
+      } else if (ci === AFTERTAX_COL) {
+        cell.fill = fl(rbg); cell.font = afterTax ? fo(AFTERTAX_FG, true, false, 11) : fo(FAINT, false, false, 9);
+        if (afterTax) cell.numFmt = '"£"#,##0.00';
         cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
       } else if (ci === RATE_COL) {
         cell.fill   = fl(rbg); cell.font = fo(MUTED, false, false, 9);
@@ -1055,6 +1125,8 @@ async function buildWorkbook() {
   teamVals.push(totalGross);    // Gross
   teamVals.push(totalAdv);      // Advances
   teamVals.push(totalNet);      // Net Pay
+  teamVals.push(totalTax);      // Est. Tax
+  teamVals.push(totalAfterTax); // Est. After Tax
 
   const tr = ws.addRow(teamVals);
   tr.height = 28;
@@ -1068,16 +1140,18 @@ async function buildWorkbook() {
     : ci === GROSS_COL ? fo(GROSS_FG, true,  false, 12)
     : ci === ADV_COL   ? fo(ADV_FG,  true,  false, 12)
     : ci === NET_COL   ? fo(NET_FG,  true,  false, 12)
+    : ci === TAX_COL   ? fo(TAX_FG,  true,  false, 12)
+    : ci === AFTERTAX_COL ? fo(AFTERTAX_FG, true, false, 12)
     : ci === TOT_COL   ? fo(TOT_FG,  true,  false, 12)
     : ci === OT_COL    ? fo(OT_FG,   true,  false, 11)
     : wk               ? fo(FAINT,   false, false, 9)
     : v                ? fo(TEAM_FG, true,  false, 10)
     :                    fo(FAINT,   false, false, 9);
     if (v && ci > 1) {
-      if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL) cell.numFmt = '"£"#,##0.00';
+      if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL || ci === TAX_COL || ci === AFTERTAX_COL) cell.numFmt = '"£"#,##0.00';
       else cell.numFmt = '0.##';
     }
-    if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL)
+    if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL || ci === TAX_COL || ci === AFTERTAX_COL)
       cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
   });
 
@@ -1199,6 +1273,8 @@ async function buildWorkbook() {
   ws.getColumn(GROSS_COL).width = 14;
   ws.getColumn(ADV_COL).width   = 11;
   ws.getColumn(NET_COL).width   = 12;
+  ws.getColumn(TAX_COL).width   = 12;
+  ws.getColumn(AFTERTAX_COL).width = 14;
 
   return await wb.xlsx.writeBuffer();
 }
