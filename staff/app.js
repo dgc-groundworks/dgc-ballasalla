@@ -163,7 +163,7 @@ async function loadAll() {
   staffRows.forEach(s => staffById[s.id] = s);
 
   // Show everyone active, plus anyone inactive who still has activity logged
-  // in this specific fortnight (e.g. left partway through it) — a leaver's
+  // in this specific week (e.g. left partway through it) — a leaver's
   // final pay period must still show their real hours.
   const activeIds = new Set();
   hourRows.forEach(h => activeIds.add(h.staff_id));
@@ -357,9 +357,9 @@ function renderHours() {
   periodDates.forEach(date => {
     const d = new Date(valFromIso(date));
     const isToday = date === todayIso;
-    head += `<th class="${isToday ? 'today-col' : ''}"><div class="day-head"><span class="day-name">${d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })}</span><span class="day-num">${d.getUTCDate()} ${d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })}</span></div></th>`;
+    head += `<th class="date-col${isToday ? ' today-col' : ''}"><div class="day-head"><span class="day-name">${d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })}</span><span class="day-num">${d.getUTCDate()} ${d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })}</span></div></th>`;
   });
-  head += '<th>Fill</th><th>OT</th><th>Total</th></tr>';
+  head += '<th class="col-fill">Fill</th><th class="col-ot">OT</th><th class="col-tot">Total</th></tr>';
 
   let body = '';
   const dayTotals = periodDates.map(() => 0);
@@ -828,14 +828,14 @@ async function buildWorkbook() {
     return `${dt.getDate()} ${dt.toLocaleString('en-GB', { month: 'short' })}`;
   });
   const isWknd = periodDates.map(d => { const day = new Date(d + 'T00:00:00').getDay(); return day === 0 || day === 6; });
-  const N_DAYS   = periodDates.length;  // 14
-  const OT_COL    = N_DAYS + 2;        // 16
-  const TOT_COL   = N_DAYS + 3;        // 17
-  const RATE_COL  = N_DAYS + 4;        // 18
-  const GROSS_COL = N_DAYS + 5;        // 19 — hours × rate
-  const ADV_COL   = N_DAYS + 6;        // 20 — advances taken
-  const NET_COL   = N_DAYS + 7;        // 21 — gross − advances
-  const LAST_COL  = NET_COL;           // 21
+  const N_DAYS   = periodDates.length;  // 7
+  const OT_COL    = N_DAYS + 2;        // 9
+  const TOT_COL   = N_DAYS + 3;        // 10
+  const RATE_COL  = N_DAYS + 4;        // 11
+  const GROSS_COL = N_DAYS + 5;        // 12 — hours × rate
+  const ADV_COL   = N_DAYS + 6;        // 13 — advances taken
+  const NET_COL   = N_DAYS + 7;        // 14 — gross − advances
+  const LAST_COL  = NET_COL;           // 14
 
   // ── per-person wages ────────────────────────────────────────────────────────
   const advancesFor = id => advancesCache
