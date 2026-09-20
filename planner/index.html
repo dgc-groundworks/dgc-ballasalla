@@ -2447,11 +2447,12 @@ function renderHoursGrid() {
       if (bh) {
         h += `<td class="bh-td${sep}">—</td>`;
       } else if (marker) {
-        const tsVal = _tsHours[s.id + '|' + d];
-        if (tsVal && tsVal > 0) {
-          // Staff submitted hours override the pre-entered leave — count actual hours, flag red
-          total += tsVal;
-          h += `<td class="hrs-conflict-td${sep ? ' '+sep.trim() : ''}" title="Leave pre-entered (${marker === 'H' ? 'Holiday' : 'Unpaid'}) but staff submitted ${tsVal}h — verify &amp; resolve"><span class="hrs-conflict-flag">!</span><input class="hrs-inp" type="number" min="0" max="24" step="0.5" value="${tsVal}" data-sid="${s.id}" data-date="${d}" oninput="onHrsChange(this)"></td>`;
+        const anyHrs = _stHours[s.id + '|' + d]; // PM entry or staff submission
+        if (anyHrs && anyHrs > 0) {
+          // Hours recorded override the pre-entered leave — count actual hours, flag red for investigation
+          total += anyHrs;
+          const src = _tsHours[s.id + '|' + d] ? 'staff submitted' : 'PM entered';
+          h += `<td class="hrs-conflict-td${sep ? ' '+sep.trim() : ''}" title="Leave pre-entered (${marker === 'H' ? 'Holiday' : 'Unpaid'}) but ${anyHrs}h ${src} — verify &amp; resolve"><span class="hrs-conflict-flag">!</span><input class="hrs-inp" type="number" min="0" max="24" step="0.5" value="${anyHrs}" data-sid="${s.id}" data-date="${d}" oninput="onHrsChange(this)"></td>`;
         } else {
           total += marker === 'H' ? 8 : 0;
           const unpaidCls = marker === 'U' ? ' unpaid' : '';
