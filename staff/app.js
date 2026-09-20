@@ -335,7 +335,7 @@ function cellFor(staffId, date) {
   if (!isWeekday(date)) return { kind: 'weekend' };
   if (BANK_HOLIDAYS.has(date)) return { kind: 'BH' };
   const leave = leaveCovering(staffId, date);
-  if (leave) return { kind: leave.leave_type === 'Holiday' ? 'H' : 'U' };
+  if (leave) return { kind: leave.leave_type === 'Holiday' ? 'H' : 'blank' };
   return { kind: 'blank' };
 }
 function rowTotal(staffId, staffName) {
