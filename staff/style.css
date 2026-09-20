@@ -346,7 +346,12 @@ label.checkbox input { width: auto; padding: 0; }
 
 .hours-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
 
-.hours-table { border-collapse: collapse; width: 100%; font-size: 0.74rem; table-layout: auto; }
+.hours-table { border-collapse: collapse; width: 100%; font-size: 0.74rem; table-layout: fixed; }
+.hours-table th.date-col { width: 62px; }
+.hours-table th.hours-name { width: 118px; }
+.hours-table th.col-fill { width: 44px; }
+.hours-table th.col-ot  { width: 44px; }
+.hours-table th.col-tot { width: 52px; }
 .excl-toggle { background: none; border: none; cursor: pointer; font-size: 8px; color: #4ade80; padding: 0 4px 0 0; line-height: 1; opacity: 0.7; vertical-align: middle; }
 .excl-toggle:hover { opacity: 1; }
 .excl-toggle.excl-off { color: var(--muted); opacity: 0.35; }
@@ -405,6 +410,8 @@ tr.excl-row td { opacity: 0.4; }
 .hours-cell.invalid-cell { border-color: var(--danger); background: rgba(217,83,79,0.12); }
 /* off-work weekends: same H/U shown as a placeholder only — never real data */
 .hours-cell::placeholder { color: var(--muted); opacity: 0.7; font-style: italic; }
+.leave-cell { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel2)); }
+[data-theme="light"] .leave-cell { background: color-mix(in srgb, var(--accent) 8%, #fff); }
 .hours-cell-wrap { position: relative; display: inline-block; }
 .hours-cell-wrap .hours-cell { padding-right: 14px; }
 .hours-note-btn {

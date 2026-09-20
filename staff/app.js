@@ -404,8 +404,9 @@ function renderHours() {
         if (excl) {
           body += `<td class="hours-readonly ${todayCls}">${c.kind}</td>`;
         } else {
-          // BH/H cells always editable — approval lock doesn't apply (admin correction)
-          body += `<td class="${todayCls}"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" placeholder="${c.kind}" title="Blank = ${c.kind} (8h paid). Enter 0 = not paid." style="color:var(--accent-green);font-weight:600;width:100%;text-align:center;border:none;background:transparent;padding:0"></td>`;
+          // BH/H/U cells always editable — approval lock doesn't apply (admin correction)
+          const leaveTitle = c.kind === 'U' ? 'Unpaid leave — enter hours if staff worked this day' : `Blank = ${c.kind} (8h paid). Enter 0 = not paid.`;
+          body += `<td class="${todayCls}"><div class="hours-cell-wrap"><input class="hours-cell leave-cell" type="number" step="0.5" min="0" data-date="${date}" placeholder="${c.kind}" title="${leaveTitle}">${noteBtn}</div></td>`;
         }
       }
     });
