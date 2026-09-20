@@ -10,8 +10,8 @@ const BANK_HOLIDAYS = new Set([
   '2027-01-01','2027-03-26','2027-03-29','2027-05-03','2027-06-04','2027-07-05','2027-08-30','2027-12-27','2027-12-28',
 ]);
 
-const ANCHOR_VAL = Date.UTC(2026, 7, 1); // Sat 1 Aug 2026 — fortnight grid anchor
-const PERIOD_DAYS = 14;
+const ANCHOR_VAL = Date.UTC(2026, 7, 3); // Mon 3 Aug 2026 — weekly grid anchor
+const PERIOD_DAYS = 7;
 
 // The staff-facing Timesheet app runs its own Monday-anchored fortnight
 // (2026-08-31) — 2 days offset from this Saturday-anchored admin grid.
@@ -109,8 +109,7 @@ const EXCLUDED_FROM_HOURS = new Set([
 ]);
 
 let periodStartVal = periodStartValFor(todayVal());
-let week1Approved = false;
-let week2Approved = false;
+let weekApproved = false;
 let periodDates = [];
 let staff = [];
 let staffById = {};
@@ -137,9 +136,8 @@ async function loadAll() {
   document.getElementById('hoursPeriodLabel').textContent =
     fmtShort(from) + ' — ' + fmtShort(to) + ' ' + String(new Date(valFromIso(to)).getUTCFullYear()).slice(2);
 
-  const week2Start = periodDates[7];
   const overlappingStaffPeriods = staffPeriodsOverlapping(valFromIso(from), valFromIso(to));
-  const [staffRows, hourRows, leaveRows, advRows, approval1Rows, approval2Rows, tsRows, confirmRows] = await Promise.all([
+  const [staffRows, hourRows, leaveRows, advRows, approvalRows, tsRows, confirmRows] = await Promise.all([
     sbGet('/dgc_staff?select=id,name,role,rate,active&order=name'),
     sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours,note&work_date=gte.' + from + '&work_date=lte.' + to)
       .then(rows => { noteColumnExists = true; return rows; })
@@ -147,7 +145,6 @@ async function loadAll() {
     sbGet('/dgc_staff_leave?select=*&from_date=lte.' + to + '&to_date=gte.' + from),
     sbGet('/dgc_staff_advances?select=*&entry_date=gte.' + from + '&entry_date=lte.' + to + '&order=entry_date.desc'),
     sbGet('/dgc_payroll_approval?select=*&period_start=eq.' + from).catch(() => []),
-    sbGet('/dgc_payroll_approval?select=*&period_start=eq.' + week2Start).catch(() => []),
     ensureLoggedIn().then(sess => {
       const token = sess ? sess.access_token : SUPABASE_KEY;
       return fetch(REST + '/dgc_timesheets?select=staff_name,work_date,hours&work_date=gte.' + from + '&work_date=lte.' + to,
@@ -214,8 +211,7 @@ async function loadAll() {
 
   leaveCache = leaveRows;
   advancesCache = advRows;
-  week1Approved = Array.isArray(approval1Rows) && approval1Rows.length > 0;
-  week2Approved = Array.isArray(approval2Rows) && approval2Rows.length > 0;
+  weekApproved = Array.isArray(approvalRows) && approvalRows.length > 0;
 
   fillActive = false;
   fillSnapshot = null;
@@ -269,20 +265,19 @@ async function renderWagesBroughtForward() {
   const prevPeriodStart = periodStartVal - PERIOD_DAYS * 86400000;
   const prevDates = [];
   for (let i = 0; i < PERIOD_DAYS; i++) prevDates.push(isoFromVal(addDaysVal(prevPeriodStart, i)));
-  const prevWeek1Start = prevDates[0], prevWeek2Start = prevDates[7];
+  const prevWeekStart = prevDates[0];
 
   let approvals;
   try {
-    approvals = await sbGet('/dgc_payroll_approval?select=*&period_start=in.(' + prevWeek1Start + ',' + prevWeek2Start + ')');
+    approvals = await sbGet('/dgc_payroll_approval?select=*&period_start=eq.' + prevWeekStart);
   } catch (e) { return; }
-  if (!Array.isArray(approvals) || !approvals.length) return; // last fortnight was never approved — nothing to flag yet
+  if (!Array.isArray(approvals) || !approvals.length) return; // last week was never approved — nothing to flag yet
 
   const approvalByStart = {};
   approvals.forEach(a => approvalByStart[a.period_start] = a);
 
   const ranges = [];
-  if (approvalByStart[prevWeek1Start]) ranges.push({ from: prevDates[0], to: prevDates[6], approvedAt: approvalByStart[prevWeek1Start].approved_at });
-  if (approvalByStart[prevWeek2Start]) ranges.push({ from: prevDates[7], to: prevDates[13], approvedAt: approvalByStart[prevWeek2Start].approved_at });
+  if (approvalByStart[prevWeekStart]) ranges.push({ from: prevDates[0], to: prevDates[PERIOD_DAYS - 1], approvedAt: approvalByStart[prevWeekStart].approved_at });
   if (!ranges.length) return;
 
   let lateRows;
@@ -377,13 +372,13 @@ function renderHours() {
     const excl = isExcluded(s);
     if (!excl) { footOT += ot; footTotal += total; footAdv += moneyFor(s.id, 'Advance'); footBonus += moneyFor(s.id, 'Bonus'); }
 
-    const sentTick = confirmedNames.has(s.name) ? ' <span class="send-tick" title="Sent their hours — happy with this fortnight">&#10003;</span>' : '';
+    const sentTick = confirmedNames.has(s.name) ? ' <span class="send-tick" title="Sent their hours — happy with this week">&#10003;</span>' : '';
     const exclBtn = /^test\b/i.test(s.name) ? '' : `<button type="button" class="excl-toggle${excl ? ' excl-off' : ''}" data-staff="${s.id}" title="${excl ? 'Excluded from totals — click to include' : 'Included in totals — click to exclude'}">&#9679;</button>`;
     body += `<tr data-staff="${s.id}"${excl ? ' class="excl-row"' : ''}><td class="hours-name">${exclBtn}${s.name}${sentTick}${salaryHrs ? ' <span style="font-size:0.7em;color:var(--muted);font-weight:400">(salary)</span>' : ''}</td>`;
     periodDates.forEach((date, i) => {
       const c = cellFor(s.id, date);
       const todayCls = date === todayIso ? 'today-col' : '';
-      const isLocked = i < 7 ? week1Approved : week2Approved;
+      const isLocked = weekApproved;
       const cellNote = (hoursCache[s.id + '_' + date] || {}).note || '';
       const noteBtn = `<button type="button" class="hours-note-btn${cellNote ? ' has-note' : ''}" data-staff="${s.id}" data-date="${date}" title="${cellNote ? esc(cellNote) : 'Add a note'}">&#128221;</button>`;
       if (c.kind === 'hours') {
@@ -414,8 +409,7 @@ function renderHours() {
         }
       }
     });
-    const bothApproved = week1Approved && week2Approved;
-    body += `<td>${bothApproved ? '' : `<button class="row-fill-btn${s.id in rowFillSnapshots ? ' active' : ''}" data-staff="${s.id}">→8</button>`}</td>`;
+    body += `<td>${weekApproved ? '' : `<button class="row-fill-btn${s.id in rowFillSnapshots ? ' active' : ''}" data-staff="${s.id}">→8</button>`}</td>`;
     body += `<td class="hours-readonly clickable" data-jump="${s.id}" data-jump-type="Overtime">${ot || 0}h</td>`;
     body += `<td class="hours-readonly" data-staff-total="${s.id}">${total}</td>`;
     body += '</tr>';
@@ -636,8 +630,9 @@ document.getElementById('todayBtn').addEventListener('click', () => { periodStar
 
 // ---- Payroll Approval ----
 function renderApprovalState() {
-  updateApproveBtn(document.getElementById('approveWeek1Btn'), week1Approved, 'Week 1');
-  updateApproveBtn(document.getElementById('approveWeek2Btn'), week2Approved, 'Week 2');
+  updateApproveBtn(document.getElementById('approveWeek1Btn'), weekApproved, 'Week');
+  const btn2 = document.getElementById('approveWeek2Btn');
+  if (btn2) btn2.hidden = true;
 }
 function updateApproveBtn(btn, approved, label) {
   if (!btn) return;
@@ -651,10 +646,9 @@ function updateApproveBtn(btn, approved, label) {
 }
 
 async function toggleApproval(weekNum) {
-  const from = periodDates[0];
-  const weekStart = weekNum === 1 ? from : periodDates[7];
-  const isApproved = weekNum === 1 ? week1Approved : week2Approved;
-  const btn = document.getElementById('approveWeek' + weekNum + 'Btn');
+  const weekStart = periodDates[0];
+  const isApproved = weekApproved;
+  const btn = document.getElementById('approveWeek1Btn');
   btn.disabled = true;
   try {
     const sess = await ensureLoggedIn();
@@ -663,15 +657,15 @@ async function toggleApproval(weekNum) {
     if (isApproved) {
       const r = await fetch(REST + '/dgc_payroll_approval?period_start=eq.' + weekStart, { method: 'DELETE', headers: authHdrs });
       if (!r.ok) throw new Error(await r.text());
-      if (weekNum === 1) week1Approved = false; else week2Approved = false;
-      document.getElementById('hoursStatus').textContent = 'Week ' + weekNum + ' unlocked — hours can be edited';
+      weekApproved = false;
+      document.getElementById('hoursStatus').textContent = 'Week unlocked — hours can be edited';
     } else {
       const user = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token } }).then(r => r.json()).catch(() => ({}));
       const approvedBy = user.email || 'PM';
       const r = await fetch(REST + '/dgc_payroll_approval', { method: 'POST', headers: { ...authHdrs, Prefer: 'return=representation' }, body: JSON.stringify({ period_start: weekStart, approved_by: approvedBy, approved_at: new Date().toISOString() }) });
       if (!r.ok) throw new Error(await r.text());
-      if (weekNum === 1) week1Approved = true; else week2Approved = true;
-      document.getElementById('hoursStatus').textContent = 'Week ' + weekNum + ' approved — accountants can pay ✓';
+      weekApproved = true;
+      document.getElementById('hoursStatus').textContent = 'Week approved — accountants can pay ✓';
     }
     renderApprovalState();
     renderHours();
@@ -698,7 +692,7 @@ document.getElementById('advDate').valueAsDate = new Date();
 
 function renderAdvances() {
   const list = document.getElementById('advancesList');
-  if (!advancesCache.length) { list.innerHTML = '<p class="hours-hint">Nothing logged this fortnight yet.</p>'; return; }
+  if (!advancesCache.length) { list.innerHTML = '<p class="hours-hint">Nothing logged this week yet.</p>'; return; }
   list.innerHTML = advancesCache.map(a => {
     const s = staffById[a.staff_id];
     const typeCls = a.entry_type.toLowerCase();
@@ -754,7 +748,7 @@ function weekdayCountClipped(fromIso, toIso) {
 function renderHolidays() {
   const list = document.getElementById('holidayList');
   const visible = leaveCache.filter(b => weekdayCountClipped(b.from_date, b.to_date) > 0);
-  if (!visible.length) { list.innerHTML = '<p class="hours-hint">No bookings touching this fortnight.</p>'; return; }
+  if (!visible.length) { list.innerHTML = '<p class="hours-hint">No bookings touching this week.</p>'; return; }
   list.innerHTML = visible.map(b => {
     const s = staffById[b.staff_id];
     const days = weekdayCountClipped(b.from_date, b.to_date);
@@ -1110,7 +1104,7 @@ async function buildWorkbook() {
   ws.mergeCells(advHdrRow.number, 14, advHdrRow.number, LAST_COL);
 
   if (!advancesCache.length) {
-    const nr = ws.addRow(['No advances or overtime logged this fortnight']);
+    const nr = ws.addRow(['No advances or overtime logged this week']);
     nr.height = 18;
     ws.mergeCells(nr.number, 1, nr.number, LAST_COL);
     nr.getCell(1).fill      = fl(SURF);
@@ -1164,7 +1158,7 @@ async function buildWorkbook() {
   ws.mergeCells(holHdrRow.number, 14, holHdrRow.number, LAST_COL);
 
   if (!leaveCache.length) {
-    const nr = ws.addRow(['No holiday bookings touching this fortnight']);
+    const nr = ws.addRow(['No holiday bookings touching this week']);
     nr.height = 18;
     ws.mergeCells(nr.number, 1, nr.number, LAST_COL);
     nr.getCell(1).fill      = fl(SURF);

@@ -27,7 +27,7 @@
 </div>
 
 <div style="position:fixed;top:8px;right:12px;z-index:100;display:flex;gap:6px;align-items:center">
-  <span style="color:#6b7f8f;font-size:10px;font-weight:600;font-family:inherit">v37</span>
+  <span style="color:#6b7f8f;font-size:10px;font-weight:600;font-family:inherit">v38</span>
   <button class="theme-toggle-btn" onclick="toggleTheme()" style="background:none;border:1px solid rgba(255,255,255,.18);border-radius:5px;color:#8ab0cc;font-size:10px;font-weight:600;padding:3px 8px;cursor:pointer;font-family:inherit">Light Mode</button>
   <button id="signOutBtn" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:5px;color:#6b7f8f;font-size:10px;font-weight:600;padding:3px 8px;cursor:pointer;font-family:inherit">Sign out</button>
 </div>
@@ -36,16 +36,16 @@
   <div id="hoursView">
     <div class="hours-header">
       <div class="period-nav">
-        <button id="prevPeriodBtn" class="icon-btn nav-arrow" title="Previous fortnight">&#8249;</button>
+        <button id="prevPeriodBtn" class="icon-btn nav-arrow" title="Previous week">&#8249;</button>
         <div>
           <h2 id="hoursPeriodLabel"></h2>
         </div>
-        <button id="nextPeriodBtn" class="icon-btn nav-arrow" title="Next fortnight">&#8250;</button>
+        <button id="nextPeriodBtn" class="icon-btn nav-arrow" title="Next week">&#8250;</button>
         <button id="todayBtn" class="secondary-btn">Today</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
-        <button id="approveWeek1Btn" class="week-approve-btn unapproved">Week 1 — Not Approved</button>
-        <button id="approveWeek2Btn" class="week-approve-btn unapproved">Week 2 — Not Approved</button>
+        <button id="approveWeek1Btn" class="week-approve-btn unapproved">Week — Not Approved</button>
+        <button id="approveWeek2Btn" class="week-approve-btn unapproved" hidden>Week 2 — Not Approved</button>
         <button id="exportBtn" class="secondary-btn">Export to Excel</button>
         <button id="exportChangeBtn" class="secondary-btn" title="Pick a different file/folder to save to" hidden>Change save location</button>
       </div>
@@ -63,7 +63,7 @@
 
     <section class="advances-section">
       <h3>Advances, Bonuses &amp; Overtime</h3>
-      <p class="hours-hint">Overtime = hours; Advance/Bonus = £. OT column in the grid shows the fortnight total.</p>
+      <p class="hours-hint">Overtime = hours; Advance/Bonus = £. OT column in the grid shows the week total.</p>
       <form id="advanceForm" class="advance-form">
         <select id="advStaff" required>
           <option value="">Staff member…</option>
@@ -84,7 +84,7 @@
 
     <section class="holiday-section">
       <h3 style="display:flex;align-items:center;gap:10px">Holidays &amp; Leave <a href="holiday-tracker.html" style="margin-left:auto;font-size:0.75rem;font-weight:700;color:#f59e0b;border:1px solid rgba(245,158,11,.4);border-radius:5px;padding:3px 10px;text-decoration:none;white-space:nowrap" target="_top">View All Holidays &rarr;</a></h3>
-      <p class="hours-hint">Bookings that touch this fortnight — add a new one at the bottom.</p>
+      <p class="hours-hint">Bookings that touch this week — add a new one at the bottom.</p>
       <div id="holidayList" class="advances-list"></div>
       <form id="holidayForm" class="advance-form">
         <select id="holStaff" required>
@@ -107,7 +107,7 @@
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=35"></script>
+<script src="app.js?v=36"></script>
 <script>
 // Hours page login gate — uses the shared auth.js session helper.
 // Session is stored in localStorage, shared across all pages on this origin.
