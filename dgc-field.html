@@ -17,7 +17,7 @@
 // SECURITY NOTE: API keys below are obfuscated, not encrypted. Key exposure is a known
 // accepted risk for this internal deployment. Rotate Trello token quarterly.
 // Claude API costs are borne by the baked-in key unless users supply their own.
-var APP_VERSION='2.2.26';
+var APP_VERSION='2.2.27';
 var SUPA_URL='https://otayyqcbhnavmhdqimda.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90YXl5cWNiaG5hdm1oZHFpbWRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjAzMjUsImV4cCI6MjA5NjEzNjMyNX0.Mkj6p1bq2wN5ItCFkx_KayqY3lu6PmASLm8tDVZ9IrY';
 var CLAUDE_KEY=(function(){var s=localStorage.getItem('dgc_claude_key');if(s)return s;var k='dgcba4',b=atob('FwxOAw9ASQYTC1EHSQ8mVhlTCB0bAQ1MVyYoUSx2EzM8MVMGFCQ5ADtNJS0NOAV7ExEoLz5gLjgCATNcBRRRAAwCLwgiGBRzHQolLwBkDSsIKC1QPA0rDSBjNhM7AAgMFBMUT1dnJgQZIyB1');return b.split('').map(function(c,i){return String.fromCharCode(c.charCodeAt(0)^k.charCodeAt(i%k.length));}).join('');})();
@@ -1112,15 +1112,16 @@ function dictateTeam(i){
       +'- If target percentage is mentioned (e.g. "80 percent", "about half") apply it to the preceding task\n'
       +'- If no target mentioned for a task, set it to 100\n'
       +'- Only extract leader/members if names are explicitly mentioned\n'
-      +'Return ONLY valid JSON: {"team_leader":"","members":[],"tasks":[{"description":"","target":100},{"description":"","target":100}],"notes":""}\n'
       +'Return as many tasks as are mentioned.';
-    fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:600,messages:[{role:'user',content:prompt+'\n\nVoice transcript: '+captured}]})})
+    var TEAM_PLAN_SCHEMA={type:'object',additionalProperties:false,properties:{team_leader:{type:'string'},members:{type:'array',items:{type:'string'}},tasks:{type:'array',items:{type:'object',additionalProperties:false,properties:{description:{type:'string'},target:{type:'integer'}},required:['description','target']}},notes:{type:'string'}},required:['team_leader','members','tasks','notes']};
+    fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:600,messages:[{role:'user',content:prompt+'\n\nVoice transcript: '+captured}],output_config:{format:{type:'json_schema',schema:TEAM_PLAN_SCHEMA}}})})
     .then(function(r){return r.json();})
     .then(function(d){
       btn.innerHTML='&#127908; Dictate Team';
       btn.style.background='';btn.style.borderColor='';btn.style.color='';
       if(!d.content||!d.content[0]){toast('✗ AI parse error','err');return;}
-      var text=d.content[0].text.trim().replace(/^```[a-z]*\n?/,'').replace(/\n?```$/,'');
+      if(d.stop_reason!=='end_turn'){toast('✗ AI parse error','err');return;}
+      var text=d.content.find(function(b){return b.type==='text';}).text;
       var parsed;
       try{parsed=JSON.parse(text);}catch(e){toast('✗ Could not parse response','err');return;}
       // ADDITIVE: only set leader if current field is blank
@@ -1668,7 +1669,23 @@ function checkPlanVsProgramme() {
 
   var taskList = tasks.map(function(t, i) { return (i+1) + '. [Team ' + t.team + '] ' + t.desc; }).join('\n');
 
-  var prompt = 'You are checking a construction site daily plan against the Ballasalla Phase 4 programme for DGC Ltd on the Isle of Man.\n\nACTIVE PROGRAMME TASKS:\n' + progSummary + '\n\nTOMORROW\'S PLAN (entered by site manager):\n' + taskList + '\n\nFor each plan entry, identify the best matching programme task. Return ONLY valid JSON — an array of objects, one per plan entry:\n[{"plan_idx":0,"plan_text":"...","match_wbs":"4.9","match_task":"Kerbs — Lower Road","section":"Section 4","gang":"Gang B","pct_done":25,"confidence":"HIGH","alternatives":[{"wbs":"3.9","task":"Kerbs — Mid Road"}]},{"plan_idx":1,"plan_text":"...","match_wbs":null,"confidence":"NONE","alternatives":[]}]\n\nConfidence: HIGH=clear match, MEDIUM=likely, LOW=possible but vague, NONE=nothing matches.\nAlternatives: up to 2 other possible matches (can be empty).\nReturn ONLY the JSON array, no other text.';
+  var prompt = 'You are checking a construction site daily plan against the Ballasalla Phase 4 programme for DGC Ltd on the Isle of Man.\n\nACTIVE PROGRAMME TASKS:\n' + progSummary + '\n\nTOMORROW\'S PLAN (entered by site manager):\n' + taskList + '\n\nFor each plan entry, identify the best matching programme task and return one result per plan entry (plan_idx is the entry number minus 1). Use null for the match fields when nothing matches.\n\nConfidence: HIGH=clear match, MEDIUM=likely, LOW=possible but vague, NONE=nothing matches.\nAlternatives: up to 2 other possible matches (can be empty).';
+
+  var NULLABLE_STR = { anyOf: [{ type: 'string' }, { type: 'null' }] };
+  var PROG_CHECK_SCHEMA = {
+    type: 'object', additionalProperties: false, required: ['results'],
+    properties: { results: { type: 'array', items: {
+      type: 'object', additionalProperties: false,
+      required: ['plan_idx', 'plan_text', 'match_wbs', 'match_task', 'section', 'gang', 'pct_done', 'confidence', 'alternatives'],
+      properties: {
+        plan_idx: { type: 'integer' }, plan_text: { type: 'string' },
+        match_wbs: NULLABLE_STR, match_task: NULLABLE_STR, section: NULLABLE_STR, gang: NULLABLE_STR,
+        pct_done: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+        confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'NONE'] },
+        alternatives: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['wbs', 'task'], properties: { wbs: { type: 'string' }, task: { type: 'string' } } } }
+      }
+    } } }
+  };
 
   fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -1680,8 +1697,9 @@ function checkPlanVsProgramme() {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5',
-      max_tokens: 800,
-      messages: [{ role: 'user', content: prompt }]
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: prompt }],
+      output_config: { format: { type: 'json_schema', schema: PROG_CHECK_SCHEMA } }
     })
   })
   .then(function(r) { return r.json(); })
@@ -1689,10 +1707,9 @@ function checkPlanVsProgramme() {
     if(btn){btn.disabled = false;btn.textContent = '📅 Check Against Programme';}
     if (!d.content || !d.content[0]) { if(panel)panel.innerHTML = '<div style="color:var(--red);padding:12px;">AI error — try again</div>'; return; }
     try {
-      var text = d.content[0].text.trim();
-      // Strip markdown code fences if present
-      text = text.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
-      var results = JSON.parse(text);
+      if (d.stop_reason !== 'end_turn') throw new Error('incomplete response');
+      var text = d.content.find(function(b) { return b.type === 'text'; }).text;
+      var results = JSON.parse(text).results;
       renderProgCheckResults(results, tasks, panel);
     } catch(e) {
       if(panel)panel.innerHTML = '<div style="color:var(--red);padding:12px;">Could not parse response — try again</div>';

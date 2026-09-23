@@ -1656,7 +1656,8 @@ async function diaryAIClean() {
       headers: {
         'content-type'      : 'application/json',
         'x-api-key'         : key,
-        'anthropic-version' : '2023-06-01'
+        'anthropic-version' : '2023-06-01',
+        'anthropic-dangerous-direct-browser-access' : 'true'
       },
       body: JSON.stringify({
         model      : 'claude-haiku-4-5',
@@ -7026,8 +7027,7 @@ function suBuildSystemPrompt(cfg, issues) {
     '- Spot crossed or inconsistent information',
     '- Ask clear, direct questions to fill gaps',
     '- Suggest sensible values based on what you know',
-    '- Be concise and practical — the user is a contractor, not an accountant',
-    '- If something is ambiguous, ask one focused question at a time',
+    '- Be practical: the user is a contractor, not an accountant',
     '- When the user gives you information, summarise what you\'ve updated in your understanding',
     '',
     '== CURRENT PROJECT CONFIG ==',
@@ -7054,7 +7054,7 @@ function suBuildSystemPrompt(cfg, issues) {
     issueList,
     '',
     'Today\'s date is ' + new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'}) + '.',
-    'Keep responses under 200 words. Use plain English. Ask one or two questions at most per reply.'
+    'Use plain English, keep replies short enough to read on site, and ask only the one question you most need answered next.'
   ].join('\n');
 }
 
