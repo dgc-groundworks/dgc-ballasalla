@@ -177,6 +177,7 @@ const STANDING_EXCLUDE = ['manx utilities', 'hartford homes', 'dandara', 'excel'
 const LS_LOG = 'silverdale_canvassing_processed';   // { ref: { date, name } }
 const LS_LEADS = 'silverdale_canvassing_leads';     // last-parsed batch, so a refresh doesn't lose work
 const LS_ENV_ALIGN = 'silverdale_canvassing_env_align';  // 'center' | 'left' — envelope address alignment
+const LS_REGISTER_DISMISSED = 'silverdale_canvassing_register_dismissed'; // { ref: { date, name } } — "looked at it, not chasing this one" from a register pull, distinct from the sent log
 
 // Starter batch — the most recent real pull (8 Sep 2026, 39 leads) — so
 // the tool shows real, working content the first time it's opened rather
@@ -262,6 +263,8 @@ function getEnvAlign(){ try { return localStorage.getItem(LS_ENV_ALIGN) || 'cent
 function setEnvAlign(v){ try { localStorage.setItem(LS_ENV_ALIGN, v); } catch {} }
 function getLog(){ try { return JSON.parse(localStorage.getItem(LS_LOG) || '{}'); } catch { return {}; } }
 function saveLog(log){ try { localStorage.setItem(LS_LOG, JSON.stringify(log)); } catch {} }
+function getDismissed(){ try { return JSON.parse(localStorage.getItem(LS_REGISTER_DISMISSED) || '{}'); } catch { return {}; } }
+function saveDismissed(d){ try { localStorage.setItem(LS_REGISTER_DISMISSED, JSON.stringify(d)); } catch {} }
 function saveLeadsToStorage(){ try { localStorage.setItem(LS_LEADS, JSON.stringify(leads)); } catch {} }
 function loadLeadsFromStorage(){ try { return JSON.parse(localStorage.getItem(LS_LEADS) || '[]'); } catch { return []; } }
 
@@ -717,6 +720,8 @@ function renderRegisterPullLoaded(box, data){
   const existingRefs = new Set(leads.map(l => l.ref));
   const apps = data.applications || [];
   const pulledDate = data.pulledAt ? new Date(data.pulledAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'unknown';
+  let dismissed = getDismissed();
+  let showDismissed = false;
 
   // The register just says "Decided" — the actual outcome (Permitted /
   // Refused / Withdrawn / etc.) is a separate field from the detail page.
@@ -736,6 +741,7 @@ function renderRegisterPullLoaded(box, data){
     const to = document.getElementById('regTo').value;
     const q = document.getElementById('regSearch').value.trim().toLowerCase();
     return apps.filter(a => {
+      if (!showDismissed && dismissed[a.ref]) return false;
       if (status !== 'all' && decisionCategory(a) !== status) return false;
       const d = a.validated || a.received;
       const parsed = d ? new Date(d.replace(/^\w+\s/, '')) : null; // strip leading "Tue " etc
@@ -765,6 +771,44 @@ function renderRegisterPullLoaded(box, data){
   function agentRef(a){
     const person = a.agentName || a.agentCompanyName;
     return person ? 'ARCH-' + slugify(person + '-' + (a.agentCompanyName || '')) : null;
+  }
+
+  // Shared by the per-row checkbox path and the bulk "Add all shown
+  // Approved/Pending" buttons — one place that builds a planning lead
+  // from a register application, so both paths apply the same
+  // never-contact/needsReview/planningStatus handling.
+  function addRegisterAppToBatch(a){
+    if (existingRefs.has(a.ref)) return false;
+    const applicant = a.applicantName || a.agentCompanyName || a.agentName || 'Applicant not available on register';
+    const lead = classify({ ref: a.ref, applicant, site: a.address || '' });
+    if (!lead.excludedReason) {
+      const agentText = `${a.agentName || ''} ${a.agentCompanyName || ''}`.toLowerCase();
+      const hit = STANDING_EXCLUDE.find(name => agentText.includes(name));
+      if (hit) { lead.excludedReason = 'Standing never-contact (agent): ' + hit; lead.include = false; }
+    }
+    if (!a.applicantName) {
+      lead.needsReview = true;
+      lead.reviewNote = lead.reviewNote || 'Applicant name not on the public register — check before sending (agent shown instead).';
+    }
+    lead.planningStatus = decisionCategory(a);
+    leads.push(lead);
+    existingRefs.add(a.ref);
+    return true;
+  }
+
+  // Shared by the per-row "+ Add as business" button and the bulk
+  // "Add all shown agents" button.
+  function addAgentToBatch(a){
+    const aRef = agentRef(a);
+    const person = a.agentName || a.agentCompanyName;
+    if (!aRef || !person || existingRefs.has(aRef)) return false;
+    const lead = classify({ ref: aRef, applicant: person, site: a.agentAddress || '' });
+    lead.type = 'Company';
+    lead.source = 'business';
+    lead.include = false; // opt-in, same as the CSV business import — review before sending
+    leads.push(lead);
+    existingRefs.add(aRef);
+    return true;
   }
 
   function rowHtml(a, forceFull){
@@ -806,7 +850,9 @@ function renderRegisterPullLoaded(box, data){
         </div>
         <div class="lr-side">
           ${already ? '<span class="tag tag-dupe">Already have it</span>' : ''}
+          ${dismissed[a.ref] ? '<span class="tag tag-dupe" title="You looked at this one before and chose not to chase it">Not chasing</span>' : ''}
           <span class="tag ${CATEGORY_TAG[decisionCategory(a)][0]}">${CATEGORY_TAG[decisionCategory(a)][1] || a.decision || 'Decided'}</span>
+          ${!already && !dismissed[a.ref] ? `<button type="button" class="btn-secondary reg-dismiss-btn" data-ref="${esc(a.ref)}" title="Looked at it, not interested — hides it and remembers, so it flags up rather than reappearing fresh next time">&#10005; Not chasing</button>` : ''}
         </div>
       </div>`;
   }
@@ -814,10 +860,16 @@ function renderRegisterPullLoaded(box, data){
   function renderList(){
     const filtered = applyFilters();
     const full = document.getElementById('regDetailToggle').checked;
-    document.getElementById('regCount').textContent = `${filtered.length} of ${apps.length} shown`;
+    const dismissedCount = Object.keys(dismissed).length;
+    document.getElementById('regCount').innerHTML = `${filtered.length} of ${apps.length} shown`
+      + (dismissedCount ? ` &middot; ${dismissedCount} not chasing, ${showDismissed ? '<button type="button" class="link-btn" id="regHideDismissed">hide</button>' : '<button type="button" class="link-btn" id="regShowDismissed">show</button>'}` : '');
     document.getElementById('registerList').innerHTML = filtered.length
       ? filtered.map(a => rowHtml(a, full)).join('')
       : '<p class="empty-state">Nothing matches those filters.</p>';
+    const showBtn = document.getElementById('regShowDismissed');
+    if (showBtn) showBtn.addEventListener('click', () => { showDismissed = true; renderList(); });
+    const hideBtn = document.getElementById('regHideDismissed');
+    if (hideBtn) hideBtn.addEventListener('click', () => { showDismissed = false; renderList(); });
   }
 
   box.innerHTML = `
@@ -839,10 +891,16 @@ function renderRegisterPullLoaded(box, data){
       <label><input type="checkbox" id="regDetailToggle"> Full detail</label>
       <input type="text" id="regSearch" placeholder="Search name, address, description&hellip;" style="min-width:220px">
     </div>
+    <p class="hint">Faster than ticking one at a time — these act on whatever the filters above are currently showing:</p>
+    <div class="row-actions" style="flex-wrap:wrap;gap:10px;margin-bottom:6px">
+      <button class="btn-secondary" id="regBulkApprovedBtn">Send all shown Approved &rarr; batch</button>
+      <button class="btn-secondary" id="regBulkPendingBtn">Send all shown Pending &rarr; batch</button>
+      <button class="btn-secondary" id="regBulkAgentsBtn">Send all shown agents &rarr; Businesses</button>
+    </div>
     <p class="hint" id="regCount"></p>
     <div id="registerList" class="lead-list"></div>
     <div class="row-actions" style="margin-top:10px">
-      <button class="btn" id="regAddSelectedBtn">Add selected to working batch</button>
+      <button class="btn" id="regAddSelectedBtn">Add ticked to working batch</button>
       <span id="regAddMsg" class="hint"></span>
     </div>`;
 
@@ -861,19 +919,23 @@ function renderRegisterPullLoaded(box, data){
     const agentBtn = e.target.closest('.reg-add-agent-btn');
     if (agentBtn) {
       const a = apps.find(x => x.ref === agentBtn.dataset.ref);
-      const aRef = a && agentRef(a);
-      const person = a && (a.agentName || a.agentCompanyName);
-      if (!a || !aRef || !person || existingRefs.has(aRef)) return;
-      const lead = classify({ ref: aRef, applicant: person, site: a.agentAddress || '' });
-      lead.type = 'Company';
-      lead.source = 'business';
-      lead.include = false; // opt-in, same as the CSV business import — review before sending
-      leads.push(lead);
-      existingRefs.add(aRef);
-      saveLeadsToStorage();
+      if (!a) return;
+      const person = a.agentName || a.agentCompanyName;
+      if (addAgentToBatch(a)) {
+        saveLeadsToStorage();
+        renderList();
+        const msg = document.getElementById('regAddMsg');
+        if (msg) msg.textContent = `Added ${person} to the Businesses batch — go to Review — Businesses to pick whether to send.`;
+      }
+      return;
+    }
+    const dismissBtn = e.target.closest('.reg-dismiss-btn');
+    if (dismissBtn) {
+      const a = apps.find(x => x.ref === dismissBtn.dataset.ref);
+      if (!a) return;
+      dismissed[a.ref] = { date: new Date().toISOString().slice(0,10), name: a.applicantName || a.agentCompanyName || a.agentName || a.ref };
+      saveDismissed(dismissed);
       renderList();
-      const msg = document.getElementById('regAddMsg');
-      if (msg) msg.textContent = `Added ${person} to the Businesses batch — go to Review — Businesses to pick whether to send.`;
     }
   });
   document.getElementById('regAddSelectedBtn').addEventListener('click', () => {
@@ -885,33 +947,34 @@ function renderRegisterPullLoaded(box, data){
     let added = 0;
     picked.forEach(ref => {
       const a = apps.find(x => x.ref === ref);
-      if (!a || existingRefs.has(ref)) return;
-      const applicant = a.applicantName || a.agentCompanyName || a.agentName || 'Applicant not available on register';
-      const lead = classify({ ref: a.ref, applicant, site: a.address || '' });
-      // classify() only screens applicant+address against the standing
-      // never-contact list. Also screen the agent — a name on that list
-      // often shows up as the AGENT on someone else's application (e.g.
-      // Hartford Homes managing a project for a nominal landowner
-      // applicant), and that's still their project.
-      if (!lead.excludedReason) {
-        const agentText = `${a.agentName || ''} ${a.agentCompanyName || ''}`.toLowerCase();
-        const hit = STANDING_EXCLUDE.find(name => agentText.includes(name));
-        if (hit) { lead.excludedReason = 'Standing never-contact (agent): ' + hit; lead.include = false; }
-      }
-      if (!a.applicantName) {
-        lead.needsReview = true;
-        lead.reviewNote = lead.reviewNote || 'Applicant name not on the public register — check before sending (agent shown instead).';
-      }
-      // Carries the register's own pending/approved status onto the
-      // lead, so the letter opens with the right framing — "congratulations
-      // on your approval" is wrong for someone still waiting on a decision.
-      lead.planningStatus = decisionCategory(a);
-      leads.push(lead);
-      existingRefs.add(ref);
-      added++;
+      if (a && addRegisterAppToBatch(a)) added++;
     });
     saveLeadsToStorage();
     document.getElementById('regAddMsg').textContent = `Added ${added} to the working batch — go to Review to pick which to send.`;
+    renderList();
+  });
+  document.getElementById('regBulkApprovedBtn').addEventListener('click', () => {
+    const shown = applyFilters().filter(a => decisionCategory(a) === 'approved');
+    let added = 0;
+    shown.forEach(a => { if (addRegisterAppToBatch(a)) added++; });
+    saveLeadsToStorage();
+    document.getElementById('regAddMsg').textContent = `Added ${added} Approved applications to the working batch (using the "congratulations" letter) — go to Review to pick which to send.`;
+    renderList();
+  });
+  document.getElementById('regBulkPendingBtn').addEventListener('click', () => {
+    const shown = applyFilters().filter(a => decisionCategory(a) === 'pending');
+    let added = 0;
+    shown.forEach(a => { if (addRegisterAppToBatch(a)) added++; });
+    saveLeadsToStorage();
+    document.getElementById('regAddMsg').textContent = `Added ${added} Pending applications to the working batch (using the "still waiting" letter) — go to Review to pick which to send.`;
+    renderList();
+  });
+  document.getElementById('regBulkAgentsBtn').addEventListener('click', () => {
+    const shown = applyFilters();
+    let added = 0;
+    shown.forEach(a => { if (addAgentToBatch(a)) added++; });
+    saveLeadsToStorage();
+    document.getElementById('regAddMsg').textContent = `Added ${added} agents to the Businesses batch (everyone with an agent on a currently-shown application) — go to Review — Businesses to pick which to send.`;
     renderList();
   });
 }
