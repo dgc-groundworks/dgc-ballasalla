@@ -1148,7 +1148,8 @@ function renderArchive(main){
       salutation: e.salutation || (lead && lead.salutation) || '',
       folder: e.copy || (lead ? leadFolder(lead) : (x.biz ? 'business' : 'approved')),
       letterDate: e.letterDate || null,
-      rebuilt: !e.recipientLines
+      bodyParas: e.bodyParas || null,
+      rebuilt: !e.recipientLines || !e.bodyParas
     };
   }
 
@@ -1421,7 +1422,7 @@ function renderPrint(main, kind){
     batch.forEach((l, i) => {
       if (l.ref) log[l.ref] = {
         date: today, name: l.applicant, source: leadFolder(l) === 'business' ? 'business' : 'planning',
-        copy: leadFolder(l), recipientLines: l.recipientLines, salutation: l.salutation, letterDate,
+        copy: leadFolder(l), recipientLines: l.recipientLines, salutation: l.salutation, letterDate, bodyParas: letterParas(l),
         description: l.description || '',
         ...(pdfFile ? (kind === 'letter' ? { pdfFile, pdfPage: i + 1 } : { envelopePdfFile: pdfFile, envelopePdfPage: i + 1 }) : {})
       };
@@ -1469,6 +1470,7 @@ function docWrapHtml(l, idx, kind){
     </div>
   </div>`;
 }
+function letterParas(l){ return ({ approved: letterBody, pending: pendingLetterBody, business: businessLetterBody }[leadFolder(l)])(); }
 function letterHtml(l){
   return `<div class="print-doc letter-page">
     <div class="letter-head">
@@ -1482,7 +1484,7 @@ function letterHtml(l){
     <div class="letter-addr">${l.recipientLines.map(esc).join('<br>')}</div>
     <div class="letter-body">
       <p>${esc(l.salutation)}</p>
-      ${({ approved: letterBody, pending: pendingLetterBody, business: businessLetterBody }[leadFolder(l)])().map(p => `<p>${p}</p>`).join('')}
+      ${(l.bodyParas || letterParas(l)).map(p => `<p>${p}</p>`).join('')}
       <p>Kind regards,</p>
       <div class="letter-sign"><img src="assets/harry-signature.jpeg" alt="Signature"></div>
       <p style="margin-top:0">Andrew Harrison<br>Director, Silverdale Limited</p>
