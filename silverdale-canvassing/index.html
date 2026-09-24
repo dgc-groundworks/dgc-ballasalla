@@ -752,12 +752,36 @@ function renderRegisterPullLoaded(box, data){
   // re-renders (filtering, ticking checkboxes) until clicked again.
   const expandedRefs = new Set();
 
+  // A synthetic ref for the AGENT on an application, distinct from the
+  // application's own ref — same naming convention as the CSV business
+  // import (ARCH-<slug>), so an agent added here and the same person
+  // later imported from a register CSV would collide and dedupe
+  // correctly rather than creating two records for one architect.
+  function agentRef(a){
+    const person = a.agentName || a.agentCompanyName;
+    return person ? 'ARCH-' + slugify(person + '-' + (a.agentCompanyName || '')) : null;
+  }
+
   function rowHtml(a, forceFull){
     const already = !!log[a.ref] || existingRefs.has(a.ref);
     const person = a.applicantName || a.agentCompanyName || a.agentName || '(applicant not on register)';
     const full = forceFull || expandedRefs.has(a.ref);
+    const aRef = agentRef(a);
+    const agentAlready = aRef && existingRefs.has(aRef);
+    // Shown even collapsed — the whole point is being able to scan
+    // whether the agent looks like a business worth adding (an
+    // architect/designer) or something else (often just the case
+    // officer or "Not Available") without expanding every row.
+    const agentSearchQuery = encodeURIComponent(`${a.agentCompanyName || a.agentName} Isle of Man`);
+    const agentLine = aRef ? `
+        <div class="hint">Agent: ${esc(a.agentName || '')}${a.agentCompanyName ? ` (${esc(a.agentCompanyName)})` : ''}
+          <a href="https://www.google.com/search?q=${agentSearchQuery}" target="_blank" rel="noopener" class="btn-secondary" style="margin-left:6px;padding:1px 7px;font-size:0.7rem;text-decoration:none;display:inline-block">&#128269; Google them</a>
+          ${agentAlready
+            ? '<span class="tag tag-dupe" style="margin-left:6px">Already a business lead</span>'
+            : `<button type="button" class="btn-secondary reg-add-agent-btn" data-ref="${esc(a.ref)}" style="margin-left:6px;padding:1px 7px;font-size:0.7rem">+ Add as business</button>`}
+        </div>` : '';
     const detailLine = full ? `
-        <div class="hint">${a.agentName ? `Agent: ${esc(a.agentName)}` : ''}${a.agentCompanyName ? ` (${esc(a.agentCompanyName)})` : ''}${a.agentAddress ? ` &middot; ${esc(a.agentAddress)}` : ''}</div>
+        <div class="hint">${a.agentAddress ? esc(a.agentAddress) : ''}</div>
         <div class="hint">${a.parish ? `Parish: ${esc(a.parish)}` : ''} &middot; Received ${esc(a.received||'?')} &middot; ${a.isDecided ? (a.decisionDate ? `Decided ${esc(a.decisionDate)}` : 'Decided') : `Validated ${esc(a.validated || '?')}`}</div>` : '';
     return `
       <div class="lead-row">
@@ -770,6 +794,7 @@ function renderRegisterPullLoaded(box, data){
               </button>
               <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}</div>
               <div class="hint" style="margin:2px 0">${esc(a.description || '')}</div>
+              ${agentLine}
               ${detailLine}
             </span>
           </div>
@@ -821,11 +846,30 @@ function renderRegisterPullLoaded(box, data){
     document.getElementById(id).addEventListener('input', renderList);
   });
   document.getElementById('registerList').addEventListener('click', e => {
-    const btn = e.target.closest('.reg-name-toggle');
-    if (!btn) return;
-    const ref = btn.dataset.ref;
-    if (expandedRefs.has(ref)) expandedRefs.delete(ref); else expandedRefs.add(ref);
-    renderList();
+    const toggleBtn = e.target.closest('.reg-name-toggle');
+    if (toggleBtn) {
+      const ref = toggleBtn.dataset.ref;
+      if (expandedRefs.has(ref)) expandedRefs.delete(ref); else expandedRefs.add(ref);
+      renderList();
+      return;
+    }
+    const agentBtn = e.target.closest('.reg-add-agent-btn');
+    if (agentBtn) {
+      const a = apps.find(x => x.ref === agentBtn.dataset.ref);
+      const aRef = a && agentRef(a);
+      const person = a && (a.agentName || a.agentCompanyName);
+      if (!a || !aRef || !person || existingRefs.has(aRef)) return;
+      const lead = classify({ ref: aRef, applicant: person, site: a.agentAddress || '' });
+      lead.type = 'Company';
+      lead.source = 'business';
+      lead.include = false; // opt-in, same as the CSV business import — review before sending
+      leads.push(lead);
+      existingRefs.add(aRef);
+      saveLeadsToStorage();
+      renderList();
+      const msg = document.getElementById('regAddMsg');
+      if (msg) msg.textContent = `Added ${person} to the Businesses batch — go to Review — Businesses to pick whether to send.`;
+    }
   });
   document.getElementById('regAddSelectedBtn').addEventListener('click', () => {
     const picked = Array.from(document.querySelectorAll('.reg-pick:checked')).map(cb => cb.dataset.ref);
