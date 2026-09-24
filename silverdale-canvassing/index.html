@@ -63,13 +63,29 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .lr-side{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .send-toggle{border:none;border-radius:20px;padding:9px 20px;font-size:0.82rem;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;min-width:104px}
 .send-toggle.on{background:var(--green);color:#08210f}
-.send-toggle.off{background:var(--surf2);color:var(--muted);border:1px solid var(--bord)}
+.send-toggle.off{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.f-move{background:var(--bg);border:1px solid var(--bord);border-radius:5px;color:var(--text);padding:4px 6px;font-size:0.76rem;font-family:inherit}
 .send-toggle:disabled{opacity:.4;cursor:default}
 .tag{display:inline-block;font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:4px}
 .tag-excl{background:rgba(239,68,68,.15);color:var(--red)}
 .tag-dupe{background:rgba(100,116,139,.2);color:var(--muted)}
 .tag-review{background:rgba(245,158,11,.18);color:var(--accent)}
 .tag-approved{background:rgba(34,197,94,.15);color:var(--green)}
+.nav{overflow-x:auto}
+.navbtn{white-space:nowrap}
+.nav-count:not(:empty){display:inline-block;min-width:18px;padding:0 6px;margin-left:5px;border-radius:9px;background:var(--surf2);color:var(--text);font-size:0.7rem;line-height:1.5}
+.reg-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.reg-actions button{padding:6px 10px;font-size:0.76rem;white-space:nowrap}
+.reg-actions button.natural{border-color:var(--accent);color:var(--accent)}
+.f-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.f-actions .btn-secondary{padding:6px 10px;font-size:0.76rem}
+.f-addr{font-size:0.78rem;color:var(--muted);margin-top:4px}
+.f-edit-panel{margin-top:10px;padding:10px 12px;border:1px solid var(--bord);border-radius:8px;background:var(--bg)}
+.f-edit-panel textarea{min-height:110px;font-family:inherit;font-size:0.85rem}
+.doc-copy-label{font-size:0.75rem;color:var(--muted);margin-right:auto;align-self:center}
+.doc-toolbar{gap:8px}
+.letter-preview{zoom:.62;margin-top:12px;overflow:hidden}
+@media (max-width:760px){.lead-row{flex-wrap:wrap}.lr-side{flex-wrap:wrap;width:100%}.main{padding:16px}}
 .print-doc{background:#fff;color:#000;box-shadow:0 4px 32px rgba(0,0,0,.4);margin:0 auto 28px;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;font-variant-numeric:lining-nums proportional-nums;font-feature-settings:"lnum" 1,"pnum" 1}
 /* Page-to-page gap is for on-screen viewing only -- html2canvas
    captures the full margin box, so it must collapse to 0 during a
@@ -129,11 +145,12 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 <nav class="nav">
   <button class="navbtn active" data-tab="import">Import &mdash; Planning</button>
   <button class="navbtn" data-tab="importBiz">Import &mdash; Businesses</button>
-  <button class="navbtn" data-tab="review">Review &mdash; Planning</button>
-  <button class="navbtn" data-tab="reviewBiz">Review &mdash; Businesses</button>
-  <button class="navbtn" data-tab="letters">Print — Letters</button>
+  <button class="navbtn" data-tab="fApproved">Approved<span class="nav-count" data-count="approved"></span></button>
+  <button class="navbtn" data-tab="fPending">Pending<span class="nav-count" data-count="pending"></span></button>
+  <button class="navbtn" data-tab="fBusiness">Businesses<span class="nav-count" data-count="business"></span></button>
+  <button class="navbtn" data-tab="letters">Print — Letters<span class="nav-count" data-count="print"></span></button>
   <button class="navbtn" data-tab="envelopes">Print — Envelopes</button>
-  <button class="navbtn" data-tab="log">Processed Log</button>
+  <button class="navbtn" data-tab="archive">Archive &mdash; Sent &amp; Not chasing</button>
 </nav>
 <main class="main" id="mainArea"><p class="empty-state">Loading…</p></main>
 
@@ -179,50 +196,6 @@ const LS_LEADS = 'silverdale_canvassing_leads';     // last-parsed batch, so a r
 const LS_ENV_ALIGN = 'silverdale_canvassing_env_align';  // 'center' | 'left' — envelope address alignment
 const LS_REGISTER_DISMISSED = 'silverdale_canvassing_register_dismissed'; // { ref: { date, name } } — "looked at it, not chasing this one" from a register pull, distinct from the sent log
 
-// Starter batch — the most recent real pull (8 Sep 2026, 39 leads) — so
-// the tool shows real, working content the first time it's opened rather
-// than a blank screen. Paste a new week's leads on Import any time to
-// replace it; this only ever loads when nothing's been saved yet.
-const STARTER_TSV = `No.	Reference	Site Address	Applicant / Developer	Type of Development	Local Authority
-1	26/00465/B	11 Carrick Bay View, Ballagawne Road, Colby, IM9 4DD	Mr & Mrs W. Philip & Norma Richards	Extension	Arbory/Colby
-2	26/00507/B	Glascoe Cottage, Nassau Road, Dog Mills, Bride, IM7 4AQ	Mrs Nicola Glover	New build dwelling (demolition + rebuild)	Bride
-3	26/00440/B	7 Albany Street, Douglas	Mr Wesley Roussouw (H&B Developments)	Extension	Douglas
-4	26/00463/B	7 Taubman Terrace, Douglas Head Road, Douglas, IM1 5BB	Mr Joannis Vamvakopoulos	Extension	Douglas
-5	26/00416/B	Ballakesh Farm, Lhen Road, Bride, IM7 4BF	Mr Henry Sage	Extension	Bride
-6	26/00444/B	33 Queens Drive, Peel, IM5 1BQ	Mr & Mrs Andrew & Melissa Cannell	Extension	Peel
-7	26/00571/B	No 38 Carrick Park, Sulby, Lezayre, IM7 2EX	Mrs Linda Atkinson	Extension	Lezayre
-8	26/00347/B	Cornerstones, Lhergydhoo, Peel, IM5 2AE	Mr & Mrs Jonathan & Diane Corlett	Extension	Peel
-9	26/00412/B	Moordown, 27 Ballagale Avenue, Surby, IM9 6QJ	Mr & Mrs Chris and Linda Hilton	Extension	Rushen
-10	26/00397/B	29 West View, Peel, IM5 1DL	Mr & Mrs David & Jan Brooks & Cooil	Extension	Peel
-11	26/00385/B	Mann Crane Hire Ltd, Balthane Industrial Estate, Ballasalla, IM9 2AJ	Mann Crane Hire Ltd	Commercial extension	Malew
-12	26/00398/B	Noa Bea, No 42 Ard Reayrt, Laxey, IM4 7QP	Mr & Mrs Daniel Clague	Extension	Garff/Laxey
-13	26/00382/B	13 Scarlett Close, Castletown, IM9 1NY	Mr Neil Allcote	Extension	Castletown
-14	26/00361/B	49 Windermere Drive, Onchan, IM3 2DS	Mr Mark Thomas	Extension	Onchan
-15	26/00355/B	Plots 65 & 66, Braddan Woods, Braddan Road, Braddan, IM4 4DR	Mr Robin Croase (Hartford Homes)	New build dwellings (2 dwellings)	Braddan
-16	26/00350/B	11 Beach Avenue, Onchan, IM3 3HQ	Mr Robert Shaw	Extension	Onchan
-17	26/00542/B	1 Claughbane Drive, Ramsey, IM8 2AZ	Mr & Mrs David Everett	Extension	Ramsey
-18	26/00336/B	Cosy Corner, 12 Ballanoa Meadow, Newtown, Santon, IM4 1HQ	Mr & Mrs Jack and Johanna Emmerson/Gledhill	Extension	Santon
-19	26/00467/B	The Snakepit, Lord Street, Douglas, IM1 2BD	Applicant name not legible on form - Company ends "Enterprise LTD"	New build commercial (wellness retreat conversion)	Douglas
-20	26/00327/B	Colby Moor House, Main Road, Colby, IM9 4NS	Mrs Kirsty Harris (Newtown Architects Ltd)	Extension	Arbory/Colby
-21	26/00433/B	Cooil Drinagh, Ronague Road, Ballabeg, Arbory, IM9 4HF	Mr & Mrs Roy & Trisha Gelling	Extension	Arbory
-22	25/91215/B	Dunedin, Quarterbridge Road, Douglas, IM2 3RG	Mr Ben Jonathan Phin	Extension	Douglas
-23	26/00419/B	Kenyons Cafe, The Hub, School Road, Onchan, IM3 4LA	Onchan District Commissioners	Commercial extension	Onchan
-24	26/00275/B	Bibaloe, Glan Road, Colby, IM9 4PA	Mr Martyn Lester & Mrs Cornelia Dahlgren	Extension	Arbory/Colby
-25	26/00411/B	13 Peel Road, Douglas, IM1 4LR	Janus Developments Ltd	Change of use (offices to HMO) + extension	Douglas
-26	26/00291/B	Ballacubbon Farm, St Marks Road, Ballasalla, IM9 3AG	Mr & Mrs Jack & Hayley Garrett	Extension	Malew
-27	26/00250/B	Rollage-ny-Twoaie, Sloc Road, Colby, IM9 4BW	Mark Patrick O'Meara & Miss Kathryn Anne Newton	New build dwelling (via refurbishment)	Rushen
-28	26/00369/B	Ben Elin, Baldhoon Road, Laxey	Mr Ben Kinrade	Extension (first floor)	Garff/Laxey
-29	26/00236/B	1, 1A & 2 Marina Road, Douglas, IM1 2HD	Niche Innovation Limited	New build commercial/mixed-use	Douglas
-30	26/00167/B	Meary Veg Wastewater Treatment Works, Ballahowe, Santon, IM4 1HL	Mr Leo Morris (Manx Utilities)	Commercial extension	Santon
-31	26/00164/B	14, Derby Square, Douglas, IM1 3LS	Mr Craig Carlson	Extension	Douglas
-32	26/00234/B	Ardane, Ballamenagh Road, Baldrine, Lonan, IM4 6AQ	Mr David Wormald	New build dwelling (replacement dwellinghouse)	Garff/Lonan
-33	26/00108/B	Lhergy Farm, Cordeman Road, St Marks, Ballasalla, IM9 3AJ	Bravo Homes Limited	Extension	Malew
-34	25/91176/B	Unit 16, Hills Meadow Industrial Estate, Peel Road, Douglas, IM1 5EA	Iron House Limited	Extension	Douglas
-35	26/00018/B	Ballagarraghyn Manor, Peel Road, St John's, German, IM4 3LH	Mr & Mrs Maurice Kelly	Extension	German
-36	25/91224/B	Rocky Mount, Stoney Mountain Road, Higher Foxdale, Malew, IM4 3ER	Vincent Hesketh	Extension	Malew
-37	25/91172/B	The Nunnery, Old Castletown Road, Douglas, IM2 1QB	Mr Philip Vermeulen (International Centre for Technology Ltd)	New build commercial (two 2-storey buildings 8 lettable units)	Douglas
-38	25/91059/B	Ballamenaugh Beg Farm, Ballamenaugh Road, Baldrine, Lonan, IM4 6AL	Mr Allan & Dave Kinrade (YOKBROS LTD)	New build commercial (replacement steel-framed building)	Garff/Lonan
-39	25/90268/B	The Boatyard, Derbyhaven, IM9 1TR	Weatherill Advocates & Solicitors Ltd (acting for applicant - individual name not stated on form)	New build dwelling	Malew`;
 
 let leads = [];      // working batch
 let state = { tab: 'import' };
@@ -268,6 +241,42 @@ function saveDismissed(d){ try { localStorage.setItem(LS_REGISTER_DISMISSED, JSO
 function saveLeadsToStorage(){ try { localStorage.setItem(LS_LEADS, JSON.stringify(leads)); } catch {} }
 function loadLeadsFromStorage(){ try { return JSON.parse(localStorage.getItem(LS_LEADS) || '[]'); } catch { return []; } }
 
+// The folder a lead sits in decides which letter it gets. Leads saved
+// before folders existed have no `folder`, so fall back to what they are.
+const FOLDERS = { approved: 'Approved', pending: 'Pending', business: 'Businesses' };
+function leadFolder(l){ return l.folder || (l.source === 'business' ? 'business' : l.planningStatus === 'pending' ? 'pending' : 'approved'); }
+function todayISO(){ return new Date().toLocaleDateString('en-CA'); }
+function prettyDate(iso){ return iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''; }
+
+// Archive = "looked at it, not chasing it". Kept in its own list (never
+// deleted), so anything archived by mistake can be brought straight back.
+// An archived folder lead keeps its whole record, so it returns intact.
+function bringBackFromArchive(ref){
+  const d = getDismissed();
+  const entry = d[ref];
+  if (!entry) return;
+  if (entry.lead && !leads.some(l => l.ref === ref)) leads.push(classify(entry.lead));
+  delete d[ref];
+  saveDismissed(d);
+  saveLeadsToStorage();
+}
+function archiveLead(i){
+  const l = leads[i];
+  const d = getDismissed();
+  d[l.ref] = { date: todayISO(), name: l.applicant, lead: l };
+  saveDismissed(d);
+  leads.splice(i, 1);
+  saveLeadsToStorage();
+}
+function updateNavCounts(){
+  const active = leads.filter(l => !l.alreadyProcessed);
+  const counts = { approved: 0, pending: 0, business: 0 };
+  active.forEach(l => counts[leadFolder(l)]++);
+  counts.print = active.filter(l => l.include).length;
+  counts.archive = Object.keys(getDismissed()).length;
+  document.querySelectorAll('.nav-count').forEach(el => { el.textContent = counts[el.dataset.count] || ''; });
+}
+
 // Everything here lives only in this one browser's local storage — there's
 // no server behind it. Backup/Restore is the safety net: a real file you
 // can move between devices/browsers, or recover from if site data ever
@@ -276,6 +285,7 @@ function downloadBackup(){
   const data = {
     leads: loadLeadsFromStorage(),
     log: getLog(),
+    archive: getDismissed(),
     envAlign: getEnvAlign(),
     exportedAt: new Date().toISOString()
   };
@@ -300,12 +310,14 @@ function restoreBackupFile(file){
     }
     const leadCount = Array.isArray(data.leads) ? data.leads.length : 0;
     const logCount = data.log && typeof data.log === 'object' ? Object.keys(data.log).length : 0;
-    if (!confirm(`Restore this backup? It has ${leadCount} leads and ${logCount} logged as sent. This replaces everything currently loaded in this browser.`)) return;
+    const archiveCount = data.archive && typeof data.archive === 'object' ? Object.keys(data.archive).length : 0;
+    if (!confirm(`Restore this backup? It has ${leadCount} leads, ${logCount} logged as sent and ${archiveCount} archived. This replaces everything currently loaded in this browser.`)) return;
+    saveLog(data.log && typeof data.log === 'object' ? data.log : {});
+    if (data.archive && typeof data.archive === 'object') saveDismissed(data.archive);
     leads = (Array.isArray(data.leads) ? data.leads : []).map(classify);
     saveLeadsToStorage();
-    saveLog(data.log && typeof data.log === 'object' ? data.log : {});
     if (data.envAlign) setEnvAlign(data.envAlign);
-    state.tab = 'review';
+    state.tab = 'fApproved';
     render();
     alert('Backup restored.');
   };
@@ -381,9 +393,33 @@ function parseBusinessCSV(text){
   return out;
 }
 
+// One letter per practice: a new business sharing a practice name or
+// office address with someone already sent (or already waiting) is
+// flagged Check rather than queued as a second letter to the same firm.
+function practiceKeys(lines){
+  if (!lines || lines.length < 3) return [];
+  const norm = t => (t || '').toLowerCase().replace(/\b(ltd|limited)\b\.?/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  return [norm(lines[1]), norm(lines[2]) + '|' + norm(lines[lines.length - 1])].filter(k => k && k !== '|');
+}
+function flagSamePractice(newLeads){
+  const seen = new Map();
+  const note = (lines, label) => practiceKeys(lines).forEach(k => { if (!seen.has(k)) seen.set(k, label); });
+  Object.values(getLog()).forEach(e => { if (e.source === 'business') note(e.recipientLines, `${e.name} (sent ${prettyDate(e.date)})`); });
+  leads.filter(l => leadFolder(l) === 'business' && !newLeads.includes(l)).forEach(l => note(l.recipientLines, l.applicant));
+  newLeads.forEach(l => {
+    if (l.alreadyProcessed || l.excludedReason) return;
+    const match = practiceKeys(l.recipientLines).map(k => seen.get(k)).find(Boolean);
+    if (match) {
+      l.extraReviewNote = l.extraReviewNote || `Same practice as ${match} — one letter per practice is usually enough.`;
+      l.needsReview = true;
+      l.reviewNote = l.reviewNote || l.extraReviewNote;
+    } else note(l.recipientLines, l.applicant);
+  });
+}
+
 function renderImportBiz(main){
   main.innerHTML = `
-    <p class="hint">Paste a CSV list of local businesses to add to the working batch — architects and engineers to start, more trades later. Expected columns: Name, Practice Name, Address Line 1, Address Line 2, Town, Postcode, IOM Reg Number (extra columns like Qualifications/UK ARB Number are ignored). This <b>adds</b> to whatever's already loaded rather than replacing it, so the list can build up over time. Everyone comes in set to "Don't send" by default — go to Review and flip on only the ones you actually want to approach (skip the ones you already know).</p>
+    <p class="hint">Paste a CSV list of local businesses — architects and engineers to start, more trades later. Expected columns: Name, Practice Name, Address Line 1, Address Line 2, Town, Postcode, IOM Reg Number (extra columns like Qualifications/UK ARB Number are ignored). This <b>adds</b> to the Businesses folder — it never replaces anything, and anyone already sent a letter or archived is skipped and reported. Nothing goes to print until you press "Send to print" in the Businesses folder.</p>
     <div class="drop-zone" id="bizDropZone">
       <textarea id="bizPasteBox" placeholder="Name,Qualifications,Practice Name,Address Line 1,Address Line 2,Town,Postcode,IOM Reg Number,UK ARB Number"></textarea>
       <div class="drop-hint">or drag a .csv file here, or <button type="button" class="link-btn" id="bizFileBtn">choose a file</button></div>
@@ -398,38 +434,40 @@ function renderImportBiz(main){
     const text = document.getElementById('bizPasteBox').value;
     const rawRows = parseBusinessCSV(text);
     const existingRefs = new Set(leads.map(l => l.ref));
+    const archived = getDismissed();
     const added = [];
-    // A business already in `leads` (whether still waiting or already
-    // archived) is never silently re-added or re-sent — but say so
-    // explicitly rather than just quietly skipping, so it's clear
-    // nothing's being contacted twice.
-    let skipped = 0, skippedAlreadySent = 0;
+    // Nobody is ever silently re-added or re-sent — anyone already in a
+    // folder, already sent, or archived is counted and reported instead.
+    let inFolder = 0, inArchive = 0;
     rawRows.forEach(raw => {
-      if (existingRefs.has(raw.ref)) {
-        skipped++;
-        const existing = leads.find(l => l.ref === raw.ref);
-        if (existing && existing.alreadyProcessed) skippedAlreadySent++;
-        return;
-      }
+      if (existingRefs.has(raw.ref)) { inFolder++; return; }
+      if (archived[raw.ref]) { inArchive++; return; }
       const lead = classify(raw);
       lead.type = 'Company';
       lead.source = 'business';
+      lead.folder = 'business';
+      lead.addedAt = todayISO();
       if (!raw.hasAddress) {
+        lead.extraReviewNote = 'No usable postal address on file — check before sending.';
         lead.needsReview = true;
-        lead.reviewNote = lead.reviewNote || 'No usable postal address on file — check before sending.';
+        lead.reviewNote = lead.reviewNote || lead.extraReviewNote;
       }
       added.push(lead);
       existingRefs.add(lead.ref);
     });
+    flagSamePractice(added);
     leads = leads.concat(added);
     saveLeadsToStorage();
+    const alreadySent = added.filter(l => l.alreadyProcessed).length;
     const msg = document.getElementById('bizParseMsg');
     if (msg) {
-      const parts = [added.length ? `Added ${added.length} new businesses.` : 'No new businesses to add.'];
-      if (skipped) parts.push(`${skipped} already in your working batch, skipped${skippedAlreadySent ? ` (${skippedAlreadySent} of those already marked sent — see the Business archive on Processed Log if you need to check)` : ''}.`);
+      const parts = [added.length - alreadySent ? `Added ${added.length - alreadySent} new businesses to the Businesses folder.` : 'No new businesses to add.'];
+      if (alreadySent) parts.push(`${alreadySent} were already sent a letter before, so they're kept out of the folder (see Archive).`);
+      if (inFolder) parts.push(`${inFolder} already in the Businesses folder, skipped.`);
+      if (inArchive) parts.push(`${inArchive} archived before, skipped.`);
       msg.textContent = parts.join(' ');
     }
-    if (added.length) { state.tab = 'reviewBiz'; render(); }
+    updateNavCounts();
   });
 }
 
@@ -497,8 +535,9 @@ function classify(lead){
   const applicantLower = lead.applicant.toLowerCase();
 
   lead.excludedReason = null;
+  const screened = `${applicantLower} ${lead.site.toLowerCase()} ${(lead.agentText || '').toLowerCase()}`;
   for (const name of STANDING_EXCLUDE) {
-    if (applicantLower.includes(name) || lead.site.toLowerCase().includes(name)) { lead.excludedReason = 'Standing never-contact: ' + name; break; }
+    if (screened.includes(name)) { lead.excludedReason = 'Standing never-contact: ' + name; break; }
   }
   lead.alreadyProcessed = !!log[lead.ref];
 
@@ -507,6 +546,9 @@ function classify(lead){
   if (/not legible|illegible|acting for|not stated/i.test(lead.applicant)) {
     lead.needsReview = true; lead.reviewNote = 'Applicant unclear on the form — check before sending.';
   }
+  // Flags set when the lead was added (no applicant on the register, no
+  // postal address, government body) must survive every reload.
+  if (lead.extraReviewNote) { lead.needsReview = true; lead.reviewNote = lead.reviewNote || lead.extraReviewNote; }
 
   // Checked on the name with any bracketed aside removed first, so an
   // individual like "Mr Wesley Roussouw (H&B Developments)" isn't
@@ -655,19 +697,22 @@ function buildSalutation(lead){
 // ---- Rendering ----
 function render(){
   document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
+  updateNavCounts();
   const main = document.getElementById('mainArea');
-  if (state.tab === 'review') return renderReview(main, 'planning');
-  if (state.tab === 'reviewBiz') return renderReview(main, 'business');
+  if (state.tab === 'fApproved') return renderFolder(main, 'approved');
+  if (state.tab === 'fPending') return renderFolder(main, 'pending');
+  if (state.tab === 'fBusiness') return renderFolder(main, 'business');
+  if (state.tab === 'archive') return renderArchive(main);
   if (state.tab === 'letters') return renderPrint(main, 'letter');
   if (state.tab === 'envelopes') return renderPrint(main, 'envelope');
-  if (state.tab === 'log') return renderLog(main);
+  if (state.tab === 'log') { state.tab = 'archive'; return render(); }
   if (state.tab === 'importBiz') return renderImportBiz(main);
   renderImport(main);
 }
 
 function renderImport(main){
   main.innerHTML = `
-    <p class="hint">Paste the leads table here — straight copy from the Weekly List export or the extracted PDF table (columns: Reference, Site Address, Applicant/Developer, Type, Local Authority; a header row is fine, tab-separated). Each pull replaces the working batch below, but the processed-log and excluded rows carry over.</p>
+    <p class="hint">Paste the leads table here — straight copy from the Weekly List export or the extracted PDF table (columns: Reference, Site Address, Applicant/Developer, Type, Local Authority; a header row is fine, tab-separated). These <b>add</b> to the Approved folder — nothing already there, already sent or archived gets added twice, and nothing is ever replaced. Or use the planning-register pull further down.</p>
     <div class="drop-zone" id="planDropZone">
       <textarea id="pasteBox" placeholder="Reference&#9;Site Address&#9;Applicant / Developer&#9;Type of Development&#9;Local Authority"></textarea>
       <div class="drop-hint">or drag a file here, or <button type="button" class="link-btn" id="planFileBtn">choose a file</button></div>
@@ -680,17 +725,21 @@ function renderImport(main){
   wireFileDrop('planDropZone', 'planFileInput', 'planFileBtn', 'pasteBox');
   document.getElementById('parseBtn').addEventListener('click', () => {
     const text = document.getElementById('pasteBox').value;
-    const newPlanningLeads = parseInput(text);
-    // "Each pull replaces the working batch" was only ever meant to mean
-    // the PLANNING batch — this used to replace the entire shared `leads`
-    // array outright, silently wiping every business lead sitting in it
-    // at the same time. Now only planning-sourced leads get replaced;
-    // anything from the Businesses import/register-pull survives.
-    const survivingBusinessLeads = leads.filter(l => l.source === 'business');
-    leads = survivingBusinessLeads.concat(newPlanningLeads);
+    const parsed = parseInput(text);
+    // Adds, never replaces — replacing the list here is what once wiped
+    // a whole batch of business leads without warning.
+    const existingRefs = new Set(leads.map(l => l.ref).filter(Boolean));
+    const archived = getDismissed();
+    const log = getLog();
+    const fresh = parsed.filter(l => !(l.ref && (existingRefs.has(l.ref) || archived[l.ref] || log[l.ref])));
+    fresh.forEach(l => { l.folder = 'approved'; l.include = false; l.addedAt = todayISO(); });
+    leads = leads.concat(fresh);
     saveLeadsToStorage();
-    document.getElementById('parseMsg').textContent = newPlanningLeads.length ? `Parsed ${newPlanningLeads.length} leads — go to Review.` : 'Nothing recognised — check the paste has tab-separated columns.';
-    if (newPlanningLeads.length) { state.tab = 'review'; render(); }
+    const skipped = parsed.length - fresh.length;
+    document.getElementById('parseMsg').textContent = parsed.length
+      ? `Added ${fresh.length} to the Approved folder.${skipped ? ` ${skipped} skipped — already in a folder, already sent, or archived.` : ''}`
+      : 'Nothing recognised — check the paste has tab-separated columns.';
+    updateNavCounts();
   });
   renderRegisterPull(main);
 }
@@ -723,12 +772,12 @@ function renderRegisterPull(main){
 }
 
 function renderRegisterPullLoaded(box, data){
-  const log = getLog();
-  const existingRefs = new Set(leads.map(l => l.ref));
   const apps = data.applications || [];
   const pulledDate = data.pulledAt ? new Date(data.pulledAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'unknown';
+  let log = getLog();
   let dismissed = getDismissed();
-  let showDismissed = false;
+  let showArchived = false;
+  const expandedRefs = new Set();
 
   // The register just says "Decided" — the actual outcome (Permitted /
   // Refused / Withdrawn / etc.) is a separate field from the detail page.
@@ -742,13 +791,19 @@ function renderRegisterPullLoaded(box, data){
   const CATEGORY_TAG = { pending: ['tag-review', 'Pending'], approved: ['tag-approved', 'Approved'], refused: ['tag-excl', 'Refused'], other: ['tag-dupe', null] };
   const CATEGORY_ORDER = { approved: 0, pending: 1, refused: 2, other: 3 };
 
+  // Applicant, site or agent — any of them on the never-contact list.
+  function standingHit(a){
+    const hay = `${a.applicantName || ''} ${a.address || ''} ${a.agentName || ''} ${a.agentCompanyName || ''}`.toLowerCase();
+    return STANDING_EXCLUDE.find(n => hay.includes(n)) || null;
+  }
+
   function applyFilters(){
     const status = document.getElementById('regStatus').value;
     const from = document.getElementById('regFrom').value;
     const to = document.getElementById('regTo').value;
     const q = document.getElementById('regSearch').value.trim().toLowerCase();
     return apps.filter(a => {
-      if (!showDismissed && dismissed[a.ref]) return false;
+      if (!showArchived && dismissed[a.ref]) return false;
       if (status !== 'all' && decisionCategory(a) !== status) return false;
       const d = a.validated || a.received;
       const parsed = d ? new Date(d.replace(/^\w+\s/, '')) : null; // strip leading "Tue " etc
@@ -760,129 +815,130 @@ function renderRegisterPullLoaded(box, data){
       }
       return true;
     })
-    // Grouped by outcome — every Approved application first, then all
-    // Pending, then Refused, then anything else (withdrawn etc.) —
-    // rather than interleaved by reference number.
     .sort((x, y) => CATEGORY_ORDER[decisionCategory(x)] - CATEGORY_ORDER[decisionCategory(y)] || (x.ref < y.ref ? 1 : -1));
   }
 
-  // Rows expanded by clicking the applicant's name — persists across
-  // re-renders (filtering, ticking checkboxes) until clicked again.
-  const expandedRefs = new Set();
-
-  // A synthetic ref for the AGENT on an application, distinct from the
-  // application's own ref — same naming convention as the CSV business
-  // import (ARCH-<slug>), so an agent added here and the same person
-  // later imported from a register CSV would collide and dedupe
-  // correctly rather than creating two records for one architect.
+  // Same ARCH-<slug> convention as the CSV business import, so one
+  // architect reached via either route dedupes to a single record.
   function agentRef(a){
     const person = a.agentName || a.agentCompanyName;
     return person ? 'ARCH-' + slugify(person + '-' + (a.agentCompanyName || '')) : null;
   }
+  const known = ref => leads.some(l => l.ref === ref) || !!log[ref] || !!dismissed[ref];
 
-  // Shared by the per-row checkbox path and the bulk "Add all shown
-  // Approved/Pending" buttons — one place that builds a planning lead
-  // from a register application, so both paths apply the same
-  // never-contact/needsReview/planningStatus handling.
-  function addRegisterAppToBatch(a){
-    if (existingRefs.has(a.ref)) return false;
+  function addRegisterAppToBatch(a, folder){
+    if (known(a.ref)) return false;
     const applicant = a.applicantName || a.agentCompanyName || a.agentName || 'Applicant not available on register';
-    const lead = classify({ ref: a.ref, applicant, site: a.address || '' });
-    if (!lead.excludedReason) {
-      const agentText = `${a.agentName || ''} ${a.agentCompanyName || ''}`.toLowerCase();
-      const hit = STANDING_EXCLUDE.find(name => agentText.includes(name));
-      if (hit) { lead.excludedReason = 'Standing never-contact (agent): ' + hit; lead.include = false; }
-    }
-    if (!a.applicantName) {
-      lead.needsReview = true;
-      lead.reviewNote = lead.reviewNote || 'Applicant name not on the public register — check before sending (agent shown instead).';
-    }
+    const extraReviewNote = !a.applicantName ? 'Applicant name not on the public register — check before sending (agent shown instead).'
+      : /\bdepartment\b|government|tynwald|manx care/i.test(applicant) ? 'Government body — DGC may already work with them. Check before sending.'
+      : undefined;
+    const lead = classify({ ref: a.ref, applicant, site: a.address || '', agentText: `${a.agentName || ''} ${a.agentCompanyName || ''}`, extraReviewNote });
     lead.planningStatus = decisionCategory(a);
+    lead.folder = folder;
+    lead.include = false;
+    lead.addedAt = todayISO();
+    lead.description = a.description || '';
     leads.push(lead);
-    existingRefs.add(a.ref);
     return true;
   }
 
-  // Shared by the per-row "+ Add as business" button and the bulk
-  // "Add all shown agents" button.
   function addAgentToBatch(a){
     const aRef = agentRef(a);
     const person = a.agentName || a.agentCompanyName;
-    if (!aRef || !person || existingRefs.has(aRef)) return false;
-    const lead = classify({ ref: aRef, applicant: person, site: a.agentAddress || '' });
+    if (!aRef || !person || known(aRef)) return false;
+    const site = [a.agentName && a.agentCompanyName ? a.agentCompanyName : '', a.agentAddress || ''].filter(Boolean).join(', ');
+    const lead = classify({ ref: aRef, applicant: person, site });
     lead.type = 'Company';
     lead.source = 'business';
-    lead.include = false; // opt-in, same as the CSV business import — review before sending
+    lead.folder = 'business';
+    lead.include = false;
+    lead.addedAt = todayISO();
+    lead.description = `Agent on ${a.ref} — ${a.description || ''}`;
     leads.push(lead);
-    existingRefs.add(aRef);
     return true;
   }
 
   function rowHtml(a, forceFull){
-    const already = !!log[a.ref] || existingRefs.has(a.ref);
+    const sent = log[a.ref];
+    const inLead = leads.find(l => l.ref === a.ref);
+    const arch = dismissed[a.ref];
+    const hit = standingHit(a);
+    const cat = decisionCategory(a);
     const person = a.applicantName || a.agentCompanyName || a.agentName || '(applicant not on register)';
     const full = forceFull || expandedRefs.has(a.ref);
     const aRef = agentRef(a);
-    const agentAlready = aRef && existingRefs.has(aRef);
-    // Shown even collapsed — the whole point is being able to scan
-    // whether the agent looks like a business worth adding (an
-    // architect/designer) or something else (often just the case
-    // officer or "Not Available") without expanding every row.
+    const agentStatus = !aRef ? '' : log[aRef] ? 'Agent already sent a letter' : leads.some(l => l.ref === aRef) ? 'Agent already in Businesses' : dismissed[aRef] ? 'Agent archived' : '';
     const agentSearchQuery = encodeURIComponent(`${a.agentCompanyName || a.agentName} Isle of Man`);
     const agentLine = aRef ? `
         <div class="hint">Agent: ${esc(a.agentName || '')}${a.agentCompanyName ? ` (${esc(a.agentCompanyName)})` : ''}
           <a href="https://www.google.com/search?q=${agentSearchQuery}" target="_blank" rel="noopener" class="btn-secondary" style="margin-left:6px;padding:1px 7px;font-size:0.7rem;text-decoration:none;display:inline-block">&#128269; Google them</a>
-          ${agentAlready
-            ? '<span class="tag tag-dupe" style="margin-left:6px">Already a business lead</span>'
-            : `<button type="button" class="btn-secondary reg-add-agent-btn" data-ref="${esc(a.ref)}" style="margin-left:6px;padding:1px 7px;font-size:0.7rem">+ Add as business</button>`}
+          ${agentStatus
+            ? `<span class="tag tag-dupe" style="margin-left:6px">${agentStatus}</span>`
+            : `<button type="button" class="btn-secondary reg-add-agent-btn" data-ref="${esc(a.ref)}" style="margin-left:6px;padding:1px 7px;font-size:0.7rem">+ Add agent as business</button>`}
         </div>` : '';
     const detailLine = full ? `
         <div class="hint">${a.agentAddress ? esc(a.agentAddress) : ''}</div>
         <div class="hint">${a.parish ? `Parish: ${esc(a.parish)}` : ''} &middot; Received ${esc(a.received||'?')} &middot; ${a.isDecided ? (a.decisionDate ? `Decided ${esc(a.decisionDate)}` : 'Decided') : `Validated ${esc(a.validated || '?')}`}</div>` : '';
+
+    let actions;
+    if (sent) actions = `<span class="tag tag-dupe" title="Already sent a letter — see Archive">Sent ${esc(prettyDate(sent.date))}</span>`;
+    else if (inLead) actions = `<span class="tag tag-approved">In ${FOLDERS[leadFolder(inLead)]}</span>`;
+    else if (arch) actions = `<span class="tag tag-dupe">Archived ${esc(prettyDate(arch.date))}</span>
+          <button type="button" class="btn-secondary reg-unarchive-btn" data-ref="${esc(a.ref)}">&#8617; Bring back</button>`;
+    else {
+      const sendBtn = (folder, text) => `<button type="button" class="btn-secondary reg-send-btn${cat === folder ? ' natural' : ''}" data-ref="${esc(a.ref)}" data-folder="${folder}">${text}</button>`;
+      actions = hit
+        ? `<span class="tag tag-excl" title="On the standing never-contact list">Never contact: ${esc(hit)}</span>
+           <button type="button" class="btn-secondary reg-dismiss-btn" data-ref="${esc(a.ref)}">Archive</button>`
+        : `<div class="reg-actions">
+            ${sendBtn('business', 'Send as Business')}
+            ${sendBtn('pending', 'Send as Pending')}
+            ${sendBtn('approved', 'Send as Approved')}
+            <button type="button" class="btn-secondary reg-dismiss-btn" data-ref="${esc(a.ref)}" title="Looked at it, not chasing it — goes to the Archive tab, where you can bring it back">Archive</button>
+          </div>`;
+    }
     return `
       <div class="lead-row">
         <div class="lr-main">
-          <div style="display:flex;gap:8px;align-items:flex-start">
-            <input type="checkbox" class="reg-pick" data-ref="${esc(a.ref)}" ${already ? 'disabled' : ''} style="margin-top:4px">
-            <span style="flex:1">
-              <button type="button" class="reg-name-toggle" data-ref="${esc(a.ref)}" title="${full ? 'Click to collapse' : 'Click to see the full application'}">
-                ${esc(person)} <span class="hint">${full ? '&#9662; hide full application' : '&#9656; show full application'}</span>
-              </button>
-              <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}</div>
-              <div class="hint" style="margin:2px 0">${esc(a.description || '')}</div>
-              ${agentLine}
-              ${detailLine}
-            </span>
-          </div>
+          <button type="button" class="reg-name-toggle" data-ref="${esc(a.ref)}" title="${full ? 'Click to collapse' : 'Click to see the full application'}">
+            ${esc(person)} <span class="hint">${full ? '&#9662; hide full application' : '&#9656; show full application'}</span>
+          </button>
+          <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}</div>
+          <div class="hint" style="margin:2px 0">${esc(a.description || '')}</div>
+          ${agentLine}
+          ${detailLine}
         </div>
         <div class="lr-side">
-          ${already ? '<span class="tag tag-dupe">Already have it</span>' : ''}
-          ${dismissed[a.ref] ? '<span class="tag tag-dupe" title="You looked at this one before and chose not to chase it">Not chasing</span>' : ''}
-          <span class="tag ${CATEGORY_TAG[decisionCategory(a)][0]}">${CATEGORY_TAG[decisionCategory(a)][1] || a.decision || 'Decided'}</span>
-          ${!already && !dismissed[a.ref] ? `<button type="button" class="btn-secondary reg-dismiss-btn" data-ref="${esc(a.ref)}" title="Looked at it, not interested — hides it and remembers, so it flags up rather than reappearing fresh next time">&#10005; Not chasing</button>` : ''}
+          <span class="tag ${CATEGORY_TAG[cat][0]}">${CATEGORY_TAG[cat][1] || a.decision || 'Decided'}</span>
+          ${actions}
         </div>
       </div>`;
   }
 
   function renderList(){
+    log = getLog();
+    dismissed = getDismissed();
     const filtered = applyFilters();
     const full = document.getElementById('regDetailToggle').checked;
-    const dismissedCount = Object.keys(dismissed).length;
+    const archivedCount = apps.filter(a => dismissed[a.ref]).length;
     document.getElementById('regCount').innerHTML = `${filtered.length} of ${apps.length} shown`
-      + (dismissedCount ? ` &middot; ${dismissedCount} not chasing, ${showDismissed ? '<button type="button" class="link-btn" id="regHideDismissed">hide</button>' : '<button type="button" class="link-btn" id="regShowDismissed">show</button>'}` : '');
+      + (archivedCount ? ` &middot; ${archivedCount} archived, ${showArchived ? '<button type="button" class="link-btn" id="regHideArchived">hide them</button>' : '<button type="button" class="link-btn" id="regShowArchived">show them</button>'}` : '');
     document.getElementById('registerList').innerHTML = filtered.length
       ? filtered.map(a => rowHtml(a, full)).join('')
       : '<p class="empty-state">Nothing matches those filters.</p>';
-    const showBtn = document.getElementById('regShowDismissed');
-    if (showBtn) showBtn.addEventListener('click', () => { showDismissed = true; renderList(); });
-    const hideBtn = document.getElementById('regHideDismissed');
-    if (hideBtn) hideBtn.addEventListener('click', () => { showDismissed = false; renderList(); });
+    const showBtn = document.getElementById('regShowArchived');
+    if (showBtn) showBtn.addEventListener('click', () => { showArchived = true; renderList(); });
+    const hideBtn = document.getElementById('regHideArchived');
+    if (hideBtn) hideBtn.addEventListener('click', () => { showArchived = false; renderList(); });
+    updateNavCounts();
   }
+  function say(text){ const m = document.getElementById('regAddMsg'); if (m) m.textContent = text; }
 
   box.innerHTML = `
     <h3 class="lead-section-hdr">Pull from the planning register</h3>
     <p class="hint">Last pulled ${esc(pulledDate)} &middot; ${apps.length} applications on file (up to ${data.monthsRequested || '?'} months back).
       <a href="${REGISTER_ACTIONS_URL}" target="_blank" rel="noopener">Pull fresh data now &rarr;</a></p>
+    <p class="hint">On each one: <b>Send as Business / Pending / Approved</b> puts it in that folder (and decides which letter it gets), <b>Archive</b> means not chasing it. Nothing is printed until you press "Send to print" inside the folder.</p>
     <div class="row-actions" style="flex-wrap:wrap;gap:10px">
       <label>From <input type="date" id="regFrom"></label>
       <label>To <input type="date" id="regTo"></label>
@@ -898,179 +954,317 @@ function renderRegisterPullLoaded(box, data){
       <label><input type="checkbox" id="regDetailToggle"> Full detail</label>
       <input type="text" id="regSearch" placeholder="Search name, address, description&hellip;" style="min-width:220px">
     </div>
-    <p class="hint">Faster than ticking one at a time — these act on whatever the filters above are currently showing:</p>
     <div class="row-actions" style="flex-wrap:wrap;gap:10px;margin-bottom:6px">
-      <button class="btn-secondary" id="regBulkApprovedBtn">Send all shown Approved &rarr; batch</button>
-      <button class="btn-secondary" id="regBulkPendingBtn">Send all shown Pending &rarr; batch</button>
-      <button class="btn-secondary" id="regBulkAgentsBtn">Send all shown agents &rarr; Businesses</button>
+      <button class="btn-secondary" id="regBulkApprovedBtn">All shown Approved &rarr; Approved folder</button>
+      <button class="btn-secondary" id="regBulkPendingBtn">All shown Pending &rarr; Pending folder</button>
+      <button class="btn-secondary" id="regBulkAgentsBtn">All shown agents &rarr; Businesses folder</button>
+      <span id="regAddMsg" class="hint"></span>
     </div>
     <p class="hint" id="regCount"></p>
-    <div id="registerList" class="lead-list"></div>
-    <div class="row-actions" style="margin-top:10px">
-      <button class="btn" id="regAddSelectedBtn">Add ticked to working batch</button>
-      <span id="regAddMsg" class="hint"></span>
-    </div>`;
+    <div id="registerList" class="lead-list"></div>`;
 
   renderList();
   ['regStatus', 'regFrom', 'regTo', 'regSearch', 'regDetailToggle'].forEach(id => {
     document.getElementById(id).addEventListener('input', renderList);
   });
   document.getElementById('registerList').addEventListener('click', e => {
-    const toggleBtn = e.target.closest('.reg-name-toggle');
-    if (toggleBtn) {
-      const ref = toggleBtn.dataset.ref;
-      if (expandedRefs.has(ref)) expandedRefs.delete(ref); else expandedRefs.add(ref);
-      renderList();
-      return;
-    }
-    const agentBtn = e.target.closest('.reg-add-agent-btn');
-    if (agentBtn) {
-      const a = apps.find(x => x.ref === agentBtn.dataset.ref);
-      if (!a) return;
-      const person = a.agentName || a.agentCompanyName;
-      if (addAgentToBatch(a)) {
-        saveLeadsToStorage();
-        renderList();
-        const msg = document.getElementById('regAddMsg');
-        if (msg) msg.textContent = `Added ${person} to the Businesses batch — go to Review — Businesses to pick whether to send.`;
-      }
-      return;
-    }
-    const dismissBtn = e.target.closest('.reg-dismiss-btn');
-    if (dismissBtn) {
-      const a = apps.find(x => x.ref === dismissBtn.dataset.ref);
-      if (!a) return;
-      dismissed[a.ref] = { date: new Date().toISOString().slice(0,10), name: a.applicantName || a.agentCompanyName || a.agentName || a.ref };
-      saveDismissed(dismissed);
-      renderList();
-    }
-  });
-  document.getElementById('regAddSelectedBtn').addEventListener('click', () => {
-    const picked = Array.from(document.querySelectorAll('.reg-pick:checked')).map(cb => cb.dataset.ref);
-    if (!picked.length) {
-      document.getElementById('regAddMsg').textContent = 'Tick some applications first.';
-      return;
-    }
-    let added = 0;
-    picked.forEach(ref => {
-      const a = apps.find(x => x.ref === ref);
-      if (a && addRegisterAppToBatch(a)) added++;
-    });
-    saveLeadsToStorage();
-    document.getElementById('regAddMsg').textContent = `Added ${added} to the working batch — go to Review to pick which to send.`;
+    const btn = e.target.closest('button');
+    if (!btn || !btn.dataset.ref) return;
+    const a = apps.find(x => x.ref === btn.dataset.ref);
+    if (!a) return;
+    const person = a.applicantName || a.agentCompanyName || a.agentName || a.ref;
+    if (btn.classList.contains('reg-name-toggle')) {
+      if (expandedRefs.has(a.ref)) expandedRefs.delete(a.ref); else expandedRefs.add(a.ref);
+    } else if (btn.classList.contains('reg-send-btn')) {
+      const folder = btn.dataset.folder;
+      if (addRegisterAppToBatch(a, folder)) { saveLeadsToStorage(); say(`${person} → ${FOLDERS[folder]} folder.`); }
+    } else if (btn.classList.contains('reg-add-agent-btn')) {
+      if (addAgentToBatch(a)) { saveLeadsToStorage(); say(`${a.agentName || a.agentCompanyName} (agent) → Businesses folder.`); }
+    } else if (btn.classList.contains('reg-dismiss-btn')) {
+      const d = getDismissed();
+      d[a.ref] = { date: todayISO(), name: person, source: 'planning', description: a.description || '', address: a.address || '' };
+      saveDismissed(d);
+      say(`${person} archived — bring it back any time from here or the Archive tab.`);
+    } else if (btn.classList.contains('reg-unarchive-btn')) {
+      bringBackFromArchive(a.ref);
+      say(`${person} brought back.`);
+    } else return;
     renderList();
   });
-  document.getElementById('regBulkApprovedBtn').addEventListener('click', () => {
-    const shown = applyFilters().filter(a => decisionCategory(a) === 'approved');
+  function bulk(filterFn, folder, label){
+    log = getLog(); dismissed = getDismissed();
     let added = 0;
-    shown.forEach(a => { if (addRegisterAppToBatch(a)) added++; });
+    applyFilters().filter(filterFn).forEach(a => { if (folder ? addRegisterAppToBatch(a, folder) : addAgentToBatch(a)) added++; });
     saveLeadsToStorage();
-    document.getElementById('regAddMsg').textContent = `Added ${added} Approved applications to the working batch (using the "congratulations" letter) — go to Review to pick which to send.`;
+    say(`Added ${added} to the ${label} folder (anything already in a folder, sent or archived was skipped).`);
     renderList();
-  });
-  document.getElementById('regBulkPendingBtn').addEventListener('click', () => {
-    const shown = applyFilters().filter(a => decisionCategory(a) === 'pending');
-    let added = 0;
-    shown.forEach(a => { if (addRegisterAppToBatch(a)) added++; });
-    saveLeadsToStorage();
-    document.getElementById('regAddMsg').textContent = `Added ${added} Pending applications to the working batch (using the "still waiting" letter) — go to Review to pick which to send.`;
-    renderList();
-  });
-  document.getElementById('regBulkAgentsBtn').addEventListener('click', () => {
-    const shown = applyFilters();
-    let added = 0;
-    shown.forEach(a => { if (addAgentToBatch(a)) added++; });
-    saveLeadsToStorage();
-    document.getElementById('regAddMsg').textContent = `Added ${added} agents to the Businesses batch (everyone with an agent on a currently-shown application) — go to Review — Businesses to pick which to send.`;
-    renderList();
-  });
+  }
+  document.getElementById('regBulkApprovedBtn').addEventListener('click', () => bulk(a => decisionCategory(a) === 'approved' && !standingHit(a), 'approved', 'Approved'));
+  document.getElementById('regBulkPendingBtn').addEventListener('click', () => bulk(a => decisionCategory(a) === 'pending' && !standingHit(a), 'pending', 'Pending'));
+  document.getElementById('regBulkAgentsBtn').addEventListener('click', () => bulk(a => !standingHit(a), null, 'Businesses'));
 }
 
-function renderReview(main, source){
-  const scoped = leads.map((l, i) => ({ l, i })).filter(x => source === 'business' ? x.l.source === 'business' : x.l.source !== 'business');
-  const label = source === 'business' ? 'businesses' : 'planning leads';
-  if (!scoped.length) {
-    main.innerHTML = leads.length
-      ? `<p class="empty-state">No ${label} in the working batch. ${source === 'business' ? 'Go to Import — Businesses to add some.' : 'Go to Import — Planning to paste this week\'s leads.'}</p>`
-      : '<p class="empty-state">Nothing parsed yet — go to Import and paste this week\'s leads.</p>';
+const COPY_NOTE = {
+  approved: 'Everyone here gets the "Congratulations on your recent planning approval" letter.',
+  pending: 'Everyone here gets the "we noticed you have recently applied for planning permission" letter.',
+  business: 'Everyone here gets the architects &amp; engineers introduction letter.'
+};
+
+function renderFolder(main, folder){
+  const label = FOLDERS[folder];
+  const inFolder = leads.map((l, i) => ({ l, i })).filter(x => leadFolder(x.l) === folder);
+  const active = inFolder.filter(x => !x.l.alreadyProcessed);
+  const sentCount = inFolder.length - active.length;
+  if (!active.length) {
+    main.innerHTML = `<p class="empty-state">Nothing waiting in ${label}.<br><br>${folder === 'business'
+      ? 'Add businesses on Import — Businesses, or press "Send as Business" / "+ Add agent as business" on the planning register list (Import — Planning).'
+      : `Press "Send as ${label}" on the planning register list (Import — Planning) to put applications here.`}</p>`
+      + (sentCount ? `<p class="hint" style="text-align:center">${sentCount} from this folder already sent — see Archive.</p>` : '');
     return;
   }
-  const active = scoped.filter(x => !x.l.alreadyProcessed);
-  const alreadySent = scoped.filter(x => x.l.alreadyProcessed);
-  const included = active.filter(x => x.l.include).length;
-  const companies = active.filter(x => x.l.type === 'Company').length;
+  const onPrint = active.filter(x => x.l.include).length;
+  const sendable = active.filter(x => !x.l.include && !x.l.excludedReason && !x.l.needsReview);
+  const flaggedWaiting = active.filter(x => !x.l.include && !x.l.excludedReason && x.l.needsReview).length;
 
-  function leadRow(l, i){
-    const flag = l.excludedReason ? { cls: 'tag-excl', label: 'Excluded', title: l.excludedReason }
+  const groups = new Map();
+  active.slice().sort((a, b) => (b.l.addedAt || '').localeCompare(a.l.addedAt || '')).forEach(x => {
+    const k = x.l.addedAt || '';
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(x);
+  });
+  const today = todayISO();
+  const groupTitle = k => !k ? 'Added earlier' : k === today ? `Added today &middot; ${prettyDate(k)}` : `Added ${prettyDate(k)}`;
+
+  function row(l, i){
+    const flag = l.excludedReason ? { cls: 'tag-excl', label: 'Never contact', title: l.excludedReason }
       : l.needsReview ? { cls: 'tag-review', label: 'Check', title: l.reviewNote }
       : null;
-    // Only the standing never-contact list locks the toggle.
-    const locked = !!l.excludedReason;
+    const editing = state.editRef === l.ref;
+    const moveOpts = Object.entries(FOLDERS).map(([k, v]) => `<option value="${k}" ${k === folder ? 'selected' : ''}>${v}</option>`).join('');
     return `
       <div class="lead-row ${flag ? 'flagged' : ''}" data-i="${i}">
         <div class="lr-main">
           <div class="lr-applicant">${esc(l.applicant)}</div>
-          <div class="lr-meta">${esc(l.ref)} &middot; ${esc(l.site)} &middot; <select class="type-sel">${['Homeowner','Company'].map(t=>`<option ${l.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
-          <input type="text" class="sal-input" value="${esc(l.salutation)}">
+          <div class="lr-meta">${esc(l.ref)}${l.description ? ' &middot; ' + esc(l.description) : ''}</div>
+          ${flag && flag.title ? `<div class="hint" style="margin:0 0 4px;color:var(--accent)">${esc(flag.title)}</div>` : ''}
+          <input type="text" class="sal-input" value="${esc(l.salutation)}" title="Salutation — click to change">
+          <div class="f-addr">${l.recipientLines.map(esc).join(' &middot; ')}</div>
+          ${editing ? `
+          <div class="f-edit-panel">
+            <div class="hint" style="margin:0 0 6px">Name &amp; address exactly as it prints — one line each</div>
+            <textarea class="f-edit-lines">${esc(l.recipientLines.join('\n'))}</textarea>
+            <div class="row-actions" style="margin:8px 0 0"><button class="btn f-edit-save">Save</button><button class="btn-secondary f-edit-cancel">Cancel</button></div>
+          </div>` : ''}
         </div>
-        <div class="lr-side">
-          ${flag ? `<span class="tag ${flag.cls}" title="${esc(flag.title)}">${flag.label}</span>` : ''}
-          <button class="btn-secondary archive-one-btn" data-i="${i}" title="Mark just this one as sent, without touching the rest of the batch">Archive</button>
-          <button class="send-toggle ${l.include ? 'on' : 'off'}" ${locked ? 'disabled' : ''}>${l.include ? 'Send' : "Don't send"}</button>
+        <div class="lr-side" style="flex-direction:column;align-items:flex-end;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            ${flag ? `<span class="tag ${flag.cls}" title="${esc(flag.title)}">${flag.label}</span>` : ''}
+            <button class="send-toggle ${l.include ? 'on' : 'off'}" ${l.excludedReason ? 'disabled' : ''}>${l.include ? '&#10003; On print list' : 'Send to print'}</button>
+          </div>
+          <div class="f-actions">
+            <button class="btn-secondary f-edit-btn">&#9998; Edit name / address</button>
+            <label class="hint" style="margin:0">Move to <select class="f-move">${moveOpts}</select></label>
+            <button class="btn-secondary f-archive-btn" title="Not chasing — goes to the Archive tab, where you can bring it back">Archive</button>
+            <button class="btn-danger f-remove-btn">Delete</button>
+          </div>
         </div>
       </div>`;
   }
 
-  const alreadySentNote = alreadySent.length
-    ? `<p class="hint">${alreadySent.length} already sent before, hidden from this list — see the ${source === 'business' ? 'Business' : 'Planning'} archive on the Processed Log tab to restore one.</p>`
-    : '';
-
-  const statBar = `
+  main.innerHTML = `
+    <div class="row-actions">
+      <button class="btn" id="fSendAllBtn" ${sendable.length ? '' : 'disabled'}>Send all ${sendable.length} to print</button>
+      ${onPrint ? `<button class="btn-secondary" id="fUnsendAllBtn">Take all ${onPrint} off the print list</button>` : ''}
+      <button class="btn-secondary" id="fGoPrintBtn">Go to Print &rarr;</button>
+      <span id="fMsg" class="hint" style="margin:0"></span>
+    </div>
     <div class="stat-bar">
-      <span><b>${scoped.length}</b> total</span>
-      <span><b>${active.filter(l=>l.l.excludedReason).length}</b> standing-excluded</span>
-      <span><b>${alreadySent.length}</b> already sent before</span>
-      <span><b>${active.filter(x=>x.l.needsReview).length}</b> flagged for a manual look</span>
-      <span style="color:var(--accent)"><b>${included}</b> set to send</span>
-    </div>${alreadySentNote}`;
+      <span><b>${active.length}</b> waiting in ${label}</span>
+      <span style="color:var(--accent)"><b>${onPrint}</b> on the print list</span>
+      ${flaggedWaiting ? `<span><b>${flaggedWaiting}</b> marked Check — send those one at a time once you've looked</span>` : ''}
+      ${sentCount ? `<span><b>${sentCount}</b> already sent (see Archive)</span>` : ''}
+    </div>
+    <p class="hint">${COPY_NOTE[folder]}</p>
+    ${[...groups].map(([k, xs]) => `<h3 class="lead-section-hdr">${groupTitle(k)} &middot; ${xs.length}</h3><div class="lead-list">${xs.map(x => row(x.l, x.i)).join('')}</div>`).join('')}
+  `;
 
-  if (source === 'business') {
-    main.innerHTML = statBar + `
-      <h3 class="lead-section-hdr">Local businesses &middot; ${active.length}</h3>
-      <div class="lead-list">${active.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None currently active in this batch.</p>'}</div>
-    `;
-  } else {
-    const homeowners = active.filter(x => x.l.type === 'Homeowner');
-    const businesses = active.filter(x => x.l.type === 'Company');
-    main.innerHTML = statBar + `
-      <h3 class="lead-section-hdr">Homeowners &middot; ${homeowners.length}</h3>
-      <div class="lead-list">${homeowners.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None in this batch.</p>'}</div>
-      <h3 class="lead-section-hdr">Businesses &middot; ${businesses.length}</h3>
-      <div class="lead-list">${businesses.map(x => leadRow(x.l, x.i)).join('') || '<p class="empty-state">None in this batch.</p>'}</div>
-    `;
+  const done = () => { saveLeadsToStorage(); render(); };
+  const sendAll = document.getElementById('fSendAllBtn');
+  sendAll.addEventListener('click', () => { sendable.forEach(x => { x.l.include = true; }); done(); });
+  const unsendAll = document.getElementById('fUnsendAllBtn');
+  if (unsendAll) unsendAll.addEventListener('click', () => { active.forEach(x => { x.l.include = false; }); done(); });
+  document.getElementById('fGoPrintBtn').addEventListener('click', () => { state.tab = 'letters'; render(); });
+
+  main.querySelectorAll('.lead-row[data-i]').forEach(rowEl => {
+    const i = +rowEl.dataset.i;
+    const l = leads[i];
+    const toggle = rowEl.querySelector('.send-toggle');
+    if (!toggle.disabled) toggle.addEventListener('click', () => { l.include = !l.include; done(); });
+    rowEl.querySelector('.sal-input').addEventListener('change', e => { l.salutation = e.target.value; l.edited = true; saveLeadsToStorage(); });
+    rowEl.querySelector('.f-edit-btn').addEventListener('click', () => { state.editRef = l.ref; render(); });
+    const save = rowEl.querySelector('.f-edit-save');
+    if (save) save.addEventListener('click', () => {
+      const lines = rowEl.querySelector('.f-edit-lines').value.split('\n').map(s => s.trim()).filter(Boolean);
+      if (lines.length) { l.recipientLines = lines; l.applicant = lines[0]; l.edited = true; }
+      state.editRef = null;
+      done();
+    });
+    const cancel = rowEl.querySelector('.f-edit-cancel');
+    if (cancel) cancel.addEventListener('click', () => { state.editRef = null; render(); });
+    rowEl.querySelector('.f-move').addEventListener('change', e => { l.folder = e.target.value; done(); });
+    rowEl.querySelector('.f-archive-btn').addEventListener('click', () => { archiveLead(i); render(); });
+    rowEl.querySelector('.f-remove-btn').addEventListener('click', () => {
+      if (!confirm(`Delete "${l.applicant}" from ${label}? (Use Archive instead if you want a record that you looked at it.)`)) return;
+      leads.splice(i, 1);
+      done();
+    });
+  });
+}
+
+// One place for the whole history: everyone who was SENT a letter (the
+// sent log) and everyone ARCHIVED as not chasing — homeowners/planning
+// first, then businesses — each expandable to show exactly what went out.
+function renderArchive(main){
+  const log = getLog();
+  const archived = getDismissed();
+  const isBizRef = (ref, source) => source === 'business' || ref.startsWith('ARCH-');
+  const entries = [];
+  Object.entries(log).forEach(([ref, e]) => entries.push({ kind: 'sent', ref, e, biz: isBizRef(ref, e.source) }));
+  Object.entries(archived).forEach(([ref, e]) => entries.push({ kind: 'archived', ref, e, biz: e.lead ? leadFolder(e.lead) === 'business' : isBizRef(ref, e.source) }));
+  const filter = state.archiveFilter || 'all';
+  const shown = entries.filter(x => filter === 'all' || x.kind === filter)
+    .sort((a, b) => (b.e.date || '').localeCompare(a.e.date || '') || (a.e.name || '').localeCompare(b.e.name || ''));
+  const open = state.archiveOpen || (state.archiveOpen = new Set());
+  const letterOpen = state.letterOpen || (state.letterOpen = new Set());
+  const COPY_LABEL = { approved: '"Congratulations on your planning approval" letter', pending: '"Applied for planning" letter', business: 'Architects &amp; engineers introduction letter' };
+
+  function letterSnapshot(x){
+    const e = x.e;
+    const lead = leads.find(l => l.ref === x.ref);
+    const recipientLines = e.recipientLines || (lead && lead.recipientLines);
+    if (!recipientLines) return null;
+    return {
+      recipientLines,
+      salutation: e.salutation || (lead && lead.salutation) || '',
+      folder: e.copy || (lead ? leadFolder(lead) : (x.biz ? 'business' : 'approved')),
+      letterDate: e.letterDate || null,
+      rebuilt: !e.recipientLines
+    };
   }
 
-  main.querySelectorAll('.lead-row[data-i]').forEach(row => {
-    const i = +row.dataset.i;
-    const toggle = row.querySelector('.send-toggle');
-    if (!toggle.disabled) toggle.addEventListener('click', () => {
-      leads[i].include = !leads[i].include;
-      saveLeadsToStorage();
-      renderReview(main, source);
+  function entryHtml(x){
+    const e = x.e;
+    const key = x.kind + ':' + x.ref;
+    const isOpen = open.has(key);
+    const statusTag = x.kind === 'sent'
+      ? `<span class="tag tag-approved">Sent ${esc(prettyDate(e.date))}</span>`
+      : `<span class="tag tag-dupe">Archived ${esc(prettyDate(e.date))} &middot; not chasing</span>`;
+    let detail = '';
+    if (isOpen) {
+      const snap = x.kind === 'sent' ? letterSnapshot(x) : null;
+      const archivedLead = x.kind === 'archived' ? e.lead : null;
+      const lines = snap ? snap.recipientLines : archivedLead ? archivedLead.recipientLines : null;
+      detail = `
+        <div class="f-edit-panel">
+          ${lines ? `<div class="f-addr" style="margin:0 0 6px;color:var(--text)">${lines.map(esc).join('<br>')}</div>` : ''}
+          ${e.description || (archivedLead && archivedLead.description) ? `<div class="hint" style="margin:0 0 6px">${esc(e.description || archivedLead.description)}</div>` : ''}
+          ${e.address ? `<div class="hint" style="margin:0 0 6px">Site: ${esc(e.address)}</div>` : ''}
+          ${e.note ? `<div class="hint" style="margin:0 0 6px">${esc(e.note)}</div>` : ''}
+          ${snap ? `<div class="hint" style="margin:0 0 6px">Letter: <b>${COPY_LABEL[snap.folder]}</b>${e.copyNote ? ' — ' + esc(e.copyNote) : ''}</div>` : ''}
+          ${e.pdfFile ? `<div class="hint" style="margin:0 0 6px">Original PDF: <b>${esc(e.pdfFile)}</b>${e.pdfPage ? `, page ${e.pdfPage}` : ''}</div>` : ''}
+          <div class="row-actions" style="margin:6px 0 0">
+            ${snap ? `<button class="btn-secondary ar-letter-btn" data-key="${esc(key)}">${letterOpen.has(key) ? 'Hide letter' : '&#128196; See the letter that was sent'}</button>` : ''}
+            ${x.kind === 'sent'
+              ? `<button class="btn-secondary ar-restore-btn" data-ref="${esc(x.ref)}" title="Takes it off the sent record, so it can be sent again">&#8617; Un-mark as sent</button>`
+              : `<button class="btn-secondary ar-bringback-btn" data-ref="${esc(x.ref)}">&#8617; Bring back</button>`}
+          </div>
+          ${snap && letterOpen.has(key) ? `
+            ${snap.rebuilt ? '<p class="hint">Rebuilt from the saved record — the wording and address shown are what this app would have printed.</p>' : ''}
+            <div class="letter-preview">${letterHtml(snap)}</div>` : ''}
+        </div>`;
+    }
+    return `
+      <div class="lead-row" style="display:block">
+        <button type="button" class="reg-name-toggle ar-toggle" data-key="${esc(key)}" style="width:100%">
+          <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span style="flex:1;min-width:200px">${esc(e.name || x.ref)} <span class="hint">${isOpen ? '&#9662;' : '&#9656;'} ${esc(x.ref)}</span></span>
+            ${statusTag}
+          </span>
+        </button>
+        ${detail}
+      </div>`;
+  }
+
+  const planning = shown.filter(x => !x.biz);
+  const business = shown.filter(x => x.biz);
+  const section = (title, xs) => `<h3 class="lead-section-hdr">${title} &middot; ${xs.length}</h3>`
+    + (xs.length ? `<div class="lead-list">${xs.map(entryHtml).join('')}</div>` : '<p class="empty-state">Nothing here.</p>');
+  const count = k => entries.filter(x => x.kind === k).length;
+
+  main.innerHTML = `
+    <div class="row-actions">
+      <label class="hint" style="margin:0">Show
+        <select id="arFilter" class="f-move">
+          <option value="all" ${filter === 'all' ? 'selected' : ''}>Everything (${entries.length})</option>
+          <option value="sent" ${filter === 'sent' ? 'selected' : ''}>Sent a letter (${count('sent')})</option>
+          <option value="archived" ${filter === 'archived' ? 'selected' : ''}>Archived — not chasing (${count('archived')})</option>
+        </select>
+      </label>
+      <span class="hint" style="margin:0">Click any name to see what it was and the letter that went out.</span>
+    </div>
+    ${section('Homeowners &amp; planning applicants', planning)}
+    ${section('Businesses &mdash; architects &amp; engineers', business)}
+    <details style="margin-top:28px">
+      <summary class="hint" style="cursor:pointer">Sent letters outside this app? Add them to the sent record</summary>
+      <div class="bulk-add-log" style="margin-top:10px">
+        <p class="hint">One per line — <code>Reference&#9;Name</code> (tab-separated) or just the reference — logged as sent today, so they're flagged if they ever come up again.</p>
+        <textarea id="bulkLogBox" rows="4" placeholder="26/00465/B&#9;Mr &amp; Mrs W. Philip &amp; Norma Richards"></textarea>
+        <div class="row-actions" style="margin-top:10px">
+          <button class="btn" id="bulkLogBtn">Add to sent record</button>
+          <span id="bulkLogMsg" class="hint" style="margin:0"></span>
+        </div>
+      </div>
+    </details>`;
+
+  document.getElementById('arFilter').addEventListener('change', e => { state.archiveFilter = e.target.value; render(); });
+  main.querySelectorAll('.ar-toggle').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.key;
+    if (open.has(k)) open.delete(k); else open.add(k);
+    render();
+  }));
+  main.querySelectorAll('.ar-letter-btn').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.key;
+    if (letterOpen.has(k)) letterOpen.delete(k); else letterOpen.add(k);
+    render();
+  }));
+  main.querySelectorAll('.ar-bringback-btn').forEach(b => b.addEventListener('click', () => { bringBackFromArchive(b.dataset.ref); render(); }));
+  main.querySelectorAll('.ar-restore-btn').forEach(b => b.addEventListener('click', () => {
+    const ref = b.dataset.ref;
+    if (!confirm('Take this off the sent record? It will then be allowed to be sent again.')) return;
+    const lg = getLog();
+    delete lg[ref];
+    saveLog(lg);
+    leads = leads.map(classify);
+    saveLeadsToStorage();
+    render();
+  }));
+  document.getElementById('bulkLogBtn').addEventListener('click', () => {
+    const lines = document.getElementById('bulkLogBox').value.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!lines.length) return;
+    const lg = getLog();
+    let n = 0;
+    lines.forEach(line => {
+      const [ref, name] = line.split('\t').map(s => (s || '').trim());
+      if (!ref) return;
+      lg[ref] = { date: todayISO(), name: name || '', source: ref.startsWith('ARCH-') ? 'business' : 'planning' };
+      n++;
     });
-    row.querySelector('.type-sel').addEventListener('change', e => { leads[i].type = e.target.value; saveLeadsToStorage(); renderReview(main, source); });
-    row.querySelector('.sal-input').addEventListener('change', e => { leads[i].salutation = e.target.value; saveLeadsToStorage(); });
-    row.querySelector('.archive-one-btn').addEventListener('click', () => {
-      const l = leads[i];
-      if (!confirm(`Mark "${l.applicant}" as sent? This moves it to the ${l.source === 'business' ? 'Business' : 'Planning'} archive.`)) return;
-      const log = getLog();
-      if (l.ref) log[l.ref] = { date: new Date().toISOString().slice(0,10), name: l.applicant, source: l.source || 'planning' };
-      saveLog(log);
-      l.alreadyProcessed = true;
-      l.include = false;
-      saveLeadsToStorage();
-      renderReview(main, source);
-    });
+    saveLog(lg);
+    leads = leads.map(classify);
+    saveLeadsToStorage();
+    render();
+    const msg = document.getElementById('bulkLogMsg');
+    if (msg) msg.textContent = `Added ${n} to the sent record.`;
   });
 }
 
@@ -1114,12 +1308,12 @@ function renderPrint(main, kind){
   // can never silently get printed/sent again.
   const batch = leads.filter(l => l.include && !l.alreadyProcessed);
   if (!batch.length) {
-    const msg = leads.length
-      ? `Nothing set to Send right now — ${leads.length} leads are loaded, but they're all either standing-excluded, flagged for a check, or already sent. Go to Review to see them and flip anything back to Send.`
-      : `Nothing parsed yet — go to Import and paste this week's leads.`;
-    main.innerHTML = `<p class="empty-state">${esc(msg)}</p>`;
+    main.innerHTML = `<p class="empty-state">Nothing on the print list yet — open Approved, Pending or Businesses and press "Send to print" (one at a time, or "Send all to print").</p>`;
     return;
   }
+  const byFolder = { approved: 0, pending: 0, business: 0 };
+  batch.forEach(l => byFolder[leadFolder(l)]++);
+  const mix = Object.entries(byFolder).filter(([, n]) => n).map(([k, n]) => `${n} ${FOLDERS[k]}`).join(' &middot; ');
 
   const align = getEnvAlign();
   const alignToggleHtml = kind === 'envelope' ? `
@@ -1132,10 +1326,12 @@ function renderPrint(main, kind){
     <div class="row-actions">
       <button class="btn" id="printBtn">&#128438; Print (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
       <button class="btn" id="savePdfBtn">&#11015; Save as PDF&hellip;</button>
-      <button class="btn" id="saveArchiveBtn">&#128190; Save &amp; Archive&hellip;</button>
-      <button class="btn-secondary" id="markSentBtn">&#10003; Mark these ${batch.length} as sent (updates the processed log)</button>
+      <button class="btn" id="saveArchiveBtn">&#128190; Save PDF &amp; mark as sent&hellip;</button>
+      <button class="btn-secondary" id="markSentBtn">&#10003; Mark these ${batch.length} as sent</button>
       ${alignToggleHtml}
       <span id="printMsg" style="color:var(--muted);font-size:0.82rem"></span>
+    </div>
+    <div class="stat-bar"><span>${mix}</span><span>Each ${kind === 'letter' ? 'letter uses' : 'envelope matches'} the copy for its folder — letters and envelopes are in the same order.</span>
     </div>
     <div id="pdfArea">${batch.map((l, i) => docWrapHtml(l, i, kind)).join('')}</div>
   `;
@@ -1145,7 +1341,11 @@ function renderPrint(main, kind){
     if (!wrap) return;
     const lead = batch[Number(wrap.dataset.idx)];
     const panel = wrap.querySelector('.doc-edit-panel');
-    if (e.target.classList.contains('doc-edit-btn')) {
+    if (e.target.classList.contains('doc-remove-btn')) {
+      lead.include = false;
+      saveLeadsToStorage();
+      render();
+    } else if (e.target.classList.contains('doc-edit-btn')) {
       panel.hidden = !panel.hidden;
     } else if (e.target.classList.contains('edit-cancel-btn')) {
       panel.hidden = true;
@@ -1174,7 +1374,7 @@ function renderPrint(main, kind){
 
     area.classList.add('pdf-exporting');
     const pages = Array.from(area.querySelectorAll('.print-doc'));
-    let ok = false;
+    let ok = null;
     try {
       let pdf = null;
       for (let i = 0; i < pages.length; i++) {
@@ -1202,7 +1402,7 @@ function renderPrint(main, kind){
       }
       pdf.save(filename);
       if (msg) msg.textContent = `Saved — check your Downloads (or wherever your browser saves files) for "${filename}".`;
-      ok = true;
+      ok = filename;
     } catch (err) {
       if (msg) msg.textContent = 'Could not build the PDF: ' + err.message;
     } finally {
@@ -1211,18 +1411,20 @@ function renderPrint(main, kind){
     }
     return ok;
   }
-  function archiveBatch(hide){
-    // Tags leads as "already sent" for the record (and to warn about
-    // resending them on a future pull). Plain "Mark as sent" never
-    // hides or locks them — that was the whole point of the earlier
-    // fix, since an accidental click shouldn't make a lead vanish.
-    // "Save & Archive" is different: it's a deliberate, unambiguous
-    // "this batch is done" action, so it also clears the batch out of
-    // Print — pass hide=true only from there.
+  // Records each lead as sent, with a snapshot of exactly what was
+  // printed (address, salutation, which letter, date, PDF file + page),
+  // so the Archive can show the actual letter that went out later.
+  function archiveBatch(hide, pdfFile){
     const log = getLog();
-    const today = new Date().toISOString().slice(0,10);
-    batch.forEach(l => {
-      if (l.ref) log[l.ref] = { date: today, name: l.applicant, source: l.source || 'planning' };
+    const today = todayISO();
+    const letterDate = todayOrdinal();
+    batch.forEach((l, i) => {
+      if (l.ref) log[l.ref] = {
+        date: today, name: l.applicant, source: leadFolder(l) === 'business' ? 'business' : 'planning',
+        copy: leadFolder(l), recipientLines: l.recipientLines, salutation: l.salutation, letterDate,
+        description: l.description || '',
+        ...(pdfFile ? (kind === 'letter' ? { pdfFile, pdfPage: i + 1 } : { envelopePdfFile: pdfFile, envelopePdfPage: i + 1 }) : {})
+      };
       l.alreadyProcessed = true;
       if (hide) l.include = false;
     });
@@ -1232,9 +1434,9 @@ function renderPrint(main, kind){
   document.getElementById('savePdfBtn').addEventListener('click', () => buildAndSavePdf(document.getElementById('savePdfBtn')));
   document.getElementById('saveArchiveBtn').addEventListener('click', async () => {
     const btn = document.getElementById('saveArchiveBtn');
-    const ok = await buildAndSavePdf(btn);
-    if (!ok) return;
-    archiveBatch(true);
+    const filename = await buildAndSavePdf(btn);
+    if (!filename) return;
+    archiveBatch(true, filename);
     render();
   });
   document.getElementById('markSentBtn').addEventListener('click', () => {
@@ -1251,7 +1453,9 @@ function docWrapHtml(l, idx, kind){
     : '';
   return `<div class="doc-wrap" data-idx="${idx}">
     <div class="doc-toolbar no-print">
+      <span class="doc-copy-label">${FOLDERS[leadFolder(l)]} letter</span>
       <button class="doc-edit-btn" type="button">&#9998; Edit this one</button>
+      <button class="doc-edit-btn doc-remove-btn" type="button">&#10005; Take off print list</button>
     </div>
     ${docHtml}
     <div class="doc-edit-panel no-print" hidden>
@@ -1274,11 +1478,11 @@ function letterHtml(l){
         <div class="addr">23 Circular Road, Douglas, Isle of Man, IM1 1AF<br>01624 614845 &nbsp;|&nbsp; info@silverdale.im &nbsp;|&nbsp; silverdale.im</div>
       </div>
     </div>
-    <div class="letter-date">${todayOrdinal()}</div>
+    <div class="letter-date">${esc(l.letterDate || todayOrdinal())}</div>
     <div class="letter-addr">${l.recipientLines.map(esc).join('<br>')}</div>
     <div class="letter-body">
       <p>${esc(l.salutation)}</p>
-      ${(l.source === 'business' ? businessLetterBody() : l.planningStatus === 'pending' ? pendingLetterBody() : letterBody()).map(p => `<p>${p}</p>`).join('')}
+      ${({ approved: letterBody, pending: pendingLetterBody, business: businessLetterBody }[leadFolder(l)])().map(p => `<p>${p}</p>`).join('')}
       <p>Kind regards,</p>
       <div class="letter-sign"><img src="assets/harry-signature.jpeg" alt="Signature"></div>
       <p style="margin-top:0">Andrew Harrison<br>Director, Silverdale Limited</p>
@@ -1299,110 +1503,23 @@ function envelopeHtml(l){
   </div>`;
 }
 
-function renderLog(main){
-  const log = getLog();
-  // Split by source so planning and business history read as two
-  // separate archives, not one merged list — an entry's own `source`
-  // wins, falling back to the ARCH- ref prefix for rows logged before
-  // that field existed.
-  const isBiz = ref => log[ref].source === 'business' || ref.startsWith('ARCH-');
-  const allRefs = Object.keys(log).sort().reverse();
-  const planningRefs = allRefs.filter(r => !isBiz(r));
-  const businessRefs = allRefs.filter(isBiz);
-
-  const bulkAddHtml = `
-    <div class="bulk-add-log">
-      <p class="hint">Already sent these outside the tool, or restoring history after a browser reset? Paste one per line — <code>Reference&#9;Name</code> (tab-separated) or just the reference on its own — and they'll be logged as sent from today (as planning history, unless the reference already looks like a business one), so they're flagged if they ever come up again.</p>
-      <textarea id="bulkLogBox" rows="4" placeholder="26/00465/B&#9;Mr & Mrs W. Philip & Norma Richards"></textarea>
-      <div class="row-actions" style="margin-top:10px">
-        <button class="btn" id="bulkLogBtn">Add to log</button>
-        <span id="bulkLogMsg" style="color:var(--muted);font-size:0.82rem"></span>
-      </div>
-    </div>`;
-
-  function section(title, refs){
-    const header = `<h3 class="lead-section-hdr">${esc(title)} &middot; ${refs.length}</h3>`;
-    if (!refs.length) return header + '<p class="empty-state">Nothing logged here yet.</p>';
-    return header + `
-      <div class="row-actions">
-        <button class="btn restore-all-btn" data-scope="${esc(title)}">&#8617; Restore all ${refs.length} to Send</button>
-      </div>
-      <table class="leads"><thead><tr><th></th><th>Reference</th><th>Applicant</th><th>Date logged</th></tr></thead><tbody>
-      ${refs.map(ref => `<tr><td><button class="btn-secondary restore-btn" data-ref="${esc(ref)}">&#8617; Restore</button></td><td>${esc(ref)}</td><td>${esc(log[ref].name)}</td><td>${esc(log[ref].date)}</td></tr>`).join('')}
-      </tbody></table>`;
-  }
-
-  main.innerHTML = bulkAddHtml
-    + (allRefs.length ? `<div class="row-actions"><button class="btn-danger" id="clearLogBtn">Clear entire log</button></div>` : '')
-    + section('Planning archive', planningRefs)
-    + section('Business archive', businessRefs);
-
-  document.getElementById('bulkLogBtn').addEventListener('click', () => {
-    const lines = document.getElementById('bulkLogBox').value.split('\n').map(s => s.trim()).filter(Boolean);
-    if (!lines.length) return;
-    const log = getLog();
-    const today = new Date().toISOString().slice(0,10);
-    let count = 0;
-    lines.forEach(line => {
-      const [ref, name] = line.split('\t').map(s => (s || '').trim());
-      if (!ref) return;
-      log[ref] = { date: today, name: name || '', source: ref.startsWith('ARCH-') ? 'business' : 'planning' };
-      count++;
-    });
-    saveLog(log);
-    leads = leads.map(classify);
-    saveLeadsToStorage();
-    renderLog(main);
-    const msg = document.getElementById('bulkLogMsg');
-    if (msg) msg.textContent = `Added ${count} to the log.`;
-  });
-
-  if (!allRefs.length) return;
-  document.getElementById('clearLogBtn').addEventListener('click', () => {
-    if (!confirm('Clear the whole processed-log? This will make every past reference look new again next import.')) return;
-    saveLog({});
-    leads = leads.map(classify);
-    saveLeadsToStorage();
-    render();
-  });
-  main.querySelectorAll('.restore-all-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const scope = btn.dataset.scope;
-      const refsToRestore = scope === 'Planning archive' ? planningRefs : businessRefs;
-      if (!confirm(`Restore all ${refsToRestore.length} in the ${scope} back to Send?`)) return;
-      const log = getLog();
-      refsToRestore.forEach(r => delete log[r]);
-      saveLog(log);
-      leads = leads.map(classify);
-      leads.forEach(l => { if (refsToRestore.includes(l.ref)) l.include = true; });
-      saveLeadsToStorage();
-      renderLog(main);
-    });
-  });
-  main.querySelectorAll('.restore-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const ref = btn.dataset.ref;
-      const log = getLog();
-      delete log[ref];
-      saveLog(log);
-      leads = leads.map(classify);
-      const restored = leads.find(l => l.ref === ref);
-      if (restored) restored.include = true;
-      saveLeadsToStorage();
-      renderLog(main);
-    });
-  });
-}
-
 document.querySelectorAll('.navbtn').forEach(btn => btn.addEventListener('click', () => { state.tab = btn.dataset.tab; render(); }));
 document.getElementById('downloadBackupBtn').addEventListener('click', downloadBackup);
 document.getElementById('restoreBackupBtn').addEventListener('click', () => document.getElementById('restoreBackupInput').click());
 document.getElementById('restoreBackupInput').addEventListener('change', e => restoreBackupFile(e.target.files[0]));
 
-const stored = loadLeadsFromStorage();
-leads = stored.length ? stored.map(classify) : parseInput(STARTER_TSV);
-if (leads.length && !stored.length) state.tab = 'review';
+leads = loadLeadsFromStorage().map(classify);
 render();
+
+// Two tabs of this app open at once used to be a silent data-loss trap:
+// the stale tab would later save its old in-memory list over the other's
+// work. Picking up the other tab's changes as they happen closes that.
+window.addEventListener('storage', e => {
+  if (e.key === LS_LEADS) leads = loadLeadsFromStorage().map(classify);
+  else if (e.key === LS_LOG || e.key === LS_REGISTER_DISMISSED) leads = leads.map(classify);
+  else return;
+  render();
+});
 </script>
 </body>
 </html>
