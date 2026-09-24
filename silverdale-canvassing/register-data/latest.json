@@ -1,6 +1,6 @@
 {
   "source": "pbc.gov.im",
-  "pulledAt": "2026-09-24T19:08:15.039519Z",
+  "pulledAt": "2026-09-24T19:50:11.641508Z",
   "monthsRequested": 1,
   "count": 158,
   "applications": [
@@ -14,13 +14,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Mr & Mrs David & Ann Giroux",
+      "applicantAddress": null,
       "agentName": "Soumya Singh",
       "agentCompanyName": "Adam Architecture",
-      "agentAddress": "West Wing Somerset House The Strand London WC2R 1LA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "West Wing Somerset House The Strand London WC2R 1LA"
     },
     {
       "ref": "26/10126/AIR",
@@ -32,13 +33,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Robinsons",
+      "applicantAddress": null,
       "agentName": "Hartford Homes Ltd",
       "agentCompanyName": null,
-      "agentAddress": "Unit 2 Middle River Douglas IM2 1AL",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Unit 2 Middle River Douglas IM2 1AL"
     },
     {
       "ref": "26/10125/AIR",
@@ -50,13 +52,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Robinsons",
+      "applicantAddress": null,
       "agentName": "Hartford Homes Ltd",
       "agentCompanyName": null,
-      "agentAddress": "Unit 2 Middle River Douglas IM2 1AL",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Unit 2 Middle River Douglas IM2 1AL"
     },
     {
       "ref": "26/10124/AIR",
@@ -68,13 +71,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Hartford Homes Ltd",
+      "applicantAddress": "Unit 2 Middle River Douglas IM2 1AL",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/10123/AIR",
@@ -86,13 +90,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Manx Utilities",
+      "applicantAddress": null,
       "agentName": "AECOM",
       "agentCompanyName": null,
-      "agentAddress": "10th Floor The Clarence West Building 2 Clarence Street West Belfast BT2 7GP",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "10th Floor The Clarence West Building 2 Clarence Street West Belfast BT2 7GP"
     },
     {
       "ref": "26/10122/AIR",
@@ -104,13 +109,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Manx Utilities",
+      "applicantAddress": null,
       "agentName": "AECOM",
       "agentCompanyName": null,
-      "agentAddress": "10th Floor The Clarence West Building 2 Clarence Street West Belfast BT2 7GP",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "10th Floor The Clarence West Building 2 Clarence Street West Belfast BT2 7GP"
     },
     {
       "ref": "26/10121/AIR",
@@ -122,13 +128,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Department Of Environment, Food & Agriculture",
+      "applicantAddress": null,
       "agentName": "Stillwater Associates",
       "agentCompanyName": null,
-      "agentAddress": "Chapter House 33 London Road Reigate RH2 9HZ",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Chapter House 33 London Road Reigate RH2 9HZ"
     },
     {
       "ref": "26/10120/AIR",
@@ -140,8 +147,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Tue 22 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "Department Of Environment, Food & Agriculture",
+      "applicantAddress": null,
       "agentName": "Stillwater Associates",
       "agentCompanyName": null,
       "agentAddress": "Chapter House 33 London Road Reigate RH2 9HZ"
@@ -156,13 +166,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Mr David Salkeld",
+      "applicantAddress": "Perk Cottage Knock Froy Lane Santon",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/10117/AIR",
@@ -174,13 +185,14 @@
       "decided": null,
       "status": "Pending Decision",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Mr & Mrs Gary & Jane Hewitt",
+      "applicantAddress": null,
       "agentName": "Gareth M Roberts",
       "agentCompanyName": null,
-      "agentAddress": "The Nook Stanley Mount East Ramsey IM8 1NP",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "The Nook Stanley Mount East Ramsey IM8 1NP"
     },
     {
       "ref": "26/10116/AIR",
@@ -192,13 +204,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Mr & Mrs Gary & Jane Hewitt",
+      "applicantAddress": null,
       "agentName": "Gareth M Roberts",
       "agentCompanyName": null,
-      "agentAddress": "The Nook Stanley Mount East Ramsey IM8 1NP",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "The Nook Stanley Mount East Ramsey IM8 1NP"
     },
     {
       "ref": "26/10115/AIR",
@@ -210,13 +223,14 @@
       "decided": null,
       "status": "Pending Decision",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Mr & Mrs Gary & Jane Hewitt",
+      "applicantAddress": null,
       "agentName": "Gareth M Roberts",
       "agentCompanyName": null,
-      "agentAddress": "The Nook Stanley Mount East Ramsey IM8 1NP",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "The Nook Stanley Mount East Ramsey IM8 1NP"
     },
     {
       "ref": "26/10114/AIR",
@@ -228,13 +242,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Mr & Mrs Wells",
+      "applicantAddress": null,
       "agentName": "EnviroArchitecture Ltd.",
       "agentCompanyName": null,
-      "agentAddress": "17 Derby Square Douglas IM1 3LS",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "17 Derby Square Douglas IM1 3LS"
     },
     {
       "ref": "26/10111/AIR",
@@ -246,13 +261,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Mr Kier James",
+      "applicantAddress": null,
       "agentName": "Cornerstone Architects Ltd",
       "agentCompanyName": null,
-      "agentAddress": "79 Parliament Street Ramsey Isle Of Man IM8 1AQ",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "79 Parliament Street Ramsey Isle Of Man IM8 1AQ"
     },
     {
       "ref": "26/10102/AIR",
@@ -264,8 +280,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 24 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "The Hon. Laurence Skelly MLC, President Of Tynwald",
+      "applicantAddress": null,
       "agentName": "Mr Carl Jenkins",
       "agentCompanyName": null,
       "agentAddress": "10 Ballaterson Road Peel Isle Of Man IM5 1BJ"
@@ -280,8 +299,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "Manx Utilities",
+      "applicantAddress": "PO Box 177 Douglas Isle Of Man IM99 1PS",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -296,8 +318,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 02 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "Wendy Cull",
+      "applicantAddress": "68 Patrick Street Peel Isle Of Man IM5 1BS",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -312,13 +337,14 @@
       "decided": null,
       "status": "Pending Decision",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Condition Discharge",
       "applicantName": "Hartford Homes",
+      "applicantAddress": "Middle River Douglas IM2 1AL",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/10078/AIR",
@@ -330,8 +356,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "Stephen Dick",
+      "applicantAddress": "C/o 4 High Street Port St Mary Isle Of Man IM9 5DR",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -346,8 +375,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "Ballalheaney Properties Limited",
+      "applicantAddress": null,
       "agentName": "Sam Samson",
       "agentCompanyName": "Samson Designs Limited",
       "agentAddress": "The Workshop Park Road Port St Mary IM9 5HP"
@@ -362,8 +394,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "Ballalheaney Properties Limited",
+      "applicantAddress": null,
       "agentName": "Sam Samson",
       "agentCompanyName": "Samson Designs Limited",
       "agentAddress": "The Workshop Park Road Port St Mary IM9 5HP"
@@ -378,8 +413,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 07 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "Mr Gordon Halton",
+      "applicantAddress": null,
       "agentName": "David Halliday",
       "agentCompanyName": null,
       "agentAddress": "134 Curly Hill Ilkley LS29 0DS"
@@ -394,8 +432,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "JM Management Ltd",
+      "applicantAddress": null,
       "agentName": "MP Associates",
       "agentCompanyName": null,
       "agentAddress": "12 Strathallan Crescent Douglas Douglas IM2 4NR"
@@ -410,8 +451,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "JM Management Ltd",
+      "applicantAddress": null,
       "agentName": "MP Associates",
       "agentCompanyName": null,
       "agentAddress": "12 Strathallan Crescent Douglas Douglas IM2 4NR"
@@ -426,13 +470,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "Livelladean Limited",
+      "applicantAddress": null,
       "agentName": "Cornerstone Architects",
       "agentCompanyName": "Cornerstone Architects",
-      "agentAddress": "79 Parliament Street Ramsey Isle Of Man IM8 1AQ",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "79 Parliament Street Ramsey Isle Of Man IM8 1AQ"
     },
     {
       "ref": "26/00871/CON",
@@ -444,13 +489,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Registered Building Consent",
       "applicantName": "Onchan Burial Authority",
+      "applicantAddress": null,
       "agentName": "Mr David Norman",
       "agentCompanyName": "Fistard project Services",
-      "agentAddress": "Almorah Fistard Road Port St Mary Port St. Mary IM9 5HF",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Almorah Fistard Road Port St Mary Port St. Mary IM9 5HF"
     },
     {
       "ref": "26/00870/GB",
@@ -462,13 +508,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Planning application Regsd Building",
       "applicantName": "Onchan Burial Authority",
+      "applicantAddress": null,
       "agentName": "Mr David Norman",
       "agentCompanyName": "Fistard Project Services",
-      "agentAddress": "Almorah Fistard Road Port St Mary Port St. Mary IM9 5HF",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Almorah Fistard Road Port St Mary Port St. Mary IM9 5HF"
     },
     {
       "ref": "26/00866/B",
@@ -480,13 +527,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Vincent Nyawai",
+      "applicantAddress": null,
       "agentName": "Mr Peter Tyreman",
       "agentCompanyName": "ELLIS BROWN ARCHITECTS",
-      "agentAddress": "1 SYDNEY MOUNT DOUGLAS IM1 3DB",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "1 SYDNEY MOUNT DOUGLAS IM1 3DB"
     },
     {
       "ref": "26/00860/B",
@@ -498,13 +546,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Paul Ford",
+      "applicantAddress": "10 Selborne Road Douglas Isle Of Man IM1 4BU",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00850/B",
@@ -516,13 +565,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Nick Crone",
+      "applicantAddress": null,
       "agentName": "Mr carl Jenkins",
       "agentCompanyName": "CJ Design Limited",
-      "agentAddress": "10 Ballaterson Road Peel IM51BJ",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "10 Ballaterson Road Peel IM51BJ"
     },
     {
       "ref": "26/00848/C",
@@ -534,13 +584,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Change of Use",
       "applicantName": "Miss Rowanna Miller",
+      "applicantAddress": "1 Peveril Road Peel isle of man IM5 1NU",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00831/B",
@@ -552,13 +603,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Claire Heath",
+      "applicantAddress": "Seafield Mount Gawne Road Rushen IM9 5LX",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00826/B",
@@ -570,13 +622,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Justin Moughtin",
+      "applicantAddress": null,
       "agentName": "Mr Nick Jones",
       "agentCompanyName": "Manx Structural Solutions",
-      "agentAddress": "15 All Saints Park Church Rd LONAN IM4 7LA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "15 All Saints Park Church Rd LONAN IM4 7LA"
     },
     {
       "ref": "26/00820/B",
@@ -588,13 +641,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Zaln Limited",
+      "applicantAddress": null,
       "agentName": "Mr John Wilson",
       "agentCompanyName": "Wilson Consulting Limited",
-      "agentAddress": "Kempis House Orrisdale Road Ballasalla IM9 3AE",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Kempis House Orrisdale Road Ballasalla IM9 3AE"
     },
     {
       "ref": "26/00805/CON",
@@ -606,13 +660,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Registered Building Consent",
       "applicantName": "Alex Lewthwaite",
+      "applicantAddress": null,
       "agentName": "Mr Wayne Lewthwaite",
       "agentCompanyName": "Kelly-Lewthwaite Building Design Limited",
-      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA"
     },
     {
       "ref": "26/00804/D",
@@ -624,13 +679,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Advertisements",
       "applicantName": "Mr Alex Lewthwaite",
+      "applicantAddress": null,
       "agentName": "Mr Wayne Lewthwaite",
       "agentCompanyName": "Kelly-Lewthwaite Building Design Limited",
-      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA"
     },
     {
       "ref": "26/00802/CON",
@@ -642,13 +698,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Registered Building Consent",
       "applicantName": "Picaro Limited",
+      "applicantAddress": null,
       "agentName": "Mr Wayne Lewthwaite",
       "agentCompanyName": "Kelly-Lewthwaite Building Design Limited",
-      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA"
     },
     {
       "ref": "26/00801/CON",
@@ -660,13 +717,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Registered Building Consent",
       "applicantName": "Mr Alex Lewthwaite",
+      "applicantAddress": null,
       "agentName": "Mr Wayne Lewthwaite",
       "agentCompanyName": "Kelly-Lewthwaite Building Design Limited",
-      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA"
     },
     {
       "ref": "26/00800/D",
@@ -678,13 +736,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Advertisements",
       "applicantName": "Mr Alex Lewthwaite",
+      "applicantAddress": null,
       "agentName": "Mr Wayne Lewthwaite",
       "agentCompanyName": "Kelly-Lewthwaite Building Design Limited",
-      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA"
     },
     {
       "ref": "26/00791/B",
@@ -696,13 +755,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Gareth Hann",
+      "applicantAddress": null,
       "agentName": "Mr Harry Swayne",
       "agentCompanyName": "Axis Consulting Engineers",
-      "agentAddress": "Attic Floor Sovereign House Station Road St John's IM4 3AS",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Attic Floor Sovereign House Station Road St John's IM4 3AS"
     },
     {
       "ref": "26/00790/B",
@@ -714,13 +774,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Blair Acheson",
+      "applicantAddress": null,
       "agentName": "Mr Tom Creer",
       "agentCompanyName": "Axis Consulting Engineers",
-      "agentAddress": "Sovereign House, St Johns Isle of Man IM4 3AJ",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Sovereign House, St Johns Isle of Man IM4 3AJ"
     },
     {
       "ref": "26/00782/B",
@@ -732,13 +793,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Roger Smith",
+      "applicantAddress": null,
       "agentName": "Mr Chris Penketh",
       "agentCompanyName": "Penketh-Millar",
-      "agentAddress": "23 West Quay Ramsey IM8 1DL",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 West Quay Ramsey IM8 1DL"
     },
     {
       "ref": "26/00779/B",
@@ -750,8 +812,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 07 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Belinda Hockney",
+      "applicantAddress": "Kerrowglass House Stockfield Road Kirk Michael Isle of Man IM6 1HP",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -766,8 +831,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Heidi Danaher",
+      "applicantAddress": null,
       "agentName": "Mr David Luton",
       "agentCompanyName": "DLD ltd",
       "agentAddress": "Architects Studio Agneash Laxey IM47NS"
@@ -782,8 +850,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Planning application Regsd Building",
       "applicantName": "Elizabeth Mary Innes",
+      "applicantAddress": "5-7 Queen Street Peel Isle Of Man IM5 1AG",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -798,8 +869,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Registered Building Consent",
       "applicantName": "Elizabeth Mary Innes",
+      "applicantAddress": "5-7 Queen Street Peel Isle Of Man IM5 1AG",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -814,13 +888,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Ms Becki Gelling",
+      "applicantAddress": null,
       "agentName": "Miss Sarah Corlett",
       "agentCompanyName": "Sarah Corlett Town Planning Consultancy Ltd",
-      "agentAddress": "Ballachrink Croft Ballacorey Road Bride IM7 4AW",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Ballachrink Croft Ballacorey Road Bride IM7 4AW"
     },
     {
       "ref": "26/00741/B",
@@ -832,13 +907,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Linda Alton-Heath",
+      "applicantAddress": null,
       "agentName": "Mr Chris Penketh",
       "agentCompanyName": "Penketh-Millar",
-      "agentAddress": "23 West Quay Ramsey IM8 1DL",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 West Quay Ramsey IM8 1DL"
     },
     {
       "ref": "26/00740/C",
@@ -850,13 +926,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Change of Use",
       "applicantName": "34 Moves (Eterna Ltd)",
+      "applicantAddress": null,
       "agentName": "Hartford Homes",
       "agentCompanyName": "Hartford Homes",
-      "agentAddress": "Unit 2, Middle River Douglas IM21AL",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Unit 2, Middle River Douglas IM21AL"
     },
     {
       "ref": "26/00737/B",
@@ -868,13 +945,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Stephen Finnegan",
+      "applicantAddress": null,
       "agentName": "Mr Martyn Hobson",
       "agentCompanyName": "ArchTec (IOM) Ltd Architectural Design Consultants",
-      "agentAddress": "Architectural Studio 7 Olafs Close Douglas IM2 7AR",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Architectural Studio 7 Olafs Close Douglas IM2 7AR"
     },
     {
       "ref": "26/00734/B",
@@ -886,13 +964,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Peveril Rifle Club",
+      "applicantAddress": null,
       "agentName": "Mr Gareth Roberts",
       "agentCompanyName": null,
-      "agentAddress": "IM8 1NP The Nook, Stanley Mount East Ramsey Isle of Man IM8 1NP",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "IM8 1NP The Nook, Stanley Mount East Ramsey Isle of Man IM8 1NP"
     },
     {
       "ref": "26/00733/B",
@@ -904,13 +983,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Ms Joney Kerruish",
+      "applicantAddress": null,
       "agentName": "Mr Nick Jones",
       "agentCompanyName": "Manx Structural Solutions",
-      "agentAddress": "15 All Saints Park Church Rd LONAN IM4 7LA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "15 All Saints Park Church Rd LONAN IM4 7LA"
     },
     {
       "ref": "26/00721/B",
@@ -922,13 +1002,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Brian Salmon",
+      "applicantAddress": null,
       "agentName": "Mr Wayne Lewthwaite",
       "agentCompanyName": "Kelly-Lewthwaite Building Design Limited",
-      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA"
     },
     {
       "ref": "26/00718/C",
@@ -940,8 +1021,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 21 Sep 2026",
       "applicationType": "Change of Use",
       "applicantName": "Dr Satish Ramm",
+      "applicantAddress": "20 Alderley Close Douglas IM2 1NT",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -956,13 +1040,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "James Bridson",
+      "applicantAddress": "4 Lyndale Avenue Peel Isle Of Man IM5 1JY",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00714/B",
@@ -974,13 +1059,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Lee Harbon",
+      "applicantAddress": null,
       "agentName": "Ellis Brown",
       "agentCompanyName": "Ellis Brown",
-      "agentAddress": "1 Sydney Mount Douglas Isle Of Man IM1 3DB",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "1 Sydney Mount Douglas Isle Of Man IM1 3DB"
     },
     {
       "ref": "26/00710/B",
@@ -992,13 +1078,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Richard Barks",
+      "applicantAddress": null,
       "agentName": "Mr David Luton",
       "agentCompanyName": "DLD ltd",
-      "agentAddress": "Architects Studio Agneash Laxey IM47NS",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Architects Studio Agneash Laxey IM47NS"
     },
     {
       "ref": "26/00709/GB",
@@ -1010,13 +1097,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Planning application Regsd Building",
       "applicantName": "Picaro Limited",
+      "applicantAddress": null,
       "agentName": "Mr Wayne Lewthwaite",
       "agentCompanyName": "Kelly-Lewthwaite Building Design Limited",
-      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA"
     },
     {
       "ref": "26/00706/B",
@@ -1028,13 +1116,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr T MacLaren",
+      "applicantAddress": null,
       "agentName": "Mick Stott",
       "agentCompanyName": "MS Design Ltd",
-      "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU"
     },
     {
       "ref": "26/00703/B",
@@ -1046,13 +1135,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Banana Computers Ltd",
+      "applicantAddress": null,
       "agentName": "Kinrade Associates Limited",
       "agentCompanyName": null,
-      "agentAddress": "Stella Maris Mountain Road Ramsey Isle Of Man IM8 2JJ",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Stella Maris Mountain Road Ramsey Isle Of Man IM8 2JJ"
     },
     {
       "ref": "26/00695/B",
@@ -1064,13 +1154,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr John Parsons",
+      "applicantAddress": "Peterson House Middle River Douglas IM2 1AL",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00693/B",
@@ -1082,13 +1173,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Peter Elworthy",
+      "applicantAddress": null,
       "agentName": "Mrs Jacqui Verduyn",
       "agentCompanyName": "Verduyn Architects Ltd",
-      "agentAddress": "Ballagawne House Ballagawne Road Colby IM9 4AZ",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Ballagawne House Ballagawne Road Colby IM9 4AZ"
     },
     {
       "ref": "26/00692/B",
@@ -1100,13 +1192,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Ms Lisa James",
+      "applicantAddress": null,
       "agentName": "Mr Andrew Henderson",
       "agentCompanyName": "AH Grace Ltd",
-      "agentAddress": "32 Cronk Avenue onchan IM3 3DF",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "32 Cronk Avenue onchan IM3 3DF"
     },
     {
       "ref": "26/00680/B",
@@ -1118,8 +1211,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Nick Crone",
+      "applicantAddress": null,
       "agentName": "Modus Architects Ltd",
       "agentCompanyName": "Modus Architects Ltd",
       "agentAddress": "PO Box 2 Castletown IM99 5DJ"
@@ -1134,8 +1230,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 07 Sep 2026",
       "applicationType": "Registered Building Consent",
       "applicantName": "Mrs Moira Mackie",
+      "applicantAddress": null,
       "agentName": "Ms Elke Zinnecker",
       "agentCompanyName": null,
       "agentAddress": "Unit 1C, Balderton Court, Balthane Ballasalla IM9 2AJ"
@@ -1150,8 +1249,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 24 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Christopher Poggio",
+      "applicantAddress": null,
       "agentName": "CJ Design Limited",
       "agentCompanyName": null,
       "agentAddress": "10 Ballaterson Road Peel IM51BJ"
@@ -1166,13 +1268,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Colin Mifflin",
+      "applicantAddress": null,
       "agentName": "Quay Design Ltd",
       "agentCompanyName": "Quay Design Ltd",
-      "agentAddress": "5 The Quay Port St Mary IM9 5EA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "5 The Quay Port St Mary IM9 5EA"
     },
     {
       "ref": "26/00667/B",
@@ -1184,13 +1287,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Stella Moss",
+      "applicantAddress": null,
       "agentName": "Mr Chris Penketh",
       "agentCompanyName": "Penketh-Millar",
-      "agentAddress": "23 West Quay Ramsey IM8 1DL",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 West Quay Ramsey IM8 1DL"
     },
     {
       "ref": "26/00664/B",
@@ -1202,13 +1306,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Peter Elworthy",
+      "applicantAddress": "46 Malew Street Castletown IM9 1AF",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00662/B",
@@ -1220,13 +1325,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Thomas Downey",
+      "applicantAddress": null,
       "agentName": "Axis Consulting Engineers Ltd.",
       "agentCompanyName": "Axis Consulting Engineers Ltd.",
-      "agentAddress": "Mr Harry Swayne Top Floor, Sovereign House, St Johns, Isle Of Man IM4 3AJ",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Mr Harry Swayne Top Floor, Sovereign House, St Johns, Isle Of Man IM4 3AJ"
     },
     {
       "ref": "26/00660/MCH",
@@ -1238,13 +1344,14 @@
       "decided": null,
       "status": "Pending Decision",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Minor Change Application",
       "applicantName": "Keldevelopments Limited",
+      "applicantAddress": null,
       "agentName": "Mr Gareth Roberts",
       "agentCompanyName": null,
-      "agentAddress": "IM8 1NP The Nook, Stanley Mount East Ramsey Isle of Man IM8 1NP",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "IM8 1NP The Nook, Stanley Mount East Ramsey Isle of Man IM8 1NP"
     },
     {
       "ref": "26/00659/B",
@@ -1256,13 +1363,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Jason Elliott",
+      "applicantAddress": null,
       "agentName": "Mr Andrew Henderson",
       "agentCompanyName": "AH Grace Ltd",
-      "agentAddress": "32 Cronk Avenue onchan IM3 3DF",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "32 Cronk Avenue onchan IM3 3DF"
     },
     {
       "ref": "26/00658/B",
@@ -1274,8 +1382,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 07 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Glenn Kinrade",
+      "applicantAddress": "Stella Maris Mountain Road Ramsey Isle Of Man IM8 2JJ",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -1290,13 +1401,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Nicola Marshall",
+      "applicantAddress": "20 Broadway Douglas Isle Of Man IM2 4EL",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00653/LAW",
@@ -1308,8 +1420,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Certificate of lawfulness",
       "applicantName": "Barbara Learoyd",
+      "applicantAddress": null,
       "agentName": "Ben Howland",
       "agentCompanyName": "Dickinson Cruickshank Ramsey",
       "agentAddress": "Masonic Buildings Water Street Ramsey IM8 1RD"
@@ -1324,13 +1439,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Bubble Limited",
+      "applicantAddress": null,
       "agentName": "Miss Sarah Corlett",
       "agentCompanyName": "Sarah Corlett Town Planning Consultancy Ltd",
-      "agentAddress": "Ballachrink Croft Ballacorey Road Bride IM7 4AW",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Ballachrink Croft Ballacorey Road Bride IM7 4AW"
     },
     {
       "ref": "26/00641/B",
@@ -1342,13 +1458,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Steen Heidemann",
+      "applicantAddress": null,
       "agentName": "Mr david Luton",
       "agentCompanyName": "DLD ltd",
-      "agentAddress": "Architects Studio Agneash Laxey IM47NS",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Architects Studio Agneash Laxey IM47NS"
     },
     {
       "ref": "26/00640/B",
@@ -1360,13 +1477,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Miss Emma Roberts",
+      "applicantAddress": "99 Woodbourne Road Douglas IM2 3AR",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00638/MCH",
@@ -1378,13 +1496,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Wed 09 Sep 2026",
       "applicationType": "Minor Change Application",
       "applicantName": "Mr & Mrs John and Jodie Bolton",
+      "applicantAddress": "11 Hillary Close Onchan IM3 4BF",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00637/CON",
@@ -1396,13 +1515,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Registered Building Consent",
       "applicantName": "Laxey Glen Mills Limited",
+      "applicantAddress": "Mill Rd, Laxey, Isle Of Man IM4 7AU",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00636/GB",
@@ -1414,13 +1534,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Planning application Regsd Building",
       "applicantName": "Laxey Glen Mills Limited",
+      "applicantAddress": "Mill Rd, Laxey, Isle Of Man IM4 7AU",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00631/B",
@@ -1432,13 +1553,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Rachael Cubbon",
+      "applicantAddress": null,
       "agentName": "Mr Mark Blair",
       "agentCompanyName": "Mark Blair Design Limited",
-      "agentAddress": "7 Creggan Lea Port St. Mary IM9 5BD",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "7 Creggan Lea Port St. Mary IM9 5BD"
     },
     {
       "ref": "26/00630/B",
@@ -1450,13 +1572,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Andrew Clark",
+      "applicantAddress": null,
       "agentName": "Mr Andrew Henderson",
       "agentCompanyName": "AH Grace Ltd",
-      "agentAddress": "32 Cronk Avenue Onchan IM3 3DF",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "32 Cronk Avenue Onchan IM3 3DF"
     },
     {
       "ref": "26/00629/B",
@@ -1468,8 +1591,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 21 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Richard Collister",
+      "applicantAddress": null,
       "agentName": "Mr carl Jenkins",
       "agentCompanyName": "CJ Design as instructed by Department Of Education, Sport...",
       "agentAddress": "10 Ballaterson Road Peel IM51BJ"
@@ -1484,8 +1610,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Miss Graihagh Hardinge",
+      "applicantAddress": null,
       "agentName": "Mr Chris Penketh",
       "agentCompanyName": "Penketh-Millar",
       "agentAddress": "23 West Quay Ramsey IM8 1DL"
@@ -1500,13 +1629,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr James Murphy",
+      "applicantAddress": null,
       "agentName": "Mick Stott",
       "agentCompanyName": "MS Design Ltd",
-      "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU"
     },
     {
       "ref": "26/00618/B",
@@ -1518,8 +1648,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Sarah Falconer",
+      "applicantAddress": null,
       "agentName": "Ms Elke Zinnecker",
       "agentCompanyName": null,
       "agentAddress": "Unit 1C, Balderton Court, Balthane Ballasalla IM9 2AJ"
@@ -1534,8 +1667,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 21 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Wayne Lewthwaite Kelly-Lewthwaite Building Design Lt",
+      "applicantAddress": null,
       "agentName": "Kelly Lewthwaite Building Design",
       "agentCompanyName": "Kelly Lewthwaite Building Design",
       "agentAddress": "23 Market Street Douglas IM1 2PA"
@@ -1550,8 +1686,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 24 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Errol & Mel Larson",
+      "applicantAddress": null,
       "agentName": "Verduyn Architects Ltd",
       "agentCompanyName": null,
       "agentAddress": "Mrs Jacqui Verduyn Ballagawne House Ballagawne Road Colby IM9 4AZ"
@@ -1566,13 +1705,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs David Caddick",
+      "applicantAddress": null,
       "agentName": "Mr Mark Blair",
       "agentCompanyName": "Mark Blair Design Limited",
-      "agentAddress": "7 Creggan Lea Port St. Mary IM9 5BD",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "7 Creggan Lea Port St. Mary IM9 5BD"
     },
     {
       "ref": "26/00601/B",
@@ -1584,8 +1724,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Peter Purcell",
+      "applicantAddress": null,
       "agentName": "Mr Stuart Batt",
       "agentCompanyName": "Urbancurve.co.uk",
       "agentAddress": "The Stallion Box - Raywood Offices Leacon Lane Charing Ashford TN270ET"
@@ -1600,8 +1743,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Adrian Kermode",
+      "applicantAddress": null,
       "agentName": "Mr Carl Jenkins",
       "agentCompanyName": "CJ Design Limited",
       "agentAddress": "10 Ballaterson Road Peel IM51BJ"
@@ -1616,8 +1762,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Tue 08 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Sarah Elder",
+      "applicantAddress": null,
       "agentName": "Miss Dawn Winn",
       "agentCompanyName": "Digit Isle Designs",
       "agentAddress": "Hall Caine Pavilion Old Church Road Crosby Crosby IM4 4BS"
@@ -1632,13 +1781,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr James Sayle",
+      "applicantAddress": null,
       "agentName": "Mr Michael Hoctor",
       "agentCompanyName": "Eire Electrical Ltd",
-      "agentAddress": "Capel Glen Pinfold Hill, Laxey ISLE OF MAN IM4 7HP",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Capel Glen Pinfold Hill, Laxey ISLE OF MAN IM4 7HP"
     },
     {
       "ref": "26/00591/B",
@@ -1650,13 +1800,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Giles Crellin",
+      "applicantAddress": null,
       "agentName": "JTM Architecture Ltd",
       "agentCompanyName": "JTM Architecture Ltd",
-      "agentAddress": "The Basement 16 Derby Road Douglas Isle of Man IM2 3ET",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "The Basement 16 Derby Road Douglas Isle of Man IM2 3ET"
     },
     {
       "ref": "26/00589/C",
@@ -1668,13 +1819,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Application Withdrawn",
+      "decisionDate": "Thu 10 Sep 2026",
       "applicationType": "Change of Use",
       "applicantName": "Colin Purvis",
+      "applicantAddress": "56 Murrays Road Douglas IM2 3HN",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00587/C",
@@ -1686,8 +1838,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Change of Use",
       "applicantName": "Bubble Limited",
+      "applicantAddress": null,
       "agentName": "Miss Sarah Corlett",
       "agentCompanyName": "Sarah Corlett Town Planning Consultancy Ltd",
       "agentAddress": "Ballachrink Croft Ballacorey Road Bride IM7 4AW"
@@ -1702,8 +1857,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Sharon Donaldson",
+      "applicantAddress": "Vistamar Croit-e-quill Close Laxey Isle Of Man IM4 7JE",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -1718,13 +1876,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Doggy Wash IoM",
+      "applicantAddress": "Mr J Tear 8 Oak Avenue Pulrose Douglas IM2 1ET",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00579/B",
@@ -1736,8 +1895,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Miss Catherine Craine",
+      "applicantAddress": null,
       "agentName": "Mick Stott",
       "agentCompanyName": null,
       "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU"
@@ -1752,13 +1914,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Dave Barrow",
+      "applicantAddress": "Advisors House Blantyre G72 0UZ",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00576/B",
@@ -1770,8 +1933,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 21 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Kenny & Emma Marshall",
+      "applicantAddress": null,
       "agentName": "Mr Samuel Samson",
       "agentCompanyName": "Samson Designs Ltd",
       "agentAddress": "THE WORKSHOP PARK ROAD PORT ST. MARY IM9 5HQ"
@@ -1786,13 +1952,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Thu 10 Sep 2026",
       "applicationType": "Advertisements",
       "applicantName": "Miss Lucy Turner",
+      "applicantAddress": "10 Prospect Hill Douglas IM1 1EJ",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00569/B",
@@ -1804,8 +1971,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Jonathan Evans",
+      "applicantAddress": null,
       "agentName": "Mr Jim Marshall",
       "agentCompanyName": null,
       "agentAddress": "109 Royal Avenue Onchan IM3 1LA"
@@ -1820,8 +1990,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Gary Dudley",
+      "applicantAddress": null,
       "agentName": "Quay Design Ltd",
       "agentCompanyName": "Quay Design Ltd",
       "agentAddress": "5 The Quay Port St Mary IM9 5EA"
@@ -1836,13 +2009,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Change of Use",
       "applicantName": "Mr Simon Cringle",
+      "applicantAddress": null,
       "agentName": "Miss Sarah Corlett",
       "agentCompanyName": "Sarah Corlett Town Planning Consultancy Ltd",
-      "agentAddress": "Ballachrink Croft Ballacorey Road Bride IM7 4AW",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Ballachrink Croft Ballacorey Road Bride IM7 4AW"
     },
     {
       "ref": "26/00561/MCH",
@@ -1854,8 +2028,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 02 Sep 2026",
       "applicationType": "Minor Change Application",
       "applicantName": "Mr & Mrs Andrew Browne",
+      "applicantAddress": null,
       "agentName": "Mr Chris Penketh",
       "agentCompanyName": "Penketh-Millar",
       "agentAddress": "23 West Quay Ramsey IM8 1DL"
@@ -1870,13 +2047,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Campbell & Pauline Berrie",
+      "applicantAddress": "Springhaven Glen Wyllin Kirk Michael IM6 1AW",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00558/B",
@@ -1888,8 +2066,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Hugh Cameron",
+      "applicantAddress": null,
       "agentName": "Mr Carl Jenkins",
       "agentCompanyName": "CJ Design Limited",
       "agentAddress": "10 Ballaterson Road Peel IM51BJ"
@@ -1904,8 +2085,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Tue 08 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Sara Kate Watson",
+      "applicantAddress": "Inchcape Lodge Ballagorry Drive Glen Mona IM7 1HE",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -1920,13 +2104,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Julian Askew",
+      "applicantAddress": "Mona house 1 Mona Street Ramsey IM8 1BD",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00540/B",
@@ -1938,8 +2123,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Christopher Karl & Rebecca Emily Preston",
+      "applicantAddress": null,
       "agentName": "Mr Martyn Hobson",
       "agentCompanyName": "ArchTec (IOM) Ltd Architectural Design Consultants",
       "agentAddress": "Architectural Studio 7 Olafs Close Douglas IM2 3EA"
@@ -1954,13 +2142,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Stuart Chivers",
+      "applicantAddress": null,
       "agentName": "JTM Architecture Ltd",
       "agentCompanyName": "JTM Architecture Ltd",
-      "agentAddress": "The Basement 16 Derby Road Douglas Isle of Man IM2 3ET",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "The Basement 16 Derby Road Douglas Isle of Man IM2 3ET"
     },
     {
       "ref": "26/00535/B",
@@ -1972,8 +2161,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Miss Jocelyn Day",
+      "applicantAddress": null,
       "agentName": "Mr Mark Blair",
       "agentCompanyName": "Mark Blair Design Limited",
       "agentAddress": "7 Creggan Lea Port St. Mary IM9 5BD"
@@ -1988,8 +2180,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Change of Use",
       "applicantName": "Harbatta & Daugherty Ltd",
+      "applicantAddress": null,
       "agentName": "Miss Val Lloyd",
       "agentCompanyName": "Architecture in Mann",
       "agentAddress": "The Design Studio 76 Summerhill Road Onchan IM3 1NH"
@@ -2004,8 +2199,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 07 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Department Of Infrastructure",
+      "applicantAddress": null,
       "agentName": "Mr Andrew Henderson",
       "agentCompanyName": "AH Grace Ltd",
       "agentAddress": "32 Cronk Avenue Onchan IM3 3DF"
@@ -2020,8 +2218,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 24 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Ms Pamela Moxon",
+      "applicantAddress": "Gulls Way Barn Dalby Isle Of Man IM5 3BR",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -2036,8 +2237,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 24 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Selva Ltd",
+      "applicantAddress": null,
       "agentName": "Mr Lee Vowles",
       "agentCompanyName": null,
       "agentAddress": "No. 5 Victoria St Douglas IM1 2LR"
@@ -2052,13 +2256,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Certificate of Lawful Use/Devel Approved",
+      "decisionDate": "Wed 02 Sep 2026",
       "applicationType": "Certificate of lawfulness",
       "applicantName": "Mr Adam Cregeen",
+      "applicantAddress": null,
       "agentName": "Mr Mark Blair",
       "agentCompanyName": "Mark Blair Design Limited",
-      "agentAddress": "7 Creggan Lea Port St. Mary IM9 5BD",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "7 Creggan Lea Port St. Mary IM9 5BD"
     },
     {
       "ref": "26/00518/D",
@@ -2070,13 +2275,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Advertisements",
       "applicantName": "Miss Nichola Gott",
+      "applicantAddress": null,
       "agentName": "Miss Nichola Gott",
       "agentCompanyName": "Butterfield Signs",
-      "agentAddress": "174 Sunbridge Road Bradford BD1 2RZ",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "174 Sunbridge Road Bradford BD1 2RZ"
     },
     {
       "ref": "26/00515/B",
@@ -2088,8 +2294,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Jody McDowell",
+      "applicantAddress": null,
       "agentName": "Mr Mark Blair",
       "agentCompanyName": "Mark Blair Design Limited",
       "agentAddress": "7 Creggan Lea Port St. Mary IM9 5BD"
@@ -2104,8 +2313,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Karen Moore",
+      "applicantAddress": null,
       "agentName": "Mr Chris Penketh",
       "agentCompanyName": "Penketh-Millar",
       "agentAddress": "23 West Quay Ramsey IM8 1DL"
@@ -2120,13 +2332,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Colin & Selena Bains",
+      "applicantAddress": null,
       "agentName": "Gordon Clarke",
       "agentCompanyName": "GCA Ltd",
-      "agentAddress": "The Design Studio, Carmodil Beg Glen Road Ballaugh, Isle of Man IM7 5JD",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "The Design Studio, Carmodil Beg Glen Road Ballaugh, Isle of Man IM7 5JD"
     },
     {
       "ref": "26/00508/B",
@@ -2138,8 +2351,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 10 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Greg Barlow",
+      "applicantAddress": null,
       "agentName": "Penketh - Millar",
       "agentCompanyName": "Penketh - Millar",
       "agentAddress": "23 West Quay Ramsey Isle Of Man IM8 1DL"
@@ -2154,8 +2370,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Fistard Property Investment Ltd",
+      "applicantAddress": null,
       "agentName": "Mr Mark Blair",
       "agentCompanyName": "Mark Blair Design Limited",
       "agentAddress": "7 Creggan Lea Port St. Mary IM9 5BD"
@@ -2170,8 +2389,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 21 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Titterton",
+      "applicantAddress": "23 Murrays Lake Drive Mount Murray IM4 2HY",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -2186,8 +2408,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Advertisements",
       "applicantName": "Mrs Sue Johnson",
+      "applicantAddress": "Commerce House Bowring Road Ramsey IM8 2LQ",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -2202,13 +2427,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr John Keen",
+      "applicantAddress": null,
       "agentName": "Miss Val Lloyd",
       "agentCompanyName": "Architecture in Mann",
-      "agentAddress": "The Design Studio 76 Summerhill Road Onchan IM3 1NH",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "The Design Studio 76 Summerhill Road Onchan IM3 1NH"
     },
     {
       "ref": "26/00484/B",
@@ -2220,13 +2446,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Thu 10 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Jamie MeKenna",
+      "applicantAddress": null,
       "agentName": "Mr Joseph Smith",
       "agentCompanyName": null,
-      "agentAddress": "Unit B2 Eden Business Park Cooil Road Braddan IM4 2AY",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Unit B2 Eden Business Park Cooil Road Braddan IM4 2AY"
     },
     {
       "ref": "26/00483/B",
@@ -2238,13 +2465,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Mukunda Measurie",
+      "applicantAddress": null,
       "agentName": "Miss Val Lloyd",
       "agentCompanyName": "Architecture in Mann",
-      "agentAddress": "The Design Studio 76 Summerhill Road Onchan IM3 1NH",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "The Design Studio 76 Summerhill Road Onchan IM3 1NH"
     },
     {
       "ref": "26/00473/B",
@@ -2256,8 +2484,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 02 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Brian & Mrs Ruth Meharg",
+      "applicantAddress": null,
       "agentName": "Mr Damien Dowling",
       "agentCompanyName": "Damien James Design",
       "agentAddress": "4 Church Close Lonan Laxey IM4 7JY"
@@ -2272,8 +2503,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 02 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr W. Philip + Mrs Norma Richards",
+      "applicantAddress": null,
       "agentName": "Horncastle Thomas",
       "agentCompanyName": null,
       "agentAddress": "20 Athol Street Douglas Isle Of Man IM1 1JA"
@@ -2288,8 +2522,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Mon 07 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr JOANNIS VAMVAKOPOULOS",
+      "applicantAddress": null,
       "agentName": "Kelly Lewthwaite Building Design",
       "agentCompanyName": null,
       "agentAddress": "23 Market Street Douglas IM1 2PA"
@@ -2304,13 +2541,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Alison Strickland",
+      "applicantAddress": "21 Selborne Drive Douglas Isle Of Man IM2 3LR",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00457/B",
@@ -2322,13 +2560,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Amanda and David Sealey",
+      "applicantAddress": null,
       "agentName": "Mr mark pearce",
       "agentCompanyName": "MP Associates Ltd",
-      "agentAddress": "12 STRATHALLAN CRESCENT Isle of Man DOUGLAS IM24NR",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "12 STRATHALLAN CRESCENT Isle of Man DOUGLAS IM24NR"
     },
     {
       "ref": "26/00454/B",
@@ -2340,13 +2579,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr PHILIP GAWNE",
+      "applicantAddress": null,
       "agentName": "Mr Stephen Crowther",
       "agentCompanyName": "Cre8 Architecture IOM",
-      "agentAddress": "31 Arbory Street, Castletown IM9 1LL",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "31 Arbory Street, Castletown IM9 1LL"
     },
     {
       "ref": "26/00441/MCH",
@@ -2358,8 +2598,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 10 Sep 2026",
       "applicationType": "Minor Change Application",
       "applicantName": "Dandara Homes Limited",
+      "applicantAddress": "Dandara Group Head Office IoM Business Park Cooil Road Braddan IM2 2SA",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -2374,8 +2617,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 09 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Robert Hirst",
+      "applicantAddress": null,
       "agentName": "Mr Sam Samson",
       "agentCompanyName": "Samson Designs Limited",
       "agentAddress": "The Workshop, Park Road Port St.Mary IM9 5HQ"
@@ -2390,13 +2636,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Enigma Ltd",
+      "applicantAddress": null,
       "agentName": "Atelier Kruger Architecture Ltd",
       "agentCompanyName": "Atelier Kruger Architecture ltd",
-      "agentAddress": "Ms A Kruger 19 Kensington Road Douglas IM1 3EP",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Ms A Kruger 19 Kensington Road Douglas IM1 3EP"
     },
     {
       "ref": "26/00425/B",
@@ -2408,13 +2655,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Jackson Katz",
+      "applicantAddress": null,
       "agentName": "Mr Wayne Lewthwaite",
       "agentCompanyName": "Kelly-Lewthwaite Building Design Limited",
-      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA"
     },
     {
       "ref": "26/00415/B",
@@ -2426,8 +2674,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 10 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr LAURENCE BARBER",
+      "applicantAddress": "Seafarers Cottage 5 Mona Terrace Castletown IM9 1BH",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -2442,13 +2693,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Split Decision",
+      "decisionDate": "Wed 09 Sep 2026",
       "applicationType": "Minor Change Application",
       "applicantName": "Mr Gary & Mrs Helen Cretney",
+      "applicantAddress": null,
       "agentName": "Mr Kevin Graham",
       "agentCompanyName": null,
-      "agentAddress": "21 Alberta Drive Onchan Isle Of Man IM3 1LT",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "21 Alberta Drive Onchan Isle Of Man IM3 1LT"
     },
     {
       "ref": "26/00401/B",
@@ -2460,8 +2712,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Sure (Isle Of Man) Ltd",
+      "applicantAddress": "Digital Gateway Freeport Ballasalla IM9 2AP",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -2476,8 +2731,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs Lee Crozier",
+      "applicantAddress": "5 Larch Hill Tromode Douglas Isle of Man IM2 5NQ",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -2492,8 +2750,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Joseph Bond",
+      "applicantAddress": null,
       "agentName": "Mr Wayne Lewthwaite",
       "agentCompanyName": "Kelly-Lewthwaite Building Design Limited",
       "agentAddress": "23 Market Street Douglas Isle of Man IM1 2PA"
@@ -2508,13 +2769,14 @@
       "decided": null,
       "status": "Pending Consideration",
       "isDecided": false,
+      "decision": null,
+      "decisionDate": null,
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mrs Joanna Lewin",
+      "applicantAddress": "Viking Corner St Pauls Square Ramsey IM8 1LE",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00387/B",
@@ -2526,13 +2788,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Application Withdrawn",
+      "decisionDate": "Tue 15 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Eden Park Ltd",
+      "applicantAddress": null,
       "agentName": "Hartford Homes",
       "agentCompanyName": null,
-      "agentAddress": "Middle River Douglas IM2 1AL",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Middle River Douglas IM2 1AL"
     },
     {
       "ref": "26/00354/B",
@@ -2544,13 +2807,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Tracey Bell",
+      "applicantAddress": null,
       "agentName": "Mick Stott",
       "agentCompanyName": "MS Design Ltd",
-      "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU"
     },
     {
       "ref": "26/00334/B",
@@ -2562,13 +2826,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Wed 09 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Ms Sharon Lamb",
+      "applicantAddress": "Ronans Cottage Howe Road Cregneash IM9 5PS",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "26/00301/B",
@@ -2580,13 +2845,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Wed 09 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Alan Hartley",
+      "applicantAddress": null,
       "agentName": "Mick Stott",
       "agentCompanyName": null,
-      "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU"
     },
     {
       "ref": "26/00297/B",
@@ -2598,8 +2864,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Dr Colin Gray",
+      "applicantAddress": "138 Royal Avenue Onchan IM3 1LJ",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
@@ -2614,13 +2883,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr & Mrs William Robert & Samantha Louise Crookall",
+      "applicantAddress": null,
       "agentName": "Martyn Hobson",
       "agentCompanyName": "ArchTec (IOM) Ltd Architectural Design Consultants",
-      "agentAddress": "Architectural Studio 7 Olafs Close Douglas IM2 7AR",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Architectural Studio 7 Olafs Close Douglas IM2 7AR"
     },
     {
       "ref": "26/00235/B",
@@ -2632,13 +2902,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Refused",
+      "decisionDate": "Fri 18 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Colin Harvey",
+      "applicantAddress": null,
       "agentName": "Mr Geoff Brown",
       "agentCompanyName": "GBS Design Services Ltd.",
-      "agentAddress": "Odin's Cottage, Ballachrink Farm Glen Road Colby IM9 4HW",
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": "Odin's Cottage, Ballachrink Farm Glen Road Colby IM9 4HW"
     },
     {
       "ref": "26/00114/B",
@@ -2650,8 +2921,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Thu 17 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr John Keggin",
+      "applicantAddress": null,
       "agentName": "Mr John Watling",
       "agentCompanyName": "Penketh Millar Ltd",
       "agentAddress": "23 West Quay Ramsey IM8 1DL"
@@ -2666,8 +2940,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Dean Ayres",
+      "applicantAddress": null,
       "agentName": "Mr Brian Woodard",
       "agentCompanyName": null,
       "agentAddress": "Harp Inn Harp Inn Cross Four Ways Isle of Man IM9 3DH"
@@ -2682,13 +2959,14 @@
       "decided": null,
       "status": "Unknown",
       "isDecided": false,
+      "decision": "Application Withdrawn",
+      "decisionDate": "Wed 09 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Banana Computers Ltd",
+      "applicantAddress": "Mr Graeme Wilson River Lodge Lezayre Rd Ramsey IM8 2TG",
       "agentName": null,
       "agentCompanyName": null,
-      "agentAddress": null,
-      "decision": null,
-      "decisionDate": null
+      "agentAddress": null
     },
     {
       "ref": "25/90616/B",
@@ -2700,8 +2978,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Fri 11 Sep 2026",
       "applicationType": "Full (detailed approval)",
       "applicantName": "Mr Michael & Diane Howlings & Duncan",
+      "applicantAddress": null,
       "agentName": "Mr Carl Jenkins",
       "agentCompanyName": "CJ Design Limited",
       "agentAddress": "10 Ballaterson Road Peel IM5 1BJ"
@@ -2716,8 +2997,11 @@
       "decided": null,
       "status": "Decided",
       "isDecided": true,
+      "decision": "Permitted",
+      "decisionDate": "Wed 23 Sep 2026",
       "applicationType": "Condition Discharge",
       "applicantName": "Mr Paul Brew",
+      "applicantAddress": "Unit 2 Middle River Douglas Isle Of Man IM2 1AL",
       "agentName": null,
       "agentCompanyName": null,
       "agentAddress": null
