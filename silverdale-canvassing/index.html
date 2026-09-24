@@ -728,6 +728,7 @@ function renderRegisterPullLoaded(box, data){
     return 'other';
   }
   const CATEGORY_TAG = { pending: ['tag-review', 'Pending'], approved: ['tag-approved', 'Approved'], refused: ['tag-excl', 'Refused'], other: ['tag-dupe', null] };
+  const CATEGORY_ORDER = { approved: 0, pending: 1, refused: 2, other: 3 };
 
   function applyFilters(){
     const status = document.getElementById('regStatus').value;
@@ -745,7 +746,11 @@ function renderRegisterPullLoaded(box, data){
         if (!hay.includes(q)) return false;
       }
       return true;
-    });
+    })
+    // Grouped by outcome — every Approved application first, then all
+    // Pending, then Refused, then anything else (withdrawn etc.) —
+    // rather than interleaved by reference number.
+    .sort((x, y) => CATEGORY_ORDER[decisionCategory(x)] - CATEGORY_ORDER[decisionCategory(y)] || (x.ref < y.ref ? 1 : -1));
   }
 
   // Rows expanded by clicking the applicant's name — persists across
