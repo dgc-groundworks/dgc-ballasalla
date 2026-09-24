@@ -186,7 +186,10 @@ def main():
             print(f"  {i}/{len(by_ref)}", file=sys.stderr)
 
         status = item.get("status") or ""
-        is_decided = bool(item.get("decided")) or "decision" in status.lower() and "pending" not in status.lower()
+        # The list view's Status column literally reads "Decided" once an
+        # application is determined (no separate date there) — the actual
+        # outcome ("Permitted"/"Refused") only shows up on the detail page.
+        is_decided = "decided" in status.lower()
         results.append({
             "ref": ref,
             "description": item.get("description") or "",
@@ -197,8 +200,11 @@ def main():
             "decided": item.get("decided"),
             "status": status,
             "isDecided": is_decided,
+            "decision": not_available(detail.get("Decision")),
+            "decisionDate": not_available(detail.get("Decision Issued Date")),
             "applicationType": not_available(detail.get("Application Type")),
             "applicantName": not_available(detail.get("Applicant Name")),
+            "applicantAddress": not_available(detail.get("Applicant Address")),
             "agentName": not_available(detail.get("Agent Name")),
             "agentCompanyName": not_available(detail.get("Agent Company Name")),
             "agentAddress": not_available(detail.get("Agent Address")),

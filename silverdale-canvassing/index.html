@@ -729,7 +729,7 @@ function renderRegisterPullLoaded(box, data){
     const detailLine = full ? `
         <div class="hint" style="margin:4px 0">${esc(a.description || '')}</div>
         <div class="hint">${a.agentName ? `Agent: ${esc(a.agentName)}` : ''}${a.agentCompanyName ? ` (${esc(a.agentCompanyName)})` : ''}${a.agentAddress ? ` &middot; ${esc(a.agentAddress)}` : ''}</div>
-        <div class="hint">${a.parish ? `Parish: ${esc(a.parish)}` : ''} &middot; Received ${esc(a.received||'?')} &middot; ${a.isDecided ? 'Decided' : 'Validated'} ${esc(a.decided || a.validated || '?')}</div>` : '';
+        <div class="hint">${a.parish ? `Parish: ${esc(a.parish)}` : ''} &middot; Received ${esc(a.received||'?')} &middot; ${a.isDecided ? (a.decisionDate ? `Decided ${esc(a.decisionDate)}` : 'Decided') : `Validated ${esc(a.validated || '?')}`}</div>` : '';
     return `
       <div class="lead-row">
         <div class="lr-main">
@@ -744,7 +744,7 @@ function renderRegisterPullLoaded(box, data){
         </div>
         <div class="lr-side">
           ${already ? '<span class="tag tag-dupe">Already have it</span>' : ''}
-          <span class="tag ${a.isDecided ? 'tag-excl' : 'tag-review'}">${a.isDecided ? 'Decided' : 'Pending'}</span>
+          <span class="tag ${a.isDecided ? 'tag-excl' : 'tag-review'}">${a.isDecided ? (a.decision || 'Decided') : 'Pending'}</span>
         </div>
       </div>`;
   }
@@ -798,6 +798,16 @@ function renderRegisterPullLoaded(box, data){
       if (!a || existingRefs.has(ref)) return;
       const applicant = a.applicantName || a.agentCompanyName || a.agentName || 'Applicant not available on register';
       const lead = classify({ ref: a.ref, applicant, site: a.address || '' });
+      // classify() only screens applicant+address against the standing
+      // never-contact list. Also screen the agent — a name on that list
+      // often shows up as the AGENT on someone else's application (e.g.
+      // Hartford Homes managing a project for a nominal landowner
+      // applicant), and that's still their project.
+      if (!lead.excludedReason) {
+        const agentText = `${a.agentName || ''} ${a.agentCompanyName || ''}`.toLowerCase();
+        const hit = STANDING_EXCLUDE.find(name => agentText.includes(name));
+        if (hit) { lead.excludedReason = 'Standing never-contact (agent): ' + hit; lead.include = false; }
+      }
       if (!a.applicantName) {
         lead.needsReview = true;
         lead.reviewNote = lead.reviewNote || 'Applicant name not on the public register — check before sending (agent shown instead).';
