@@ -838,6 +838,8 @@ function renderRegisterPullLoaded(box, data){
     lead.include = false;
     lead.addedAt = todayISO();
     lead.description = a.description || '';
+    lead.appliedDate = a.received || '';
+    lead.decidedDate = a.isDecided ? (a.decisionDate || '') : '';
     leads.push(lead);
     return true;
   }
@@ -904,6 +906,7 @@ function renderRegisterPullLoaded(box, data){
             ${esc(person)} <span class="hint">${full ? '&#9662; hide full application' : '&#9656; show full application'}</span>
           </button>
           <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}</div>
+          <div class="lr-meta" style="margin-bottom:2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''}</div>
           <div class="hint" style="margin:2px 0">${esc(a.description || '')}</div>
           ${agentLine}
           ${detailLine}
@@ -982,7 +985,7 @@ function renderRegisterPullLoaded(box, data){
       if (addAgentToBatch(a)) { saveLeadsToStorage(); say(`${a.agentName || a.agentCompanyName} (agent) → Businesses folder.`); }
     } else if (btn.classList.contains('reg-dismiss-btn')) {
       const d = getDismissed();
-      d[a.ref] = { date: todayISO(), name: person, source: 'planning', description: a.description || '', address: a.address || '' };
+      d[a.ref] = { date: todayISO(), name: person, source: 'planning', description: a.description || '', address: a.address || '', appliedDate: a.received || '', decidedDate: a.isDecided ? (a.decisionDate || '') : '' };
       saveDismissed(d);
       say(`${person} archived — bring it back any time from here or the Archive tab.`);
     } else if (btn.classList.contains('reg-unarchive-btn')) {
@@ -1045,7 +1048,7 @@ function renderFolder(main, folder){
       <div class="lead-row ${flag ? 'flagged' : ''}" data-i="${i}">
         <div class="lr-main">
           <div class="lr-applicant">${esc(l.applicant)}</div>
-          <div class="lr-meta">${esc(l.ref)}${l.description ? ' &middot; ' + esc(l.description) : ''}</div>
+          <div class="lr-meta">${esc(l.ref)}${l.appliedDate ? ` &middot; <b style="color:var(--text)">Applied ${esc(l.appliedDate)}</b>` : ''}${l.decidedDate ? ` &middot; Decided ${esc(l.decidedDate)}` : ''}${l.description ? ' &middot; ' + esc(l.description) : ''}</div>
           ${flag && flag.title ? `<div class="hint" style="margin:0 0 4px;color:var(--accent)">${esc(flag.title)}</div>` : ''}
           <input type="text" class="sal-input" value="${esc(l.salutation)}" title="Salutation — click to change">
           <div class="f-addr">${l.recipientLines.map(esc).join(' &middot; ')}</div>
@@ -1170,6 +1173,7 @@ function renderArchive(main){
           ${lines ? `<div class="f-addr" style="margin:0 0 6px;color:var(--text)">${lines.map(esc).join('<br>')}</div>` : ''}
           ${e.description || (archivedLead && archivedLead.description) ? `<div class="hint" style="margin:0 0 6px">${esc(e.description || archivedLead.description)}</div>` : ''}
           ${e.address ? `<div class="hint" style="margin:0 0 6px">Site: ${esc(e.address)}</div>` : ''}
+          ${(e.appliedDate || (archivedLead && archivedLead.appliedDate)) ? `<div class="hint" style="margin:0 0 6px"><b style="color:var(--text)">Applied ${esc(e.appliedDate || archivedLead.appliedDate)}</b>${(e.decidedDate || (archivedLead && archivedLead.decidedDate)) ? ` &middot; Decided ${esc(e.decidedDate || archivedLead.decidedDate)}` : ''}</div>` : ''}
           ${e.note ? `<div class="hint" style="margin:0 0 6px">${esc(e.note)}</div>` : ''}
           ${snap ? `<div class="hint" style="margin:0 0 6px">Letter: <b>${COPY_LABEL[snap.folder]}</b>${e.copyNote ? ' — ' + esc(e.copyNote) : ''}</div>` : ''}
           ${e.pdfFile ? `<div class="hint" style="margin:0 0 6px">Original PDF: <b>${esc(e.pdfFile)}</b>${e.pdfPage ? `, page ${e.pdfPage}` : ''}</div>` : ''}
@@ -1423,7 +1427,7 @@ function renderPrint(main, kind){
       if (l.ref) log[l.ref] = {
         date: today, name: l.applicant, source: leadFolder(l) === 'business' ? 'business' : 'planning',
         copy: leadFolder(l), recipientLines: l.recipientLines, salutation: l.salutation, letterDate, bodyParas: letterParas(l),
-        description: l.description || '',
+        description: l.description || '', appliedDate: l.appliedDate || '', decidedDate: l.decidedDate || '',
         ...(pdfFile ? (kind === 'letter' ? { pdfFile, pdfPage: i + 1 } : { envelopePdfFile: pdfFile, envelopePdfPage: i + 1 }) : {})
       };
       l.alreadyProcessed = true;
