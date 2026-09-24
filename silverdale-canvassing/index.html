@@ -115,6 +115,9 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 <header class="topbar">
   <h1>Silverdale Canvassing</h1>
   <span class="sub">Planning-leads intake &rarr; letters &amp; envelopes, ready to print</span>
+  <button class="btn-secondary" id="downloadBackupBtn" title="Save all leads and the processed log to a file, so you can load it on any device">&#128190; Backup</button>
+  <button class="btn-secondary" id="restoreBackupBtn" title="Load a previously saved backup file">&#8593; Restore</button>
+  <input type="file" id="restoreBackupInput" accept=".json,application/json" style="display:none">
   <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">Light Mode</button>
 </header>
 <nav class="nav">
@@ -255,6 +258,50 @@ function getLog(){ try { return JSON.parse(localStorage.getItem(LS_LOG) || '{}')
 function saveLog(log){ try { localStorage.setItem(LS_LOG, JSON.stringify(log)); } catch {} }
 function saveLeadsToStorage(){ try { localStorage.setItem(LS_LEADS, JSON.stringify(leads)); } catch {} }
 function loadLeadsFromStorage(){ try { return JSON.parse(localStorage.getItem(LS_LEADS) || '[]'); } catch { return []; } }
+
+// Everything here lives only in this one browser's local storage — there's
+// no server behind it. Backup/Restore is the safety net: a real file you
+// can move between devices/browsers, or recover from if site data ever
+// gets cleared.
+function downloadBackup(){
+  const data = {
+    leads: loadLeadsFromStorage(),
+    log: getLog(),
+    envAlign: getEnvAlign(),
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Silverdale Canvassing Backup - ${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function restoreBackupFile(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); } catch {
+      alert('Could not read that file — is it a Silverdale Canvassing backup?');
+      return;
+    }
+    const leadCount = Array.isArray(data.leads) ? data.leads.length : 0;
+    const logCount = data.log && typeof data.log === 'object' ? Object.keys(data.log).length : 0;
+    if (!confirm(`Restore this backup? It has ${leadCount} leads and ${logCount} logged as sent. This replaces everything currently loaded in this browser.`)) return;
+    leads = (Array.isArray(data.leads) ? data.leads : []).map(classify);
+    saveLeadsToStorage();
+    saveLog(data.log && typeof data.log === 'object' ? data.log : {});
+    if (data.envAlign) setEnvAlign(data.envAlign);
+    state.tab = 'review';
+    render();
+    alert('Backup restored.');
+  };
+  reader.readAsText(file);
+}
 
 // ---- Parsing a pasted table ----
 // Expects tab-separated (straight copy from a spreadsheet or the
@@ -648,6 +695,7 @@ function renderReview(main, source){
         </div>
         <div class="lr-side">
           ${flag ? `<span class="tag ${flag.cls}" title="${esc(flag.title)}">${flag.label}</span>` : ''}
+          <button class="btn-secondary archive-one-btn" data-i="${i}" title="Mark just this one as sent, without touching the rest of the batch">Archive</button>
           <button class="send-toggle ${l.include ? 'on' : 'off'}" ${locked ? 'disabled' : ''}>${l.include ? 'Send' : "Don't send"}</button>
         </div>
       </div>`;
@@ -692,6 +740,17 @@ function renderReview(main, source){
     });
     row.querySelector('.type-sel').addEventListener('change', e => { leads[i].type = e.target.value; saveLeadsToStorage(); renderReview(main, source); });
     row.querySelector('.sal-input').addEventListener('change', e => { leads[i].salutation = e.target.value; saveLeadsToStorage(); });
+    row.querySelector('.archive-one-btn').addEventListener('click', () => {
+      const l = leads[i];
+      if (!confirm(`Mark "${l.applicant}" as sent? This moves it to the ${l.source === 'business' ? 'Business' : 'Planning'} archive.`)) return;
+      const log = getLog();
+      if (l.ref) log[l.ref] = { date: new Date().toISOString().slice(0,10), name: l.applicant, source: l.source || 'planning' };
+      saveLog(log);
+      l.alreadyProcessed = true;
+      l.include = false;
+      saveLeadsToStorage();
+      renderReview(main, source);
+    });
   });
 }
 
@@ -1004,6 +1063,9 @@ function renderLog(main){
 }
 
 document.querySelectorAll('.navbtn').forEach(btn => btn.addEventListener('click', () => { state.tab = btn.dataset.tab; render(); }));
+document.getElementById('downloadBackupBtn').addEventListener('click', downloadBackup);
+document.getElementById('restoreBackupBtn').addEventListener('click', () => document.getElementById('restoreBackupInput').click());
+document.getElementById('restoreBackupInput').addEventListener('change', e => restoreBackupFile(e.target.files[0]));
 
 const stored = loadLeadsFromStorage();
 leads = stored.length ? stored.map(classify) : parseInput(STARTER_TSV);
