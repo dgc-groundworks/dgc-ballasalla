@@ -1,0 +1,49 @@
+name: Pull IoM Planning Register
+
+on:
+  # Automatic — keeps the data reasonably fresh without anyone touching
+  # anything. Mondays at 06:00 UTC (planning weekly lists publish weekly).
+  schedule:
+    - cron: '0 6 * * 1'
+  # Manual — this is the "click it whenever" button: go to this repo's
+  # Actions tab → "Pull IoM Planning Register" → Run workflow.
+  workflow_dispatch:
+    inputs:
+      months:
+        description: 'How many recent months to pull (1-6)'
+        required: false
+        default: '3'
+
+permissions:
+  contents: write
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Pull register
+        run: |
+          python3 silverdale-canvassing/scripts/pull_register.py \
+            --months "${{ github.event.inputs.months || '3' }}" \
+            --out silverdale-canvassing/register-data/latest.json
+
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add silverdale-canvassing/register-data/latest.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Pull planning register data ($(date -u +%Y-%m-%d))"
+            git push
+          fi

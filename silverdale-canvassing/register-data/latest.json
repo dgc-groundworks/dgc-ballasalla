@@ -1,0 +1,40 @@
+{
+  "source": "pbc.gov.im",
+  "pulledAt": "2026-09-24T19:00:00Z",
+  "monthsRequested": 1,
+  "count": 2,
+  "applications": [
+    {
+      "ref": "26/00706/B",
+      "description": "Proposed installation of railings and gate to enclose a covered area to the rear of the building",
+      "address": "2 And 2A Senna Road Douglas Isle Of Man IM1 2HB",
+      "parish": "DOUGLAS",
+      "received": "Tue 22 Sep 2026",
+      "validated": "Thu 24 Sep 2026",
+      "decided": null,
+      "status": "Pending Consideration",
+      "isDecided": false,
+      "applicationType": "Full (detailed approval)",
+      "applicantName": "Mr T MacLaren",
+      "agentName": "Mick Stott",
+      "agentCompanyName": "MS Design Ltd",
+      "agentAddress": "2 Cronk Rhenny Villa Quines Hill Port Soderick Braddan, Isle of Man IM4 1AU"
+    },
+    {
+      "ref": "26/00710/B",
+      "description": "Proposed summerhouse and woodstore",
+      "address": "The Lhea Pinfold Hill Laxey Isle Of Man IM4 7HL",
+      "parish": "LAXEY",
+      "received": "Tue 22 Sep 2026",
+      "validated": "Wed 23 Sep 2026",
+      "decided": null,
+      "status": "Pending Consideration",
+      "isDecided": false,
+      "applicationType": "Full (detailed approval)",
+      "applicantName": null,
+      "agentName": null,
+      "agentCompanyName": null,
+      "agentAddress": null
+    }
+  ]
+}

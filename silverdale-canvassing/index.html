@@ -53,6 +53,9 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .lr-meta{font-size:0.78rem;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .lr-meta select{background:var(--bg);border:1px solid var(--bord);border-radius:5px;color:var(--muted);padding:3px 6px;font-size:0.74rem;font-family:inherit}
 .sal-input{width:100%;max-width:420px;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text);padding:6px 8px;margin-left:-8px;font-size:0.92rem;font-family:inherit}
+.register-pull{margin-top:32px;padding-top:22px;border-top:1px solid var(--bord)}
+.register-pull input[type=date],.register-pull input[type=text],.register-pull select{background:var(--surf);border:1px solid var(--bord);border-radius:6px;color:var(--text);padding:6px 8px;font-size:0.85rem;font-family:inherit}
+.register-pull label{font-size:0.85rem;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
 .sal-input:hover{border-color:var(--bord)}
 .sal-input:focus{background:var(--bg);border-color:var(--accent);outline:none}
 .lr-side{display:flex;align-items:center;gap:12px;flex-shrink:0}
@@ -663,6 +666,149 @@ function renderImport(main){
     saveLeadsToStorage();
     document.getElementById('parseMsg').textContent = leads.length ? `Parsed ${leads.length} leads — go to Review.` : 'Nothing recognised — check the paste has tab-separated columns.';
     if (leads.length) { state.tab = 'review'; render(); }
+  });
+  renderRegisterPull(main);
+}
+
+// ---- Pull from the government planning register ----
+// The register itself (pbc.gov.im) blocks cross-origin browser requests
+// and only exposes the applicant/agent name per-application, so the
+// actual scraping runs server-side as a GitHub Action (see
+// scripts/pull_register.py + .github/workflows/pull-planning-register.yml)
+// on a weekly schedule, or on demand from that workflow's "Run workflow"
+// button. It commits register-data/latest.json into this same site, so
+// the app just fetches it same-origin — no CORS issue.
+const REGISTER_DATA_URL = 'register-data/latest.json';
+const REGISTER_ACTIONS_URL = 'https://github.com/dgc-groundworks/dgc-ballasalla/actions/workflows/pull-planning-register.yml';
+
+function renderRegisterPull(main){
+  const box = document.createElement('div');
+  box.className = 'register-pull';
+  box.innerHTML = `<h3 class="lead-section-hdr">Pull from the planning register</h3><p class="hint">Loading the latest pull&hellip;</p>`;
+  main.appendChild(box);
+
+  fetch(REGISTER_DATA_URL).then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+    .then(data => renderRegisterPullLoaded(box, data))
+    .catch(() => {
+      box.innerHTML = `
+        <h3 class="lead-section-hdr">Pull from the planning register</h3>
+        <p class="hint">No register data has been pulled yet. It pulls automatically once a week, or you can trigger it right now from
+          <a href="${REGISTER_ACTIONS_URL}" target="_blank" rel="noopener">GitHub Actions &rarr; Run workflow</a> (takes a few minutes) — come back here and refresh once it's finished.</p>`;
+    });
+}
+
+function renderRegisterPullLoaded(box, data){
+  const log = getLog();
+  const existingRefs = new Set(leads.map(l => l.ref));
+  const apps = data.applications || [];
+  const pulledDate = data.pulledAt ? new Date(data.pulledAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'unknown';
+
+  function applyFilters(){
+    const status = document.getElementById('regStatus').value;
+    const from = document.getElementById('regFrom').value;
+    const to = document.getElementById('regTo').value;
+    const q = document.getElementById('regSearch').value.trim().toLowerCase();
+    return apps.filter(a => {
+      if (status === 'pending' && a.isDecided) return false;
+      if (status === 'decided' && !a.isDecided) return false;
+      const d = a.validated || a.received;
+      const parsed = d ? new Date(d.replace(/^\w+\s/, '')) : null; // strip leading "Tue " etc
+      if (from && parsed && parsed < new Date(from)) return false;
+      if (to && parsed && parsed > new Date(to + 'T23:59:59')) return false;
+      if (q) {
+        const hay = `${a.ref} ${a.address} ${a.description} ${a.applicantName||''} ${a.agentName||''} ${a.agentCompanyName||''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function rowHtml(a, full){
+    const already = !!log[a.ref] || existingRefs.has(a.ref);
+    const person = a.applicantName || a.agentCompanyName || a.agentName || '(applicant not on register)';
+    const detailLine = full ? `
+        <div class="hint" style="margin:4px 0">${esc(a.description || '')}</div>
+        <div class="hint">${a.agentName ? `Agent: ${esc(a.agentName)}` : ''}${a.agentCompanyName ? ` (${esc(a.agentCompanyName)})` : ''}${a.agentAddress ? ` &middot; ${esc(a.agentAddress)}` : ''}</div>
+        <div class="hint">${a.parish ? `Parish: ${esc(a.parish)}` : ''} &middot; Received ${esc(a.received||'?')} &middot; ${a.isDecided ? 'Decided' : 'Validated'} ${esc(a.decided || a.validated || '?')}</div>` : '';
+    return `
+      <div class="lead-row">
+        <div class="lr-main">
+          <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+            <input type="checkbox" class="reg-pick" data-ref="${esc(a.ref)}" ${already ? 'disabled' : ''} style="margin-top:4px">
+            <span>
+              <div class="lr-applicant">${esc(person)}</div>
+              <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}${!full ? ` &middot; ${esc((a.description||'').slice(0,70))}${(a.description||'').length>70?'…':''}` : ''}</div>
+              ${detailLine}
+            </span>
+          </label>
+        </div>
+        <div class="lr-side">
+          ${already ? '<span class="tag tag-dupe">Already have it</span>' : ''}
+          <span class="tag ${a.isDecided ? 'tag-excl' : 'tag-review'}">${a.isDecided ? 'Decided' : 'Pending'}</span>
+        </div>
+      </div>`;
+  }
+
+  function renderList(){
+    const filtered = applyFilters();
+    const full = document.getElementById('regDetailToggle').checked;
+    document.getElementById('regCount').textContent = `${filtered.length} of ${apps.length} shown`;
+    document.getElementById('registerList').innerHTML = filtered.length
+      ? filtered.map(a => rowHtml(a, full)).join('')
+      : '<p class="empty-state">Nothing matches those filters.</p>';
+  }
+
+  box.innerHTML = `
+    <h3 class="lead-section-hdr">Pull from the planning register</h3>
+    <p class="hint">Last pulled ${esc(pulledDate)} &middot; ${apps.length} applications on file (up to ${data.monthsRequested || '?'} months back).
+      <a href="${REGISTER_ACTIONS_URL}" target="_blank" rel="noopener">Pull fresh data now &rarr;</a></p>
+    <div class="row-actions" style="flex-wrap:wrap;gap:10px">
+      <label>From <input type="date" id="regFrom"></label>
+      <label>To <input type="date" id="regTo"></label>
+      <label>Status
+        <select id="regStatus">
+          <option value="all">All</option>
+          <option value="pending">Pending only</option>
+          <option value="decided">Decided only</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="regDetailToggle"> Full detail</label>
+      <input type="text" id="regSearch" placeholder="Search name, address, description&hellip;" style="min-width:220px">
+    </div>
+    <p class="hint" id="regCount"></p>
+    <div id="registerList" class="lead-list"></div>
+    <div class="row-actions" style="margin-top:10px">
+      <button class="btn" id="regAddSelectedBtn">Add selected to working batch</button>
+      <span id="regAddMsg" class="hint"></span>
+    </div>`;
+
+  renderList();
+  ['regStatus', 'regFrom', 'regTo', 'regSearch', 'regDetailToggle'].forEach(id => {
+    document.getElementById(id).addEventListener('input', renderList);
+  });
+  document.getElementById('regAddSelectedBtn').addEventListener('click', () => {
+    const picked = Array.from(document.querySelectorAll('.reg-pick:checked')).map(cb => cb.dataset.ref);
+    if (!picked.length) {
+      document.getElementById('regAddMsg').textContent = 'Tick some applications first.';
+      return;
+    }
+    let added = 0;
+    picked.forEach(ref => {
+      const a = apps.find(x => x.ref === ref);
+      if (!a || existingRefs.has(ref)) return;
+      const applicant = a.applicantName || a.agentCompanyName || a.agentName || 'Applicant not available on register';
+      const lead = classify({ ref: a.ref, applicant, site: a.address || '' });
+      if (!a.applicantName) {
+        lead.needsReview = true;
+        lead.reviewNote = lead.reviewNote || 'Applicant name not on the public register — check before sending (agent shown instead).';
+      }
+      leads.push(lead);
+      existingRefs.add(ref);
+      added++;
+    });
+    saveLeadsToStorage();
+    document.getElementById('regAddMsg').textContent = `Added ${added} to the working batch — go to Review to pick which to send.`;
+    renderList();
   });
 }
 
