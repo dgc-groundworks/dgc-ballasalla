@@ -680,10 +680,17 @@ function renderImport(main){
   wireFileDrop('planDropZone', 'planFileInput', 'planFileBtn', 'pasteBox');
   document.getElementById('parseBtn').addEventListener('click', () => {
     const text = document.getElementById('pasteBox').value;
-    leads = parseInput(text);
+    const newPlanningLeads = parseInput(text);
+    // "Each pull replaces the working batch" was only ever meant to mean
+    // the PLANNING batch — this used to replace the entire shared `leads`
+    // array outright, silently wiping every business lead sitting in it
+    // at the same time. Now only planning-sourced leads get replaced;
+    // anything from the Businesses import/register-pull survives.
+    const survivingBusinessLeads = leads.filter(l => l.source === 'business');
+    leads = survivingBusinessLeads.concat(newPlanningLeads);
     saveLeadsToStorage();
-    document.getElementById('parseMsg').textContent = leads.length ? `Parsed ${leads.length} leads — go to Review.` : 'Nothing recognised — check the paste has tab-separated columns.';
-    if (leads.length) { state.tab = 'review'; render(); }
+    document.getElementById('parseMsg').textContent = newPlanningLeads.length ? `Parsed ${newPlanningLeads.length} leads — go to Review.` : 'Nothing recognised — check the paste has tab-separated columns.';
+    if (newPlanningLeads.length) { state.tab = 'review'; render(); }
   });
   renderRegisterPull(main);
 }
