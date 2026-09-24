@@ -192,6 +192,7 @@ def main():
         is_decided = "decided" in status.lower()
         results.append({
             "ref": ref,
+            "keyVal": item.get("keyVal"),
             "description": item.get("description") or "",
             "address": item.get("address") or "",
             "parish": not_available(detail.get("Parish")),
@@ -208,6 +209,7 @@ def main():
             "agentName": not_available(detail.get("Agent Name")),
             "agentCompanyName": not_available(detail.get("Agent Company Name")),
             "agentAddress": not_available(detail.get("Agent Address")),
+            "decisionLevel": not_available(detail.get("Actual Decision Level")) or not_available(detail.get("Expected Decision Level")),
         })
 
     output = {

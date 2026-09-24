@@ -84,6 +84,12 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .f-edit-panel textarea{min-height:110px;font-family:inherit;font-size:0.85rem}
 .doc-copy-label{font-size:0.75rem;color:var(--muted);margin-right:auto;align-self:center}
 .doc-toolbar{gap:8px}
+.timing-panel{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px 14px;font-size:0.82rem}
+.timing{color:var(--text);font-weight:700}
+.tstats-h{font-size:0.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:14px 0 6px}
+table.tstats th{position:static}
+table.tstats td,table.tstats th{padding:5px 8px}
+.tstats-body{overflow-x:auto}
 .letter-preview{zoom:.62;margin-top:12px;overflow:hidden}
 @media (max-width:760px){.lead-row{flex-wrap:wrap}.lr-side{flex-wrap:wrap;width:100%}.main{padding:16px}}
 .print-doc{background:#fff;color:#000;box-shadow:0 4px 32px rgba(0,0,0,.4);margin:0 auto 28px;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;font-variant-numeric:lining-nums proportional-nums;font-feature-settings:"lnum" 1,"pnum" 1}
@@ -696,6 +702,7 @@ function buildSalutation(lead){
 
 // ---- Rendering ----
 function render(){
+  if (!timings) loadTimings().then(() => { if (state.tab !== 'import') render(); });
   document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
   updateNavCounts();
   const main = document.getElementById('mainArea');
@@ -712,7 +719,10 @@ function render(){
 
 function renderImport(main){
   main.innerHTML = `
-    <p class="hint">Paste the leads table here — straight copy from the Weekly List export or the extracted PDF table (columns: Reference, Site Address, Applicant/Developer, Type, Local Authority; a header row is fine, tab-separated). These <b>add</b> to the Approved folder — nothing already there, already sent or archived gets added twice, and nothing is ever replaced. Or use the planning-register pull further down.</p>
+    <div id="timingPanel" class="timing-panel"><span class="hint" style="margin:0">Loading planning timings&hellip;</span></div>
+    <details id="pasteDetails" style="margin-top:28px">
+    <summary class="hint" style="cursor:pointer">Paste a list by hand instead (the old way)</summary>
+    <p class="hint">Paste the leads table here — straight copy from the Weekly List export or the extracted PDF table (columns: Reference, Site Address, Applicant/Developer, Type, Local Authority; a header row is fine, tab-separated). These <b>add</b> to the Approved folder — nothing already there, already sent or archived gets added twice, and nothing is ever replaced.</p>
     <div class="drop-zone" id="planDropZone">
       <textarea id="pasteBox" placeholder="Reference&#9;Site Address&#9;Applicant / Developer&#9;Type of Development&#9;Local Authority"></textarea>
       <div class="drop-hint">or drag a file here, or <button type="button" class="link-btn" id="planFileBtn">choose a file</button></div>
@@ -721,7 +731,8 @@ function renderImport(main){
     <div class="row-actions" style="margin-top:14px">
       <button class="btn" id="parseBtn">Parse leads</button>
       <span id="parseMsg" style="color:var(--muted);font-size:0.82rem"></span>
-    </div>`;
+    </div>
+    </details>`;
   wireFileDrop('planDropZone', 'planFileInput', 'planFileBtn', 'pasteBox');
   document.getElementById('parseBtn').addEventListener('click', () => {
     const text = document.getElementById('pasteBox').value;
@@ -744,6 +755,307 @@ function renderImport(main){
   renderRegisterPull(main);
 }
 
+// ---- Planning decision times ----
+// Built from 5 years of register decisions (scripts/planning_history.py).
+// "Typical" = the median days from received to decision issued, for the
+// most specific group with at least 10 decisions in the last two years —
+// the same rule the weekly pull uses when it locks in a forecast.
+const TIMINGS_URL = 'register-data/timings.json';
+const PREDICTIONS_URL = 'register-data/predictions.json';
+const ADMIN_WORK = ['Conditions / information', 'Minor change', 'Certificate of lawfulness'];
+const DAY_MS = 86400000;
+let timings = null;
+let predictions = {};
+
+function isoToDate(s){ return s ? new Date(s + 'T12:00:00') : null; }
+function regDate(s){ if (!s) return null; const d = new Date(String(s).replace(/^\w{3}\s+/, '') + ' 12:00'); return isNaN(d) ? null : d; }
+function daysBetween(a, b){ return a && b ? Math.round((b - a) / DAY_MS) : null; }
+function fmtWeeks(days){ if (days == null) return ''; const w = Math.round(days / 7 * 10) / 10; return `${w} ${w === 1 ? 'week' : 'weeks'}`; }
+function fmtDay(d){ return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); }
+
+let timingsPromise = null;
+function loadTimings(){
+  if (timingsPromise) return timingsPromise;
+  return timingsPromise = Promise.all([
+    fetch(TIMINGS_URL).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(PREDICTIONS_URL).then(r => r.ok ? r.json() : {}).catch(() => ({}))
+  ]).then(([t, p]) => {
+    predictions = p || {};
+    const rows = [], byRef = new Map();
+    if (t) t.rows.forEach(r => {
+      const o = { ref: r[0], work: t.works[r[1]], type: t.types[r[2]], level: t.levels[r[3]], outcome: t.outcomes[r[4]],
+                  received: isoToDate(r[5]), validated: isoToDate(r[6]), decided: isoToDate(r[7]), complexity: r[8] || null,
+                  agent: (t.agents || [])[r[9]] || '', applicant: (t.applicants || [])[r[10]] || '', applicantKey: r[11] || '' };
+      o.days = daysBetween(o.received, o.decided);
+      if (o.days != null && o.days < 0) o.days = null;
+      rows.push(o); byRef.set(o.ref, o);
+    });
+    timings = { rows, byRef, generated: t && t.generated };
+    return timings;
+  });
+}
+
+function summarise(days){
+  if (!days.length) return null;
+  const s = days.slice().sort((a, b) => a - b);
+  const q = p => { const i = (s.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return s[lo] + (s[hi] - s[lo]) * (i - lo); };
+  const counts = new Map();
+  s.forEach(d => { const w = Math.round(d / 7); counts.set(w, (counts.get(w) || 0) + 1); });
+  let modeWeeks = null, best = 0;
+  counts.forEach((c, w) => { if (c > best || (c === best && w < modeWeeks)) { best = c; modeWeeks = w; } });
+  return { n: s.length, mean: s.reduce((a, b) => a + b, 0) / s.length, median: q(0.5), p25: q(0.25), p75: q(0.75), modeWeeks };
+}
+
+function typicalFor(work, type, asOf){
+  if (!timings) return null;
+  const now = asOf || new Date();
+  const since = new Date(now - 730 * DAY_MS);
+  const pool = timings.rows.filter(r => r.days != null && r.decided >= since && r.decided < now);
+  for (const [basis, pick] of [[work, r => r.work === work], [type, r => r.type === type], ['all applications', () => true]]) {
+    if (!basis) continue;
+    const ds = pool.filter(pick).map(r => r.days);
+    if (ds.length >= 10) return { days: summarise(ds).median, n: ds.length, basis };
+  }
+  return null;
+}
+
+// The forecast shown for a pending application: the one locked in by the
+// weekly pull if there is one, otherwise worked out live the same way.
+function forecastFor(ref, received, work, type){
+  const p = predictions[ref];
+  if (p && regDate(p.predictedDate)) return { date: regDate(p.predictedDate), days: p.typicalDays, n: p.basedOn, basis: p.basis, lockedOn: p.madeOn };
+  const typ = received && typicalFor(work, type);
+  return typ ? { date: new Date(received.getTime() + Math.round(typ.days) * DAY_MS), days: typ.days, n: typ.n, basis: typ.basis } : null;
+}
+
+function timingHtml(ref, receivedStr, decidedStr){
+  const t = timings && timings.byRef.get(ref);
+  const received = regDate(receivedStr) || (t && t.received);
+  const decided = regDate(decidedStr) || (t && t.decided);
+  if (!received) return '';
+  const chips = t && t.work ? ` <span class="tag tag-dupe" title="What the application is for">${esc(t.work)}</span>${t.level ? ` <span class="tag tag-dupe" title="Who makes the decision">${esc(t.level)}</span>` : ''}` : '';
+  if (decided) {
+    const typ = typicalFor(t && t.work, t && t.type);
+    return `<span class="timing">&#9201; ${fmtWeeks(daysBetween(received, decided))} to decide</span>${typ ? ` <span class="hint" style="margin:0">(typical ${fmtWeeks(typ.days)} for ${esc(typ.basis)})</span>` : ''}${chips}`;
+  }
+  const f = forecastFor(ref, received, t && t.work, t && t.type);
+  const overdue = f && f.date < new Date();
+  return `<span class="timing">&#9201; waiting ${fmtWeeks(daysBetween(received, new Date()))}</span>`
+    + (f ? ` &middot; <b style="color:var(--text)">expected &asymp; ${fmtDay(f.date)}</b> <span class="hint" style="margin:0">(${fmtWeeks(f.days)} typical for ${esc(f.basis)}, ${f.n} decisions${f.lockedOn ? `, forecast locked ${esc(prettyDate(f.lockedOn))}` : ''})</span>${overdue ? ' <span class="tag tag-review">past expected date</span>' : ''}` : '')
+    + chips;
+}
+
+// How good the forecasts are. Back-test: re-run the method as it would
+// have stood on each application's received date, over applications
+// received 6-12 months ago. Live: forecasts locked in by the weekly pull
+// that have since been decided.
+function forecastAccuracy(){
+  const score = errs => errs.length ? { n: errs.length, within14: Math.round(100 * errs.filter(e => Math.abs(e) <= 14).length / errs.length), medianMiss: Math.round(summarise(errs.map(Math.abs)).median) } : null;
+  const live = score(Object.values(predictions).filter(p => p.errorDays != null).map(p => p.errorDays));
+  let back = null;
+  if (timings) {
+    const now = Date.now();
+    const test = timings.rows.filter(r => r.days != null && r.received && now - r.received >= 183 * DAY_MS && now - r.received < 365 * DAY_MS && !ADMIN_WORK.includes(r.work));
+    const cache = new Map(), errs = [];
+    test.forEach(r => {
+      const key = `${r.work}|${r.type}|${r.received.toISOString().slice(0, 7)}`;
+      if (!cache.has(key)) cache.set(key, typicalFor(r.work, r.type, r.received));
+      const typ = cache.get(key);
+      if (typ) errs.push(r.days - Math.round(typ.days));
+    });
+    back = score(errs);
+  }
+  return { live, back };
+}
+
+function renderTimingPanel(el){
+  if (!timings || !timings.rows.length) {
+    el.innerHTML = '<span class="hint" style="margin:0">Planning timings will appear here once the register history has been pulled.</span>';
+    return;
+  }
+  const range = state.timingRange || '365';
+  const withAdmin = !!state.timingAdmin;
+  const since = range === 'all' ? null : new Date(Date.now() - Number(range) * DAY_MS);
+  const rows = timings.rows.filter(r => r.days != null && (!since || r.decided >= since) && (withAdmin || !ADMIN_WORK.includes(r.work)));
+  const all = summarise(rows.map(r => r.days));
+  const first = rows.reduce((m, r) => !m || r.decided < m ? r.decided : m, null);
+  const ranges = [['365', 'last 12 months'], ['730', 'last 2 years'], ['1095', 'last 3 years'], ['1826', 'last 5 years'], ['all', 'everything pulled']];
+  const table = (title, keyFn) => {
+    const groups = new Map();
+    rows.forEach(r => { const k = keyFn(r) || 'Not stated'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r.days); });
+    const body = [...groups].map(([k, ds]) => [k, summarise(ds)]).filter(([, st]) => st.n >= 3).sort((a, b) => b[1].n - a[1].n)
+      .map(([k, st]) => `<tr><td>${esc(k)}</td><td>${st.n}</td><td><b>${fmtWeeks(st.median)}</b></td><td>${fmtWeeks(st.mean)}</td><td>${st.modeWeeks} wks</td><td>${fmtWeeks(st.p25)} &ndash; ${fmtWeeks(st.p75)}</td></tr>`).join('');
+    return `<h4 class="tstats-h">${title}</h4><table class="leads tstats"><thead><tr><th>Type</th><th>Decisions</th><th>Median</th><th>Mean</th><th>Mode</th><th>Middle half</th></tr></thead><tbody>${body}</tbody></table>`;
+  };
+  const acc = state.timingOpen ? forecastAccuracy() : null;
+  const whoHtml = state.timingOpen ? whoAppliesHtml(rows) : '';
+  const accLine = s => s ? `<b>${s.within14}%</b> within 2 weeks of the forecast &middot; typical miss ${s.medianMiss} days &middot; ${s.n} applications` : '';
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span><b>&#9201; Planning decision time</b></span>
+      <select id="tRange" class="f-move">${ranges.map(([v, t]) => `<option value="${v}" ${v === range ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      ${all ? `<span>Median <b>${fmtWeeks(all.median)}</b> &middot; Mean <b>${fmtWeeks(all.mean)}</b> &middot; Mode <b>${all.modeWeeks} wks</b> &middot; middle half ${fmtWeeks(all.p25)}&ndash;${fmtWeeks(all.p75)} &middot; ${all.n.toLocaleString('en-GB')} decisions</span>` : '<span class="hint" style="margin:0">No decisions in this range.</span>'}
+      <button type="button" class="link-btn" id="tToggle">${state.timingOpen ? 'hide detail' : 'what this means &amp; by type'}</button>
+    </div>
+    ${state.timingOpen ? `
+    <div class="tstats-body">
+      <label class="hint" style="margin:8px 0 0;display:block"><input type="checkbox" id="tAdmin" ${withAdmin ? 'checked' : ''}> Include condition discharges, minor changes &amp; lawfulness certificates (quick admin decisions, left out by default)</label>
+      <div class="hint" style="margin:10px 0">
+        <b>How it's measured:</b> from the day the application was received to the day the decision was issued, using ${all ? all.n.toLocaleString('en-GB') : 0} decisions from the public planning register${first ? ` (decided ${fmtDay(first)} to now)` : ''}.<br>
+        <b>Median</b> &mdash; the middle one: half were quicker, half slower. The best &ldquo;typical&rdquo; figure, because a few very slow applications can't drag it.<br>
+        <b>Mean</b> &mdash; the ordinary average: add them all up and divide. Pulled up by the slow ones, so it's usually higher than the median.<br>
+        <b>Mode</b> &mdash; the most common time, to the nearest week.<br>
+        <b>Middle half</b> &mdash; a quarter were quicker than the first figure and a quarter slower than the second, so it's the realistic range to quote.<br>
+        <b>Forecasts:</b> each pending application gets the median for its kind of work over the last 2 years (or its official application type, then all applications, if fewer than 10 decisions). The weekly pull locks each forecast in on the day it's made, so it can be scored honestly when the decision lands.
+      </div>
+      <div class="hint" style="margin:0 0 6px"><b>Forecast accuracy</b><br>
+        Back-test (the method re-run as it would have stood at the time, on applications received 6&ndash;12 months ago): ${acc && acc.back ? accLine(acc.back) : 'not enough data yet'}<br>
+        Live score (forecasts locked in by the weekly pull, now decided): ${acc && acc.live ? accLine(acc.live) : 'none come due yet &mdash; this fills in week by week'}
+      </div>
+      ${table('By kind of work (read from the description)', r => r.work)}
+      ${table('By official application type', r => r.type)}
+      ${table('By who decided it', r => r.level)}
+      ${table('By outcome', r => r.outcome)}
+      ${whoHtml}
+      ${rows.some(r => r.complexity) ? table("By complexity (Claude's reading: 1 trivial &ndash; 5 major)", r => r.complexity ? `${r.complexity} — ${['', 'trivial', 'minor', 'substantial', 'significant', 'major'][r.complexity]}` : null) : ''}
+    </div>` : ''}`;
+  el.querySelector('#tRange').addEventListener('change', e => { state.timingRange = e.target.value; renderTimingPanel(el); });
+  el.querySelector('#tToggle').addEventListener('click', () => { state.timingOpen = !state.timingOpen; renderTimingPanel(el); });
+  const adm = el.querySelector('#tAdmin');
+  if (adm) adm.addEventListener('change', e => { state.timingAdmin = e.target.checked; renderTimingPanel(el); });
+  wireWhoApplies(el);
+}
+
+// ---- Who applies most: agents (architects, designers) and developers ----
+const DETAILS_URL = 'register-data/details.json';
+let detailsPromise = null;
+function loadDetails(){
+  if (!detailsPromise) detailsPromise = fetch(DETAILS_URL).then(r => r.ok ? r.json() : { apps: {} }).catch(() => ({ apps: {} }));
+  return detailsPromise;
+}
+const whoKey = (kind, r) => kind === 'agents'
+  ? (r.agent || '').toLowerCase().replace(/\b(ltd|limited|llp|plc)\b\.?/g, '').replace(/[^a-z0-9]+/g, '')
+  : (r.applicant ? r.applicantKey : '');
+const neverContact = name => STANDING_EXCLUDE.find(n => (name || '').toLowerCase().includes(n));
+const whoName = (kind, r) => kind === 'agents' ? r.agent : r.applicant;
+
+function whoAppliesHtml(rows){
+  const kind = state.whoKind || 'agents';
+  const q = (state.whoSearch || '').trim().toLowerCase();
+  const repeatOnly = state.whoRepeat !== false;
+  const groups = new Map();
+  // Every application in the range counts, pending ones included.
+  const since = state.timingRange === 'all' ? null : new Date(Date.now() - Number(state.timingRange || '365') * DAY_MS);
+  timings.rows.filter(r => !since || (r.decided || r.received) >= since).forEach(r => {
+    const k = whoKey(kind, r);
+    if (!k) return;
+    if (!groups.has(k)) groups.set(k, { key: k, name: whoName(kind, r), apps: [] });
+    groups.get(k).apps.push(r);
+  });
+  let list = [...groups.values()];
+  const total = list.length;
+  if (repeatOnly) list = list.filter(g => g.apps.length >= 2);
+  if (q) list = list.filter(g => g.name.toLowerCase().includes(q));
+  list.sort((a, b) => b.apps.length - a.apps.length || a.name.localeCompare(b.name));
+  const limit = state.whoLimit || 40;
+  const bodyRows = list.slice(0, limit).map(g => {
+    const decided = g.apps.filter(a => a.days != null);
+    const approved = g.apps.filter(a => a.outcome === 'approved').length;
+    const latest = g.apps.reduce((m, a) => !m || a.received > m ? a.received : m, null);
+    const st = decided.length ? summarise(decided.map(a => a.days)) : null;
+    const open = state.whoOpen === g.key;
+    return `<tr class="who-row" data-key="${esc(g.key)}"><td><button type="button" class="link-btn who-name" data-key="${esc(g.key)}">${open ? '&#9662;' : '&#9656;'} ${esc(g.name)}</button>${neverContact(g.name) ? ' <span class="tag tag-excl">never contact</span>' : ''}</td><td><b>${g.apps.length}</b></td><td>${latest ? esc(fmtDay(latest)) : ''}</td><td>${decided.length ? Math.round(100 * approved / decided.length) + '%' : '&ndash;'}</td><td>${st ? fmtWeeks(st.median) : '&ndash;'}</td></tr>`
+      + (open ? `<tr><td colspan="5"><div id="whoDetail" class="f-edit-panel"><span class="hint" style="margin:0">Loading their applications&hellip;</span></div></td></tr>` : '');
+  }).join('');
+  return `
+    <h4 class="tstats-h">Who applies most</h4>
+    <div class="row-actions" style="margin-bottom:8px">
+      <select id="whoKind" class="f-move">
+        <option value="agents" ${kind === 'agents' ? 'selected' : ''}>Agents (architects, designers, planning consultants)</option>
+        <option value="applicants" ${kind === 'applicants' ? 'selected' : ''}>Applicants (developers &amp; repeat applicants)</option>
+      </select>
+      <input type="text" id="whoSearch" class="f-move" placeholder="Search a name&hellip;" value="${esc(state.whoSearch || '')}" style="min-width:180px">
+      <label class="hint" style="margin:0"><input type="checkbox" id="whoRepeat" ${repeatOnly ? 'checked' : ''}> only those with 2 or more</label>
+    </div>
+    <p class="hint" style="margin:0 0 6px">${list.length.toLocaleString('en-GB')} shown of ${total.toLocaleString('en-GB')} ${kind === 'agents' ? 'agents' : 'named applicants'} in this date range. Click a name to see everything they've been involved in.${kind === 'applicants' ? ' Private individuals are only named once they have applied more than once.' : ''}</p>
+    <table class="leads tstats"><thead><tr><th>Name</th><th>Applications</th><th>Latest</th><th>Approved</th><th>Typical time</th></tr></thead><tbody>${bodyRows}</tbody></table>
+    ${list.length > limit ? `<button type="button" class="link-btn" id="whoMore">show ${Math.min(40, list.length - limit)} more</button>` : ''}`;
+}
+
+function addBusinessLead(o){
+  const log = getLog(), archived = getDismissed();
+  if (leads.some(l => l.ref === o.ref) || log[o.ref] || archived[o.ref]) return false;
+  const site = [o.name && o.company && o.name !== o.company ? o.company : '', o.address || ''].filter(Boolean).join(', ');
+  const lead = classify({ ref: o.ref, applicant: o.name || o.company, site });
+  Object.assign(lead, { type: 'Company', source: 'business', folder: 'business', include: false, addedAt: todayISO(), description: o.description || '' });
+  flagSamePractice([lead]);
+  leads.push(lead);
+  saveLeadsToStorage();
+  updateNavCounts();
+  return true;
+}
+
+function renderWhoDetail(el){
+  const box = el.querySelector('#whoDetail');
+  if (!box) return;
+  const kind = state.whoKind || 'agents';
+  const apps = timings.rows.filter(r => whoKey(kind, r) === state.whoOpen).sort((a, b) => (b.received || 0) - (a.received || 0));
+  loadDetails().then(d => {
+    const det = ref => (d.apps || {})[ref] || [];
+    const latestDet = det(apps[0] && apps[0].ref);
+    const name = whoName(kind, apps[0] || {}) || '';
+    const people = [...new Set(apps.map(a => det(a.ref)[3]).filter(Boolean))];
+    const company = latestDet[4] || '';
+    const person = latestDet[3] || company || name;
+    const bizRef = 'ARCH-' + slugify(person + '-' + company);
+    const log = getLog(), archived = getDismissed();
+    const status = log[bizRef] ? `Letter sent ${esc(prettyDate(log[bizRef].date))}` : leads.some(l => l.ref === bizRef) ? 'Already in Businesses' : archived[bizRef] ? 'Archived' : '';
+    const q = encodeURIComponent(`${name} Isle of Man`);
+    box.innerHTML = `
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <b style="color:var(--text)">${esc(name)}</b>
+        <a href="https://www.google.com/search?q=${q}" target="_blank" rel="noopener" class="btn-secondary" style="padding:2px 8px;font-size:0.72rem;text-decoration:none">&#128269; Google them</a>
+        ${neverContact(name) || neverContact(company) ? `<span class="tag tag-excl">On the never-contact list</span>` : status ? `<span class="tag tag-dupe">${status}</span>` : `<button type="button" class="btn-secondary" id="whoAddBiz" style="padding:2px 8px;font-size:0.72rem">+ Add as business</button>`}
+        <span id="whoMsg" class="hint" style="margin:0"></span>
+      </div>
+      ${kind === 'agents' && people.length ? `<div class="hint" style="margin:0 0 4px">People: ${people.map(esc).join(', ')}</div>` : ''}
+      ${latestDet[5] ? `<div class="hint" style="margin:0 0 8px">Address: ${esc(latestDet[5])}</div>` : ''}
+      <table class="leads tstats"><thead><tr><th>Ref</th><th>Applied</th><th>Decided</th><th>Time</th><th>Outcome</th><th>What for</th></tr></thead><tbody>
+      ${apps.map(a => { const x = det(a.ref); return `<tr>
+        <td>${x[2] ? `<a href="https://pbc.gov.im/online-applications/applicationDetails.do?activeTab=summary&amp;keyVal=${encodeURIComponent(x[2])}" target="_blank" rel="noopener">${esc(a.ref)}</a>` : esc(a.ref)}</td>
+        <td>${a.received ? esc(fmtDay(a.received)) : ''}</td>
+        <td>${a.decided ? esc(fmtDay(a.decided)) : '<span class="tag tag-review">pending</span>'}</td>
+        <td>${a.days != null ? fmtWeeks(a.days) : ''}</td>
+        <td>${esc(x[7] || a.outcome || '')}</td>
+        <td><span class="tag tag-dupe">${esc(a.work || '')}</span> ${esc(x[0] || '')}<div class="hint" style="margin:2px 0 0">${esc(x[1] || '')}${kind === 'agents' && x[6] ? ` &middot; applicant: ${esc(x[6])}` : ''}${kind === 'applicants' && (x[4] || x[3]) ? ` &middot; agent: ${esc(x[4] || x[3])}` : ''}</div></td>
+      </tr>`; }).join('')}
+      </tbody></table>`;
+    const add = box.querySelector('#whoAddBiz');
+    if (add) add.addEventListener('click', () => {
+      const ok = addBusinessLead({ ref: bizRef, name: person, company, address: latestDet[5], description: `${apps.length} planning applications on the register (latest ${apps[0] && apps[0].ref})` });
+      box.querySelector('#whoMsg').textContent = ok ? `${person} added to the Businesses folder.` : 'Already in a folder, sent or archived.';
+      if (ok) add.remove();
+    });
+  });
+}
+
+function wireWhoApplies(el){
+  const kindSel = el.querySelector('#whoKind');
+  if (!kindSel) return;
+  const rerender = () => renderTimingPanel(el);
+  kindSel.addEventListener('change', e => { state.whoKind = e.target.value; state.whoOpen = null; state.whoLimit = 40; rerender(); });
+  el.querySelector('#whoRepeat').addEventListener('change', e => { state.whoRepeat = e.target.checked; rerender(); });
+  const search = el.querySelector('#whoSearch');
+  search.addEventListener('change', e => { state.whoSearch = e.target.value; rerender(); });
+  const more = el.querySelector('#whoMore');
+  if (more) more.addEventListener('click', () => { state.whoLimit = (state.whoLimit || 40) + 40; rerender(); });
+  el.querySelectorAll('.who-name').forEach(b => b.addEventListener('click', () => {
+    state.whoOpen = state.whoOpen === b.dataset.key ? null : b.dataset.key;
+    rerender();
+  }));
+  renderWhoDetail(el);
+}
+
 // ---- Pull from the government planning register ----
 // The register itself (pbc.gov.im) blocks cross-origin browser requests
 // and only exposes the applicant/agent name per-application, so the
@@ -759,10 +1071,11 @@ function renderRegisterPull(main){
   const box = document.createElement('div');
   box.className = 'register-pull';
   box.innerHTML = `<h3 class="lead-section-hdr">Pull from the planning register</h3><p class="hint">Loading the latest pull&hellip;</p>`;
-  main.appendChild(box);
+  main.insertBefore(box, document.getElementById('pasteDetails'));
 
-  fetch(REGISTER_DATA_URL).then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
-    .then(data => renderRegisterPullLoaded(box, data))
+  loadTimings().then(() => { const el = document.getElementById('timingPanel'); if (el) renderTimingPanel(el); });
+  Promise.all([fetch(REGISTER_DATA_URL).then(r => { if (!r.ok) throw new Error('not found'); return r.json(); }), loadTimings()])
+    .then(([data]) => renderRegisterPullLoaded(box, data))
     .catch(() => {
       box.innerHTML = `
         <h3 class="lead-section-hdr">Pull from the planning register</h3>
@@ -883,7 +1196,14 @@ function renderRegisterPullLoaded(box, data){
         <div class="hint">${a.parish ? `Parish: ${esc(a.parish)}` : ''} &middot; Received ${esc(a.received||'?')} &middot; ${a.isDecided ? (a.decisionDate ? `Decided ${esc(a.decisionDate)}` : 'Decided') : `Validated ${esc(a.validated || '?')}`}</div>` : '';
 
     let actions;
-    if (sent) actions = `<span class="tag tag-dupe" title="Already sent a letter — see Archive">Sent ${esc(prettyDate(sent.date))}</span>`;
+    if (sent) {
+      const p = predictions[a.ref];
+      const actual = a.isDecided ? regDate(a.decisionDate) : null;
+      const forecast = p ? regDate(p.predictedDate) : null;
+      const diff = actual && forecast ? daysBetween(forecast, actual) : null;
+      actions = `<span class="tag tag-dupe" title="Already sent a letter — see Archive">Sent ${esc(prettyDate(sent.date))}${sent.copy ? ` &middot; ${FOLDERS[sent.copy] || sent.copy} letter` : ''}</span>`
+        + (sent.copy === 'pending' && actual ? `<div class="hint" style="margin:4px 0 0;text-align:right">You sent the pending letter ${esc(prettyDate(sent.date))}.<br>${forecast ? `Forecast &asymp; ${fmtDay(forecast)} &middot; ` : ''}decided ${fmtDay(actual)}${diff != null ? ` (${Math.abs(diff)} days ${diff > 0 ? 'later' : diff < 0 ? 'earlier' : '&mdash; spot on'})` : ''}</div>` : '');
+    }
     else if (inLead) actions = `<span class="tag tag-approved">In ${FOLDERS[leadFolder(inLead)]}</span>`;
     else if (arch) actions = `<span class="tag tag-dupe">Archived ${esc(prettyDate(arch.date))}</span>
           <button type="button" class="btn-secondary reg-unarchive-btn" data-ref="${esc(a.ref)}">&#8617; Bring back</button>`;
@@ -907,6 +1227,7 @@ function renderRegisterPullLoaded(box, data){
           </button>
           <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}</div>
           <div class="lr-meta" style="margin-bottom:2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''}</div>
+          <div class="lr-meta" style="margin-bottom:2px">${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
           <div class="hint" style="margin:2px 0">${esc(a.description || '')}</div>
           ${agentLine}
           ${detailLine}
@@ -1049,6 +1370,7 @@ function renderFolder(main, folder){
         <div class="lr-main">
           <div class="lr-applicant">${esc(l.applicant)}</div>
           <div class="lr-meta">${esc(l.ref)}${l.appliedDate ? ` &middot; <b style="color:var(--text)">Applied ${esc(l.appliedDate)}</b>` : ''}${l.decidedDate ? ` &middot; Decided ${esc(l.decidedDate)}` : ''}${l.description ? ' &middot; ' + esc(l.description) : ''}</div>
+          ${l.appliedDate ? `<div class="lr-meta">${timingHtml(l.ref, l.appliedDate, l.decidedDate)}</div>` : ''}
           ${flag && flag.title ? `<div class="hint" style="margin:0 0 4px;color:var(--accent)">${esc(flag.title)}</div>` : ''}
           <input type="text" class="sal-input" value="${esc(l.salutation)}" title="Salutation — click to change">
           <div class="f-addr">${l.recipientLines.map(esc).join(' &middot; ')}</div>
@@ -1174,6 +1496,7 @@ function renderArchive(main){
           ${e.description || (archivedLead && archivedLead.description) ? `<div class="hint" style="margin:0 0 6px">${esc(e.description || archivedLead.description)}</div>` : ''}
           ${e.address ? `<div class="hint" style="margin:0 0 6px">Site: ${esc(e.address)}</div>` : ''}
           ${(e.appliedDate || (archivedLead && archivedLead.appliedDate)) ? `<div class="hint" style="margin:0 0 6px"><b style="color:var(--text)">Applied ${esc(e.appliedDate || archivedLead.appliedDate)}</b>${(e.decidedDate || (archivedLead && archivedLead.decidedDate)) ? ` &middot; Decided ${esc(e.decidedDate || archivedLead.decidedDate)}` : ''}</div>` : ''}
+          ${(e.appliedDate || (archivedLead && archivedLead.appliedDate)) ? `<div class="hint" style="margin:0 0 6px">${timingHtml(x.ref, e.appliedDate || archivedLead.appliedDate, e.decidedDate || (archivedLead && archivedLead.decidedDate))}</div>` : ''}
           ${e.note ? `<div class="hint" style="margin:0 0 6px">${esc(e.note)}</div>` : ''}
           ${snap ? `<div class="hint" style="margin:0 0 6px">Letter: <b>${COPY_LABEL[snap.folder]}</b>${e.copyNote ? ' — ' + esc(e.copyNote) : ''}</div>` : ''}
           ${e.pdfFile ? `<div class="hint" style="margin:0 0 6px">Original PDF: <b>${esc(e.pdfFile)}</b>${e.pdfPage ? `, page ${e.pdfPage}` : ''}</div>` : ''}

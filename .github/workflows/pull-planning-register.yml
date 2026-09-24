@@ -28,7 +28,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4
+        run: pip install requests beautifulsoup4 anthropic
 
       - name: Pull register
         run: |
@@ -36,11 +36,20 @@ jobs:
             --months "${{ github.event.inputs.months || '3' }}" \
             --out silverdale-canvassing/register-data/latest.json
 
+      - name: Update decision-time history, forecasts and accuracy
+        run: python3 silverdale-canvassing/scripts/planning_history.py --update silverdale-canvassing/register-data/latest.json
+
+      # Only does anything once an ANTHROPIC_API_KEY repository secret exists.
+      - name: Claude reads new applications (type, complexity, homes)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 silverdale-canvassing/scripts/ai_classify.py --max 2000
+
       - name: Commit result
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add silverdale-canvassing/register-data/latest.json
+          git add silverdale-canvassing/register-data/*.json
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
