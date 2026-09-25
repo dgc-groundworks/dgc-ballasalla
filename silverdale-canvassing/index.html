@@ -48,7 +48,7 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .lead-section-hdr{font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--bord)}
 .lead-section-hdr:first-of-type{margin-top:4px}
 .lead-list{display:flex;flex-direction:column;background:var(--surf);border:1px solid var(--bord);border-radius:10px;overflow:hidden}
-.lead-row{display:flex;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid var(--bord)}
+.lead-row{display:flex;align-items:flex-start;gap:16px;padding:14px 18px;border-bottom:1px solid var(--bord)}
 .lead-list .lead-row:last-child{border-bottom:none}
 .lead-row.flagged{background:rgba(245,158,11,.06)}
 .lr-main{flex:1;min-width:0}
@@ -56,12 +56,18 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .reg-name-toggle{background:none;border:none;padding:0;margin-bottom:3px;font:inherit;font-size:0.98rem;font-weight:700;color:var(--text);cursor:pointer;text-align:left;display:block}
 .reg-name-toggle:hover{color:var(--accent)}
 .reg-name{font-size:0.98rem;font-weight:700;color:var(--text);margin-bottom:3px}
-.reg-work{background:var(--surf2);border-left:4px solid var(--accent);border-radius:6px;padding:9px 12px;margin:8px 0 6px;font-size:0.98rem;font-weight:600;color:var(--text);line-height:1.45}
+.reg-work{background:var(--surf2);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;margin:6px 0 4px;font-size:1.02rem;font-weight:700;color:var(--text);line-height:1.4}
 .reg-work .lbl{display:block;font-size:0.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
-.reg-plain{border:1px solid var(--bord);border-radius:6px;padding:9px 12px;margin:0 0 8px;font-size:0.82rem;color:var(--text);line-height:1.5}
-.reg-plain .lbl{font-size:0.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
-.reg-plain div{margin:3px 0}
-.reg-plain b{color:var(--accent)}
+.reg-plain{margin:2px 0 4px}
+.reg-links{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}
+.reg-why{border:1px solid var(--bord);border-radius:6px;padding:7px 12px;margin:4px 0;font-size:0.82rem;color:var(--text);line-height:1.5}
+.reg-why summary{cursor:pointer;color:var(--muted);font-size:0.78rem;font-weight:700;list-style:none}
+.reg-why summary::-webkit-details-marker{display:none}
+.reg-why summary::before{content:'\25b8 ';color:var(--accent)}
+.reg-why[open] summary::before{content:'\25be ';color:var(--accent)}
+.reg-why[open] summary{margin-bottom:6px}
+.reg-why div{margin:3px 0}
+.reg-why b{color:var(--accent)}
 .lr-meta{font-size:0.78rem;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .lr-meta select{background:var(--bg);border:1px solid var(--bord);border-radius:5px;color:var(--muted);padding:3px 6px;font-size:0.74rem;font-family:inherit}
 .sal-input{width:100%;max-width:420px;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text);padding:6px 8px;margin-left:-8px;font-size:0.92rem;font-family:inherit}
@@ -1131,27 +1137,23 @@ function outcomeStats(work, type){
 function plainEnglishHtml(a){
   const t = timings && timings.byRef.get(a.ref);
   const work = t && t.work, type = a.applicationType || (t && t.type);
-  const est = typeof MARKET !== 'undefined' ? MARKET.estimates.get(a.ref) : null;
+  const badge = typeof estimateBadgeHtml === 'function' ? estimateBadgeHtml(a.ref) : '';
+  const drawings = a.keyVal ? `<div class="reg-links">${drawingsLinkHtml(a.keyVal)}${siteExtentHtml(a.siteExtent)}</div>` : '';
+
+  // The same explanation and stats apply to every application of a given
+  // type — reading it once is enough, so it's tucked behind a toggle
+  // rather than reprinted in full on every one of a hundred-plus rows.
   const lines = [];
   const meaning = TYPE_PLAIN[type];
-  if (est && est.what) lines.push(`<div><b>What it is:</b> ${esc(est.what)}</div>`);
   if (meaning) lines.push(`<div><b>What this application is:</b> ${esc(meaning)}</div>`);
   const PAPERWORK = ['Conditions / information', 'Minor change', 'Variation of conditions', 'Certificate of lawfulness'];
   if (WORK_ON_SITE[work] && !(meaning && PAPERWORK.includes(work))) lines.push(`<div><b>On site:</b> ${esc(WORK_ON_SITE[work])}</div>`);
   const st = outcomeStats(work, type), typ = typicalFor(work, type);
   if (st) lines.push(`<div><b>How similar ones go:</b> ${st.approved}% approved${st.refused ? `, ${st.refused}% refused` : ''}${typ ? `, usually decided in about ${fmtWeeks(typ.days)}` : ''}. Based on ${st.n} decided in the last 2 years (${esc(st.basis)}).</div>`);
-  const r = regDate(a.received);
-  if (a.isDecided) {
-    const d = regDate(a.decisionDate);
-    lines.push(`<div><b>This one:</b> ${esc((a.decision || 'decided').toLowerCase())}${d ? ` on ${fmtDay(d)}` : ''}${r && d ? `, ${fmtWeeks(daysBetween(r, d))} after it went in` : ''}.</div>`);
-  } else if (r) {
-    const f = forecastFor(a.ref, r, t && t.validated, work, type);
-    lines.push(`<div><b>This one:</b> waiting ${fmtWeeks(daysBetween(r, new Date()))} so far${f ? `, decision expected around ${fmtDay(f.date)}` : ''}.</div>`);
-  }
-  const badge = typeof estimateBadgeHtml === 'function' ? estimateBadgeHtml(a.ref) : '';
-  const drawings = a.keyVal ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">${drawingsLinkHtml(a.keyVal)}${siteExtentHtml(a.siteExtent)}</div>` : '';
-  if (!lines.length && !badge && !drawings) return '';
-  return `<div class="reg-plain"><span class="lbl">In plain English</span>${lines.join('')}${badge}${drawings}</div>`;
+  const why = lines.length ? `<details class="reg-why"><summary>What this means &amp; how similar ones usually go</summary>${lines.join('')}</details>` : '';
+
+  if (!badge && !drawings && !why) return '';
+  return `<div class="reg-plain">${badge}${drawings}${why}</div>`;
 }
 
 // How good the forecasts are. Back-test: re-run the method as it would
@@ -1507,10 +1509,8 @@ function renderRegisterPullLoaded(box, data){
           ${agentStatus
             ? `<span class="tag tag-dupe" style="margin-left:6px">${agentStatus}</span>`
             : `<button type="button" class="btn-secondary reg-add-agent-btn" data-ref="${esc(a.ref)}" style="margin-left:6px;padding:1px 7px;font-size:0.7rem">+ Add agent as business</button>`}
+          ${a.agentAddress ? `<br><span style="opacity:.75">${esc(a.agentAddress)}</span>` : ''}
         </div>` : '';
-    const detailLine = full ? `
-        <div class="hint">${a.agentAddress ? esc(a.agentAddress) : ''}</div>
-        <div class="hint">${a.parish ? `Parish: ${esc(a.parish)}` : ''} &middot; Received ${esc(a.received||'?')} &middot; ${a.isDecided ? (a.decisionDate ? `Decided ${esc(a.decisionDate)}` : 'Decided') : `Validated ${esc(a.validated || '?')}`}</div>` : '';
 
     let actions;
     if (sent) {
@@ -1540,13 +1540,11 @@ function renderRegisterPullLoaded(box, data){
       <div class="lead-row">
         <div class="lr-main">
           <div class="reg-name">${esc(person)}</div>
-          <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}</div>
-          <div class="lr-meta" style="margin-bottom:2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''}</div>
-          <div class="lr-meta" style="margin-bottom:2px">${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
+          <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}${a.parish ? ` &middot; ${esc(a.parish)}` : ''}</div>
           <div class="reg-work"><span class="lbl">Applying for</span>${esc(a.description || 'No description on the register')}</div>
+          <div class="lr-meta" style="margin:4px 0 2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''} &middot; ${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
           ${plainEnglishHtml(a)}
           ${agentLine}
-          ${detailLine}
         </div>
         <div class="lr-side">
           <span class="tag ${CATEGORY_TAG[cat][0]}">${CATEGORY_TAG[cat][1] || a.decision || 'Decided'}</span>
