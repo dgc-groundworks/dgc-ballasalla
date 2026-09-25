@@ -97,12 +97,21 @@ function marketRows(){
     return true;
   });
 }
+// Does the job suit Silverdale (design, project management or a full build)? Older estimates only
+// have a free-text note, so fall back to reading that.
+function silverdaleFit(e){
+  if (e.silverdaleFit) return e.silverdaleFit === 'not a fit' ? '' : e.silverdaleFit;
+  const t = (e.silverdale || '').toLowerCase();
+  if (!t || /\bnot\b|\bno\b|unlikely|none/.test(t)) return '';
+  return /full build/.test(t) ? 'full build' : /project management/.test(t) ? 'project management' : /design/.test(t) ? 'design and planning' : '';
+}
 function marketTotals(rows){
   const priced = rows.filter(e => MK.grade.includes(e.grade) && e.total);
   const sum = key => [0, 1].map(i => priced.reduce((s, e) => s + (e[key] ? e[key][i] : 0), 0));
   return { count: rows.length, priced: priced.length, total: sum('total'), groundworks: sum('groundworks'), england: sum('england'),
            grades: ['A', 'B', 'C', 'D'].map(g => rows.filter(e => e.grade === g).length),
-           offMainsHomes: priced.filter(e => e.offMains && e.homes > 0).length, rows: priced };
+           offMainsHomes: priced.filter(e => e.offMains && e.homes > 0).length, rows: priced,
+           silverdale: priced.filter(e => silverdaleFit(e)) };
 }
 function groupBy(rows, key){
   const g = new Map();
@@ -131,8 +140,17 @@ async function renderMarket(main){
   const rows = marketRows();
   const t = marketTotals(rows);
   const byType = groupBy(t.rows, 'type'), byParish = groupBy(t.rows, 'parish'), byClient = groupBy(t.rows, 'client'), byStatus = groupBy(t.rows, 'status');
-  const opps = t.rows.filter(e => ['approved', 'pending'].includes(e.status) && e.groundworks)
+  // Never list anyone on the standing never-contact list as an opportunity.
+  const contactable = e => {
+    const a = appsByRef.get(e.ref) || {};
+    const hay = `${a.applicantName || ''} ${a.address || ''} ${a.agentName || ''} ${a.agentCompanyName || ''}`.toLowerCase();
+    return !(typeof STANDING_EXCLUDE !== 'undefined' && STANDING_EXCLUDE.some(n => hay.includes(n)));
+  };
+  const opps = t.rows.filter(e => ['approved', 'pending'].includes(e.status) && e.groundworks && contactable(e))
     .sort((a, b) => midOf(b.groundworks) - midOf(a.groundworks)).slice(0, 15);
+  const silOpps = t.silverdale.filter(e => ['approved', 'pending'].includes(e.status) && contactable(e))
+    .sort((a, b) => midOf(b.total) - midOf(a.total)).slice(0, 15);
+  const silTotal = [0, 1].map(i => t.silverdale.reduce((s, e) => s + e.total[i], 0));
   const run = MARKET.summary && MARKET.summary.lastRun;
   const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
 
@@ -151,6 +169,7 @@ async function renderMarket(main){
       <div class="mk-card"><div class="k">Estimated work value</div><div class="v">${money(midOf(t.total))}</div><div class="s">range ${moneyRange(t.total)}</div></div>
       <div class="mk-card"><div class="k">DGC groundworks and drainage share</div><div class="v">${money(midOf(t.groundworks))}</div><div class="s">range ${moneyRange(t.groundworks)}</div></div>
       <div class="mk-card"><div class="k">Same work in England</div><div class="v">${money(midOf(t.england))}</div><div class="s">Isle of Man prices are higher; this shows by how much</div></div>
+      <div class="mk-card"><div class="k">Silverdale pipeline</div><div class="v">${money(midOf(silTotal))}</div><div class="s">${t.silverdale.length} jobs that suit a full build, project management or design</div></div>
       <div class="mk-card"><div class="k">Off-mains new homes</div><div class="v">${t.offMainsHomes}</div><div class="s">each likely needs a septic tank or treatment plant and drainage field</div></div>
     </div>
     <div class="mk-section"><h3>Value by type of work</h3><p class="hint" style="margin:0 0 8px">Orange bar: whole job. Green bar: DGC's groundworks and drainage share. Number in brackets: how many applications.</p>${barsHtml(byType)}</div>
@@ -160,6 +179,16 @@ async function renderMarket(main){
       ${opps.map(e => { const a = appsByRef.get(e.ref) || {}; return `<div class="mk-opp">
         <div class="t">${esc(e.what)}</div>
         <div class="lr-meta">${esc(e.ref)} &middot; ${esc(a.address || e.parish || '')} &middot; ${esc(e.status)}${a.agentCompanyName || a.agentName ? ` &middot; agent ${esc(a.agentCompanyName || a.agentName)}` : ''}</div>
+        ${estimateBadgeHtml(e.ref)}
+        ${e.keyVal && typeof documentsLink === 'function' ? `<a class="hint" href="${documentsLink(e.keyVal)}" target="_blank" rel="noopener">Drawings and documents on the planning register &nearr;</a>` : ''}
+      </div>`; }).join('') || '<p class="hint">None yet.</p>'}
+    </div>
+    <div class="mk-section"><h3>Top opportunities for Silverdale (approved or pending, suit a full build, project management or design)</h3>
+      ${silOpps.map(e => { const a = appsByRef.get(e.ref) || {}; return `<div class="mk-opp">
+        <div class="t">${esc(e.what)}</div>
+        <div class="lr-meta">${esc(e.ref)} &middot; ${esc(a.address || e.parish || '')} &middot; ${esc(e.status)}${a.agentCompanyName || a.agentName ? ` &middot; agent ${esc(a.agentCompanyName || a.agentName)}` : ''}</div>
+        <div class="est-badge"><span class="est-val" style="background:rgba(56,153,207,.12);border-color:rgba(56,153,207,.4)">Silverdale: ${esc(silverdaleFit(e))}</span></div>
+        ${e.silverdale ? `<div class="hint" style="margin:2px 0">${esc(e.silverdale)}</div>` : ''}
         ${estimateBadgeHtml(e.ref)}
         ${e.keyVal && typeof documentsLink === 'function' ? `<a class="hint" href="${documentsLink(e.keyVal)}" target="_blank" rel="noopener">Drawings and documents on the planning register &nearr;</a>` : ''}
       </div>`; }).join('') || '<p class="hint">None yet.</p>'}
@@ -178,7 +207,7 @@ async function renderMarket(main){
 
   [['mkPeriod', 'period'], ['mkStatus', 'status'], ['mkGrade', 'grade']].forEach(([id, key]) =>
     main.querySelector('#' + id).addEventListener('change', e => { MK[key] = e.target.value; renderMarket(main); }));
-  main.querySelector('#mkDigest').addEventListener('click', () => downloadDigest(t, byType, byParish, opps, appsByRef));
+  main.querySelector('#mkDigest').addEventListener('click', () => downloadDigest(t, byType, byParish, opps, appsByRef, silOpps, silTotal));
   wireEstimatorEditor(main);
 }
 
@@ -199,7 +228,7 @@ async function wireEstimatorEditor(main){
 }
 
 // A short Markdown note to drop into Obsidian.
-function downloadDigest(t, byType, byParish, opps, appsByRef){
+function downloadDigest(t, byType, byParish, opps, appsByRef, silOpps, silTotal){
   if (!t.count) { alert('No estimates for these filters yet, so there is nothing to save. Estimates appear after the next weekly pull.'); return; }
   const period = { '30': 'last 30 days', '90': 'last 90 days', '365': 'last 12 months', all: 'everything priced' }[MK.period];
   const today = new Date().toISOString().slice(0, 10);
@@ -218,6 +247,7 @@ Filters: ${MK.status === 'all' ? 'all applications' : MK.status}, grades ${MK.gr
 - **DGC groundworks and drainage share:** ${moneyRange(t.groundworks)}
 - **Same work in England:** ${moneyRange(t.england)}
 - **Off-mains new homes:** ${t.offMainsHomes}
+- **Silverdale pipeline:** ${moneyRange(silTotal)} across ${t.silverdale.length} jobs that suit a full build, project management or design
 
 ## By type of work
 | Type | Apps | Whole job | DGC share |
@@ -229,7 +259,10 @@ ${byType.map(line).join('\n')}
 |---|---|---|---|
 ${byParish.slice(0, 12).map(line).join('\n')}
 
-## Top opportunities
+## Top opportunities for Silverdale
+${(silOpps || []).map(e => { const a = appsByRef.get(e.ref) || {}; return `- **${e.ref}** ${e.what} (${a.address || e.parish || ''}). ${silverdaleFit(e)}. Job ${moneyRange(e.total)}, grade ${e.grade}, ${e.status}.${a.agentCompanyName || a.agentName ? ` Agent: ${a.agentCompanyName || a.agentName}.` : ''}`; }).join('\n')}
+
+## Top opportunities for DGC
 ${opps.map(e => { const a = appsByRef.get(e.ref) || {}; return `- **${e.ref}** ${e.what} (${a.address || e.parish || ''}). Job ${moneyRange(e.total)}, DGC share ${moneyRange(e.groundworks)}, grade ${e.grade}, ${e.status}.${a.agentCompanyName || a.agentName ? ` Agent: ${a.agentCompanyName || a.agentName}.` : ''}`; }).join('\n')}
 
 *Estimates from the Isle of Man planning register, priced by Claude with the private DGC rate book. Ranges with grades (A about ±15%, B about ±30%, C about ±50%), a guide not a quote.*

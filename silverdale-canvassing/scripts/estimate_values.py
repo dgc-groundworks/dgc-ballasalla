@@ -60,6 +60,7 @@ SCHEMA = {
             "total": NULLABLE_RANGE,
             "groundworks": NULLABLE_RANGE,
             "england": NULLABLE_RANGE,
+            "silverdaleFit": {"type": "string", "enum": ["full build", "project management", "design and planning", "not a fit"]},
             "silverdale": {"type": "string"},
             "grade": {"type": "string", "enum": ["A", "B", "C", "D"]},
             "why": {"type": "string"},
@@ -67,7 +68,7 @@ SCHEMA = {
             "sources": {"type": "array", "items": {"type": "string"}},
         },
         "required": ["ref", "what", "type", "homes", "client", "offMains", "floorM2", "siteM2", "sizeFrom",
-                     "total", "groundworks", "england", "silverdale", "grade", "why", "opportunity", "sources"],
+                     "total", "groundworks", "england", "silverdaleFit", "silverdale", "grade", "why", "opportunity", "sources"],
         "additionalProperties": False,
     }}},
     "required": ["results"],
@@ -246,6 +247,9 @@ def summarise(run=None):
     recent = [e for e in rows if e["_received"] and (today - e["_received"]).days <= 90
               and e.get("status") in ("approved", "pending") and e.get("groundworks") and e.get("grade") in ("A", "B", "C")]
     out["topOpportunities"] = [e["ref"] for e in sorted(recent, key=lambda e: -mid(e["groundworks"]))[:15]]
+    sil = [e for e in rows if e["_received"] and (today - e["_received"]).days <= 90 and e.get("status") in ("approved", "pending")
+           and e.get("total") and e.get("grade") in ("A", "B", "C") and e.get("silverdaleFit") not in (None, "not a fit")]
+    out["topSilverdale"] = [e["ref"] for e in sorted(sil, key=lambda e: -mid(e["total"]))[:15]]
     if run:
         out["lastRun"] = run
     elif os.path.exists(SUMMARY_PATH):
