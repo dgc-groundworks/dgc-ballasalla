@@ -58,6 +58,8 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .reg-name{font-size:0.98rem;font-weight:700;color:var(--text);margin-bottom:3px}
 .reg-work{background:var(--surf2);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;margin:6px 0 4px;font-size:1.02rem;font-weight:700;color:var(--text);line-height:1.4}
 .reg-work .lbl{display:block;font-size:0.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
+.reg-work-gloss{font-weight:700}
+.reg-work-raw{font-size:0.8rem;font-weight:400;color:var(--muted);line-height:1.4;margin-top:4px}
 .reg-plain{margin:2px 0 4px}
 .reg-links{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}
 .reg-why{border:1px solid var(--bord);border-radius:6px;padding:7px 12px;margin:4px 0;font-size:0.82rem;color:var(--text);line-height:1.5}
@@ -1120,6 +1122,33 @@ const WORK_ON_SITE = {
   'Variation of conditions': 'A change to the conditions on an existing permission.',
   'Certificate of lawfulness': 'Confirming something is lawful, rather than new building work.'
 };
+// These reference a condition number and an earlier permission, with
+// nothing in the register's own wording restating what the project
+// actually is — unlike a full application's description, which usually
+// reads fine on its own. A short gloss goes ahead of the raw wording
+// only for these.
+const PAPERWORK = ['Conditions / information', 'Minor change', 'Variation of conditions', 'Certificate of lawfulness'];
+const PAPERWORK_GLOSS = {
+  'Conditions / information': 'Follow-up paperwork on an already-approved project',
+  'Minor change': 'A small change to an already-approved project',
+  'Variation of conditions': 'Changing the conditions on an already-approved permission',
+  'Certificate of lawfulness': 'Confirming something is lawful — not new building work'
+};
+// The prominent "Applying for" text on a register row. For an ordinary
+// full application the register's own wording is clear enough on its
+// own. For paperwork types it isn't (see PAPERWORK above), so a plain
+// one-line gloss — the market estimate's own description where one
+// exists, else a generic fallback — goes ahead of it, with the raw
+// wording kept but demoted to secondary weight rather than dropped.
+function whatThisIsHtml(a){
+  const t = timings && timings.byRef.get(a.ref);
+  const work = t && t.work;
+  const raw = esc(a.description || 'No description on the register');
+  if (!PAPERWORK.includes(work)) return raw;
+  const est = typeof MARKET !== 'undefined' ? MARKET.estimates.get(a.ref) : null;
+  const gloss = (est && est.what) || PAPERWORK_GLOSS[work];
+  return `<div class="reg-work-gloss">${esc(gloss)}</div><div class="reg-work-raw">${raw}</div>`;
+}
 function outcomeStats(work, type){
   if (!timings) return null;
   const since = new Date(Date.now() - 730 * DAY_MS);
@@ -1146,7 +1175,6 @@ function plainEnglishHtml(a){
   const lines = [];
   const meaning = TYPE_PLAIN[type];
   if (meaning) lines.push(`<div><b>What this application is:</b> ${esc(meaning)}</div>`);
-  const PAPERWORK = ['Conditions / information', 'Minor change', 'Variation of conditions', 'Certificate of lawfulness'];
   if (WORK_ON_SITE[work] && !(meaning && PAPERWORK.includes(work))) lines.push(`<div><b>On site:</b> ${esc(WORK_ON_SITE[work])}</div>`);
   const st = outcomeStats(work, type), typ = typicalFor(work, type);
   if (st) lines.push(`<div><b>How similar ones go:</b> ${st.approved}% approved${st.refused ? `, ${st.refused}% refused` : ''}${typ ? `, usually decided in about ${fmtWeeks(typ.days)}` : ''}. Based on ${st.n} decided in the last 2 years (${esc(st.basis)}).</div>`);
@@ -1541,7 +1569,7 @@ function renderRegisterPullLoaded(box, data){
         <div class="lr-main">
           <div class="reg-name">${esc(person)}</div>
           <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}${a.parish ? ` &middot; ${esc(a.parish)}` : ''}</div>
-          <div class="reg-work"><span class="lbl">Applying for</span>${esc(a.description || 'No description on the register')}</div>
+          <div class="reg-work"><span class="lbl">Applying for</span>${whatThisIsHtml(a)}</div>
           <div class="lr-meta" style="margin:4px 0 2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''} &middot; ${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
           ${plainEnglishHtml(a)}
           ${agentLine}
