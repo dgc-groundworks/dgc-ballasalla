@@ -200,6 +200,7 @@ async function wireEstimatorEditor(main){
 
 // A short Markdown note to drop into Obsidian.
 function downloadDigest(t, byType, byParish, opps, appsByRef){
+  if (!t.count) { alert('No estimates for these filters yet, so there is nothing to save. Estimates appear after the next weekly pull.'); return; }
   const period = { '30': 'last 30 days', '90': 'last 90 days', '365': 'last 12 months', all: 'everything priced' }[MK.period];
   const today = new Date().toISOString().slice(0, 10);
   const line = g => `| ${g.k} | ${g.n} | ${moneyRange(g.total)} | ${moneyRange(g.gw)} |`;
