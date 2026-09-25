@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="../staff/config.js"></script>
+<script src="../staff/auth.js?v=2"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -137,16 +139,55 @@ table.tstats td,table.tstats th{padding:5px 8px}
   .letter-page,.env-page{page-break-after:always}
   @page{margin:0}
 }
+/* Sign-in screen and online-save indicator */
+body.locked .topbar,body.locked .nav,body.locked .main{display:none}
+.gate{display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px}
+body.locked .gate{display:flex}
+.gate-card{width:100%;max-width:390px;background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:26px}
+.gate-card h1{font-size:1.2rem;color:var(--accent);margin-bottom:6px}
+.gate-card form{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.gate-card input{background:var(--surf2);border:1px solid var(--bord);border-radius:6px;color:var(--text);padding:10px 12px;font:inherit}
+.gate-card details{margin-top:14px}
+.gate-card summary{cursor:pointer;color:var(--muted);font-size:0.8rem}
+.gate-msg{font-size:0.82rem;margin-top:10px;color:var(--muted)}
+.gate-msg.err{color:var(--red)}
+.gate-msg.ok{color:var(--green)}
+.cloud-chip{font-size:0.75rem;font-weight:700;padding:4px 10px;border-radius:12px;border:1px solid var(--bord);color:var(--muted);white-space:nowrap}
+.cloud-chip.ok{color:var(--green);border-color:rgba(34,197,94,.4)}
+.cloud-chip.saving{color:var(--accent);border-color:rgba(245,158,11,.4)}
+.cloud-chip.warn{color:var(--red);border-color:rgba(239,68,68,.4)}
 </style>
 </head>
-<body>
+<body class="locked">
+<div class="gate" id="gate"><div class="gate-card">
+  <h1>Silverdale Canvassing</h1>
+  <p class="hint" style="margin:0">Private. Sign in with your DGC or Silverdale email, the same login as the Job Planner.</p>
+  <div id="gateChecking" class="gate-msg">Checking sign-in&hellip;</div>
+  <div id="gateForms" style="display:none">
+    <form id="gateLinkForm">
+      <input type="email" id="gateEmail" placeholder="Email" required autocomplete="username">
+      <button class="btn" type="submit">Email me a login link</button>
+    </form>
+    <details>
+      <summary>Sign in with a password instead</summary>
+      <form id="gatePwForm">
+        <input type="email" id="gatePwEmail" placeholder="Email" required autocomplete="username">
+        <input type="password" id="gatePwPass" placeholder="Password" required autocomplete="current-password">
+        <button class="btn-secondary" type="submit">Sign in</button>
+      </form>
+    </details>
+  </div>
+  <p id="gateMsg" class="gate-msg"></p>
+</div></div>
 <header class="topbar">
   <h1>Silverdale Canvassing</h1>
   <span class="sub">Planning-leads intake &rarr; letters &amp; envelopes, ready to print</span>
   <button class="btn-secondary" id="downloadBackupBtn" title="Save all leads and the processed log to a file, so you can load it on any device">&#128190; Backup</button>
   <button class="btn-secondary" id="restoreBackupBtn" title="Load a previously saved backup file">&#8593; Restore</button>
   <input type="file" id="restoreBackupInput" accept=".json,application/json" style="display:none">
+  <span class="cloud-chip" id="cloudStatus" title="Leads, sent letters and the archive are saved online, private to Ash and Harry">Connecting&hellip;</span>
   <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">Light Mode</button>
+  <button class="theme-toggle-btn" id="signOutBtn" title="Signs this browser out (also signs out of the Job Planner here)">Sign out</button>
 </header>
 <nav class="nav">
   <button class="navbtn active" data-tab="import">Import &mdash; Planning</button>
@@ -241,11 +282,170 @@ function todayOrdinal(){
 function getEnvAlign(){ try { return localStorage.getItem(LS_ENV_ALIGN) || 'center'; } catch { return 'center'; } }
 function setEnvAlign(v){ try { localStorage.setItem(LS_ENV_ALIGN, v); } catch {} }
 function getLog(){ try { return JSON.parse(localStorage.getItem(LS_LOG) || '{}'); } catch { return {}; } }
-function saveLog(log){ try { localStorage.setItem(LS_LOG, JSON.stringify(log)); } catch {} }
+function saveLog(log){ try { localStorage.setItem(LS_LOG, JSON.stringify(log)); } catch {} cloudQueue(LS_LOG); }
 function getDismissed(){ try { return JSON.parse(localStorage.getItem(LS_REGISTER_DISMISSED) || '{}'); } catch { return {}; } }
-function saveDismissed(d){ try { localStorage.setItem(LS_REGISTER_DISMISSED, JSON.stringify(d)); } catch {} }
-function saveLeadsToStorage(){ try { localStorage.setItem(LS_LEADS, JSON.stringify(leads)); } catch {} }
+function saveDismissed(d){ try { localStorage.setItem(LS_REGISTER_DISMISSED, JSON.stringify(d)); } catch {} cloudQueue(LS_REGISTER_DISMISSED); }
+function saveLeadsToStorage(){ try { localStorage.setItem(LS_LEADS, JSON.stringify(leads)); } catch {} cloudQueue(LS_LEADS); }
 function loadLeadsFromStorage(){ try { return JSON.parse(localStorage.getItem(LS_LEADS) || '[]'); } catch { return []; } }
+
+// ---- Online storage, private to Ash and Harry ----
+// Leads, the sent log and the archive are saved in the Job Planner's Supabase
+// database (table canvass_state). Row level security only lets the emails in
+// canvass_allowed read or change them, and every earlier version is kept in
+// canvass_state_history. This browser keeps its own copy too, so the app keeps
+// working if the connection drops and catches up when it's back.
+const CLOUD_IDS = { [LS_LEADS]: 'leads', [LS_LOG]: 'log', [LS_REGISTER_DISMISSED]: 'archive' };
+const cloud = { on: false, email: '', known: {}, pending: new Set(), timer: null, busy: false };
+const BUCKET = 'canvassing';   // private file store: register data and letter images
+
+async function cloudFetch(path, opts){
+  const session = await ensureLoggedIn();
+  if (!session) throw new Error('signed-out');
+  opts = opts || {};
+  return fetch(SUPABASE_URL + path, Object.assign({}, opts, { headers: authedHeaders(session, opts.headers) }));
+}
+function cloudStatus(kind, text){
+  const el = document.getElementById('cloudStatus');
+  if (el) { el.className = 'cloud-chip ' + kind; el.textContent = text; }
+}
+function cloudQueue(lsKey){
+  if (!cloud.on || !CLOUD_IDS[lsKey]) return;
+  cloud.pending.add(lsKey);
+  cloudStatus('saving', 'Saving online…');
+  clearTimeout(cloud.timer);
+  cloud.timer = setTimeout(cloudFlush, 1500);
+}
+function localJson(lsKey){ try { return JSON.parse(localStorage.getItem(lsKey) || (lsKey === LS_LEADS ? '[]' : '{}')); } catch { return lsKey === LS_LEADS ? [] : {}; } }
+async function cloudFlush(){
+  if (cloud.busy) { clearTimeout(cloud.timer); cloud.timer = setTimeout(cloudFlush, 800); return; }
+  cloud.busy = true;
+  try {
+    for (const lsKey of [...cloud.pending]) {
+      const res = await cloudPush(CLOUD_IDS[lsKey], localJson(lsKey));
+      if (res === 'conflict') { cloud.pending.clear(); cloud.busy = false; await cloudConflict(); return; }
+      cloud.pending.delete(lsKey);
+    }
+    cloudStatus('ok', 'Saved online');
+  } catch (e) {
+    cloudStatus('warn', 'Not saved online yet (saved on this computer)');
+    clearTimeout(cloud.timer); cloud.timer = setTimeout(cloudFlush, 30000);
+  } finally { cloud.busy = false; }
+}
+// Only overwrites the online copy if nobody else has saved since we last read it.
+async function cloudPush(id, data){
+  const known = cloud.known[id];
+  let r, rows;
+  if (known) {
+    r = await cloudFetch(`/rest/v1/canvass_state?id=eq.${id}&updated_at=eq.${encodeURIComponent(known)}`,
+      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ data, updated_by: cloud.email || null }) });
+    if (!r.ok) throw new Error('save failed ' + r.status);
+    rows = await r.json();
+    if (!rows.length) return 'conflict';
+  } else {
+    r = await cloudFetch('/rest/v1/canvass_state',
+      { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ id, data, updated_by: cloud.email || null }) });
+    if (r.status === 409) return 'conflict';
+    if (!r.ok) throw new Error('save failed ' + r.status);
+    rows = await r.json();
+  }
+  cloud.known[id] = rows[0].updated_at;
+  return 'ok';
+}
+async function cloudRows(select){
+  const r = await cloudFetch('/rest/v1/canvass_state?select=' + (select || 'id,data,updated_at'));
+  if (!r.ok) throw new Error('load failed ' + r.status);
+  return r.json();
+}
+function writeLocalFromRows(rows){
+  const byId = Object.fromEntries(rows.map(x => [x.id, x]));
+  for (const [lsKey, id] of Object.entries(CLOUD_IDS)) {
+    if (!byId[id]) continue;
+    cloud.known[id] = byId[id].updated_at;
+    try { localStorage.setItem(lsKey, JSON.stringify(byId[id].data)); } catch {}
+  }
+}
+function keepLocalCopy(label){
+  try { localStorage.setItem(`silverdale_canvassing_${label}_${new Date().toISOString().replace(/[:.]/g, '-')}`,
+    JSON.stringify({ leads: localJson(LS_LEADS), log: localJson(LS_LOG), archive: localJson(LS_REGISTER_DISMISSED) })); } catch {}
+}
+async function cloudConflict(){
+  keepLocalCopy('conflict_copy');
+  try { writeLocalFromRows(await cloudRows()); } catch {}
+  leads = loadLeadsFromStorage().map(classify);
+  render();
+  cloudStatus('ok', 'Saved online');
+  alert('This list was changed on another device a moment ago, so the latest version has been loaded. Your last change on this screen was not saved online, so please check it and do it again.');
+}
+// Sign-in check, then line this browser up with the online copy.
+async function cloudStart(){
+  const chk = await cloudFetch('/rest/v1/rpc/canvass_is_allowed', { method: 'POST', body: '{}' });
+  if (chk.status === 404) return 'not-set-up';
+  if (!chk.ok) throw new Error('check failed ' + chk.status);
+  if ((await chk.json()) !== true) return 'not-allowed';
+  const rows = await cloudRows();
+  const counts = `${localJson(LS_LEADS).length} leads, ${Object.keys(localJson(LS_LOG)).length} sent and ${Object.keys(localJson(LS_REGISTER_DISMISSED)).length} archived`;
+  const localHasData = Object.keys(CLOUD_IDS).some(k => { const v = localStorage.getItem(k); return v && v !== '[]' && v !== '{}'; });
+  if (!rows.length) {
+    cloud.on = true;
+    if (localHasData && confirm(`First time online: save this computer's list (${counts}) as the online copy?\n\nChoose Cancel if you have a more up-to-date list on another computer.`)) {
+      Object.keys(CLOUD_IDS).forEach(k => cloud.pending.add(k));
+      await cloudFlush();
+    }
+    return 'ok';
+  }
+  const differs = rows.some(x => { const k = Object.keys(CLOUD_IDS).find(k => CLOUD_IDS[k] === x.id); return k && JSON.stringify(x.data) !== JSON.stringify(localJson(k)); });
+  if (localHasData && differs) keepLocalCopy('before_online');   // this browser's old copy is kept, just in case
+  writeLocalFromRows(rows);
+  cloud.on = true;
+  return 'ok';
+}
+async function cloudRefreshIfNewer(){
+  if (!cloud.on || cloud.pending.size || cloud.busy) return;
+  try {
+    const rows = await cloudRows('id,updated_at');
+    if (!rows.some(x => cloud.known[x.id] !== x.updated_at)) return;
+    writeLocalFromRows(await cloudRows());
+    leads = loadLeadsFromStorage().map(classify);
+    render();
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) cloudRefreshIfNewer(); });
+window.addEventListener('focus', cloudRefreshIfNewer);
+window.addEventListener('online', () => { if (cloud.pending.size) cloudFlush(); });
+
+// Private files (planning register data, letter images). Until the weekly pull
+// saves into the private store, the old public copy is used as a fallback.
+async function privateFile(path){
+  try { const r = await cloudFetch(`/storage/v1/object/authenticated/${BUCKET}/${path}`); return r.ok ? r : null; }
+  catch { return null; }
+}
+async function privateJson(path, fallbackUrl){
+  const r = await privateFile(path);
+  if (r) return r.json();
+  const r2 = await fetch(fallbackUrl);
+  if (!r2.ok) throw new Error('not found');
+  return r2.json();
+}
+const IMG = { logo: 'assets/silverdale-logo.jpg', sig: 'assets/harry-signature.jpeg' };
+async function loadLetterImages(){
+  for (const [k, file] of [['logo', 'silverdale-logo.jpg'], ['sig', 'harry-signature.jpeg']]) {
+    let r = await privateFile('letter-images/' + file);
+    if (!r && cloud.on) {
+      // One-off move of the image from the old public folder into the private store.
+      try {
+        const pub = await fetch('assets/' + file);
+        if (pub.ok) {
+          const blob = await pub.blob();
+          const up = await cloudFetch(`/storage/v1/object/${BUCKET}/letter-images/${file}`,
+            { method: 'POST', headers: { 'Content-Type': blob.type || 'image/jpeg', 'x-upsert': 'true' }, body: blob });
+          if (up.ok) r = await privateFile('letter-images/' + file);
+        }
+      } catch {}
+    }
+    if (r) IMG[k] = URL.createObjectURL(await r.blob());
+  }
+}
+
 
 // The folder a lead sits in decides which letter it gets. Leads saved
 // before folders existed have no `folder`, so fall back to what they are.
@@ -283,10 +483,9 @@ function updateNavCounts(){
   document.querySelectorAll('.nav-count').forEach(el => { el.textContent = counts[el.dataset.count] || ''; });
 }
 
-// Everything here lives only in this one browser's local storage — there's
-// no server behind it. Backup/Restore is the safety net: a real file you
-// can move between devices/browsers, or recover from if site data ever
-// gets cleared.
+// Leads, the sent log and the archive are saved online (see the online
+// storage section above) as well as in this browser. Backup/Restore is an
+// extra safety net: a real file you can keep or load anywhere.
 function downloadBackup(){
   const data = {
     leads: loadLeadsFromStorage(),
@@ -777,8 +976,8 @@ let timingsPromise = null;
 function loadTimings(){
   if (timingsPromise) return timingsPromise;
   return timingsPromise = Promise.all([
-    fetch(TIMINGS_URL).then(r => r.ok ? r.json() : null).catch(() => null),
-    fetch(PREDICTIONS_URL).then(r => r.ok ? r.json() : {}).catch(() => ({}))
+    privateJson(TIMINGS_URL, TIMINGS_URL).catch(() => null),
+    privateJson(PREDICTIONS_URL, PREDICTIONS_URL).catch(() => ({}))
   ]).then(([t, p]) => {
     predictions = p || {};
     const rows = [], byRef = new Map();
@@ -944,7 +1143,7 @@ function renderTimingPanel(el){
 const DETAILS_URL = 'register-data/details.json';
 let detailsPromise = null;
 function loadDetails(){
-  if (!detailsPromise) detailsPromise = fetch(DETAILS_URL).then(r => r.ok ? r.json() : { apps: {} }).catch(() => ({ apps: {} }));
+  if (!detailsPromise) detailsPromise = privateJson(DETAILS_URL, DETAILS_URL).catch(() => ({ apps: {} }));
   return detailsPromise;
 }
 const whoKey = (kind, r) => kind === 'agents'
@@ -1088,7 +1287,7 @@ function renderRegisterPull(main){
   main.insertBefore(box, document.getElementById('pasteDetails'));
 
   loadTimings().then(() => { const el = document.getElementById('timingPanel'); if (el) renderTimingPanel(el); });
-  Promise.all([fetch(REGISTER_DATA_URL).then(r => { if (!r.ok) throw new Error('not found'); return r.json(); }), loadTimings()])
+  Promise.all([privateJson(REGISTER_DATA_URL, REGISTER_DATA_URL), loadTimings()])
     .then(([data]) => renderRegisterPullLoaded(box, data))
     .catch(() => {
       box.innerHTML = `
@@ -1815,7 +2014,7 @@ function letterParas(l){ return ({ approved: letterBody, pending: pendingLetterB
 function letterHtml(l){
   return `<div class="print-doc letter-page">
     <div class="letter-head">
-      <div class="letter-logo"><img src="assets/silverdale-logo.jpg" alt="Silverdale"></div>
+      <div class="letter-logo"><img src="${IMG.logo}" alt="Silverdale"></div>
       <div class="letter-sender">
         <div class="name">Silverdale Limited</div>
         <div class="addr">23 Circular Road, Douglas, Isle of Man, IM1 1AF<br>01624 614845 &nbsp;|&nbsp; info@silverdale.im &nbsp;|&nbsp; silverdale.im</div>
@@ -1827,7 +2026,7 @@ function letterHtml(l){
       <p>${esc(l.salutation)}</p>
       ${(l.bodyParas || letterParas(l)).map(p => `<p>${p}</p>`).join('')}
       <p>Kind regards,</p>
-      <div class="letter-sign"><img src="assets/harry-signature.jpeg" alt="Signature"></div>
+      <div class="letter-sign"><img src="${IMG.sig}" alt="Signature"></div>
       <p style="margin-top:0">Andrew Harrison<br>Director, Silverdale Limited</p>
     </div>
   </div>`;
@@ -1836,7 +2035,7 @@ function envelopeHtml(l){
   const [name, ...addr] = l.recipientLines;
   const alignClass = getEnvAlign() === 'left' ? ' align-left' : '';
   return `<div class="print-doc env-page${alignClass}">
-    <div class="env-logo"><img src="assets/silverdale-logo.jpg" alt="Silverdale"></div>
+    <div class="env-logo"><img src="${IMG.logo}" alt="Silverdale"></div>
     <div class="env-recipient">
       <div class="er-block">
         <div class="er-name">${esc(name)}</div>
@@ -1851,8 +2050,52 @@ document.getElementById('downloadBackupBtn').addEventListener('click', downloadB
 document.getElementById('restoreBackupBtn').addEventListener('click', () => document.getElementById('restoreBackupInput').click());
 document.getElementById('restoreBackupInput').addEventListener('change', e => restoreBackupFile(e.target.files[0]));
 
-leads = loadLeadsFromStorage().map(classify);
-render();
+document.getElementById('signOutBtn').addEventListener('click', () => {
+  if (confirm('Sign out of Silverdale Canvassing on this browser? This also signs you out of the Job Planner here.')) logout();
+});
+
+function gateMessage(text, kind){ const m = document.getElementById('gateMsg'); m.textContent = text || ''; m.className = 'gate-msg' + (kind ? ' ' + kind : ''); }
+function showGate(){
+  document.body.classList.add('locked');
+  document.getElementById('gateChecking').style.display = 'none';
+  document.getElementById('gateForms').style.display = '';
+}
+document.getElementById('gateLinkForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  gateMessage('Sending…');
+  try { await sendMagicLink(document.getElementById('gateEmail').value.trim()); gateMessage('Check your email and click the link. This page signs in on its own once you do.', 'ok'); }
+  catch (err) { gateMessage(err.message, 'err'); }
+});
+document.getElementById('gatePwForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  gateMessage('Signing in…');
+  try { await login(document.getElementById('gatePwEmail').value.trim(), document.getElementById('gatePwPass').value); gateMessage(''); boot(); }
+  catch (err) { gateMessage(err.message, 'err'); }
+});
+
+async function boot(){
+  const session = await ensureLoggedIn();
+  if (!session) { showGate(); return; }
+  try { const u = await cloudFetch('/auth/v1/user'); if (u.ok) cloud.email = (await u.json()).email || ''; } catch {}
+  let mode;
+  try { mode = await cloudStart(); } catch { mode = 'offline'; }
+  if (mode === 'not-allowed') {
+    showGate();
+    document.getElementById('gateForms').style.display = 'none';
+    gateMessage(`${cloud.email || 'This login'} doesn't have access to Silverdale Canvassing. Sign out and use a director's email.`, 'err');
+    const b = document.createElement('button'); b.className = 'btn-secondary'; b.textContent = 'Sign out'; b.style.marginTop = '12px';
+    b.onclick = logout; document.querySelector('.gate-card').appendChild(b);
+    return;
+  }
+  document.body.classList.remove('locked');
+  if (mode === 'ok') cloudStatus('ok', 'Saved online');
+  else if (mode === 'not-set-up') cloudStatus('warn', 'Online saving not set up yet (saved on this computer)');
+  else cloudStatus('warn', "Can't reach online storage (saved on this computer)");
+  await loadLetterImages();
+  leads = loadLeadsFromStorage().map(classify);
+  render();
+}
+boot();
 
 // Two tabs of this app open at once used to be a silent data-loss trap:
 // the stale tab would later save its old in-memory list over the other's
