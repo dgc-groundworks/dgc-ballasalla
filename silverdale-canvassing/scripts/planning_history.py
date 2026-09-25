@@ -273,13 +273,13 @@ def write_timings(history):
                      code("agents", agent_label(r)), code("applicants", r.get("applicantName")), r.get("applicantKey") or ""])
         details[r["ref"]] = [r.get("description") or "", r.get("address") or "", r.get("keyVal") or "",
                              r.get("agentName") or "", r.get("agentCompanyName") or "", r.get("agentAddress") or "",
-                             r.get("applicantName") or "", r.get("decision") or ""]
+                             r.get("applicantName") or "", r.get("decision") or "", r.get("siteExtent")]
     save(TIMINGS, {"generated": datetime.utcnow().isoformat() + "Z",
                    "fields": ["ref", "work", "type", "level", "outcome", "received", "validated", "decided",
                               "complexity", "agent", "applicant", "applicantKey"],
                    **enc, "rows": rows})
     save(DETAILS, {"fields": ["description", "address", "keyVal", "agentName", "agentCompanyName", "agentAddress",
-                              "applicantName", "decision"], "apps": details})
+                              "applicantName", "decision", "siteExtent"], "apps": details})
 
 
 # ---- Advanced search by decision date (for the backfill) ----
@@ -444,7 +444,9 @@ def update(latest_path):
                "applicantName": a.get("applicantName") or prev.get("applicantName"),
                "applicantKey": prev.get("applicantKey"),
                "keyVal": a.get("keyVal") or prev.get("keyVal"),
-               "agentCompanyName": a.get("agentCompanyName") or prev.get("agentCompanyName")}
+               "agentCompanyName": a.get("agentCompanyName") or prev.get("agentCompanyName"),
+               "siteExtent": a.get("siteExtent") or prev.get("siteExtent"),
+               "documentNames": a.get("documentNames") or prev.get("documentNames")}
         rec["workType"] = work_type(rec["description"], rec["ref"], rec["applicationType"])
         rec["outcome"] = outcome(rec["decision"])
         rec["firstSeen"] = prev.get("firstSeen") or today.isoformat()

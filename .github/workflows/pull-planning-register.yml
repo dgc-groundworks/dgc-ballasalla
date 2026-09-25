@@ -33,7 +33,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4 anthropic
+        run: |
+          sudo apt-get update && sudo apt-get install -y tesseract-ocr
+          pip install requests beautifulsoup4 anthropic pymupdf pytesseract pillow
 
       - name: Fetch current data from the private store
         if: ${{ env.SUPABASE_SERVICE_KEY != '' }}
@@ -52,7 +54,7 @@ jobs:
       - name: Claude reads new applications (type, complexity, homes)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python3 silverdale-canvassing/scripts/ai_classify.py --max 2000
+        run: python3 silverdale-canvassing/scripts/ai_classify.py --max 150
 
       - name: Save to the private store
         if: ${{ env.SUPABASE_SERVICE_KEY != '' }}

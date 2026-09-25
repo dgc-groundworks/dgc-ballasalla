@@ -250,6 +250,25 @@ let state = { tab: 'import' };
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+// The register publishes every application's actual drawings (site plans,
+// floor plans, elevations) on this public tab — no login needed. Built
+// straight from the keyVal we already store, so it works for any
+// application, past or present, without another fetch.
+function documentsLink(keyVal){
+  return keyVal ? `https://pbc.gov.im/online-applications/applicationDetails.do?activeTab=documents&keyVal=${encodeURIComponent(keyVal)}` : null;
+}
+function drawingsLinkHtml(keyVal){
+  const url = documentsLink(keyVal);
+  return url ? `<a href="${url}" target="_blank" rel="noopener" class="btn-secondary" style="padding:1px 7px;font-size:0.7rem;text-decoration:none;display:inline-block">&#128207; Drawings</a>` : '';
+}
+// Best-effort plot size read off the site plan's printed scale and red
+// boundary highlight (see scripts/site_extent.py) — a bounding-box
+// estimate, not the exact shape, so it's always labelled "approx".
+function siteExtentHtml(se){
+  if (!se) return '';
+  return `<span class="hint" style="margin:0" title="Estimated from the site plan's printed scale (1:${se.scale}) and boundary highlight — a bounding box, not the exact shape">&#128207; approx ${se.widthM}m &times; ${se.heightM}m (~${se.envelopeAreaM2.toLocaleString('en-GB')} m&sup2; plot)</span>`;
+}
+
 // Lets a paste box also accept a dropped or picked file — reads it as
 // text and fills the textarea, since dropping a file onto a plain
 // <textarea> just inserts its filename, not its contents.
@@ -1241,7 +1260,7 @@ function renderWhoDetail(el){
         <td>${a.decided ? esc(fmtDay(a.decided)) : predictions[a.ref] ? '<span class="tag tag-review">pending</span>' : '<span class="hint" style="margin:0">date not given</span>'}</td>
         <td>${a.days != null ? fmtWeeks(a.days) : ''}</td>
         <td>${esc(x[7] || a.outcome || '')}</td>
-        <td><span class="tag tag-dupe">${esc(a.work || '')}</span> ${esc(x[0] || '')}<div class="hint" style="margin:2px 0 0">${esc(x[1] || '')}${kind === 'agents' && x[6] ? ` &middot; applicant: ${esc(x[6])}` : ''}${kind === 'applicants' && (x[4] || x[3]) ? ` &middot; agent: ${esc(x[4] || x[3])}` : ''}</div></td>
+        <td><span class="tag tag-dupe">${esc(a.work || '')}</span> ${esc(x[0] || '')}<div class="hint" style="margin:2px 0 0">${esc(x[1] || '')}${kind === 'agents' && x[6] ? ` &middot; applicant: ${esc(x[6])}` : ''}${kind === 'applicants' && (x[4] || x[3]) ? ` &middot; agent: ${esc(x[4] || x[3])}` : ''}</div>${x[2] ? `<div class="hint" style="margin:2px 0 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(x[2])}${siteExtentHtml(x[8])}</div>` : ''}</td>
       </tr>`; }).join('')}
       </tbody></table>`;
     const add = box.querySelector('#whoAddBiz');
@@ -1367,6 +1386,8 @@ function renderRegisterPullLoaded(box, data){
     lead.description = a.description || '';
     lead.appliedDate = a.received || '';
     lead.decidedDate = a.isDecided ? (a.decisionDate || '') : '';
+    lead.keyVal = a.keyVal || '';
+    lead.siteExtent = a.siteExtent || null;
     leads.push(lead);
     return true;
   }
@@ -1408,6 +1429,8 @@ function renderRegisterPullLoaded(box, data){
     const detailLine = full ? `
         <div class="hint">${a.agentAddress ? esc(a.agentAddress) : ''}</div>
         <div class="hint">${a.parish ? `Parish: ${esc(a.parish)}` : ''} &middot; Received ${esc(a.received||'?')} &middot; ${a.isDecided ? (a.decisionDate ? `Decided ${esc(a.decisionDate)}` : 'Decided') : `Validated ${esc(a.validated || '?')}`}</div>` : '';
+    const drawingsLine = a.keyVal ? `
+        <div class="hint" style="margin:4px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(a.keyVal)}${siteExtentHtml(a.siteExtent)}</div>` : '';
 
     let actions;
     if (sent) {
@@ -1441,6 +1464,7 @@ function renderRegisterPullLoaded(box, data){
           <div class="lr-meta" style="margin-bottom:2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''}</div>
           <div class="lr-meta" style="margin-bottom:2px">${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
           <div class="hint" style="margin:2px 0">${esc(a.description || '')}</div>
+          ${drawingsLine}
           ${agentLine}
           ${detailLine}
         </div>
@@ -1517,7 +1541,7 @@ function renderRegisterPullLoaded(box, data){
       if (addAgentToBatch(a)) { saveLeadsToStorage(); say(`${a.agentName || a.agentCompanyName} (agent) → Businesses folder.`); }
     } else if (btn.classList.contains('reg-dismiss-btn')) {
       const d = getDismissed();
-      d[a.ref] = { date: todayISO(), name: person, source: 'planning', description: a.description || '', address: a.address || '', appliedDate: a.received || '', decidedDate: a.isDecided ? (a.decisionDate || '') : '' };
+      d[a.ref] = { date: todayISO(), name: person, source: 'planning', description: a.description || '', address: a.address || '', appliedDate: a.received || '', decidedDate: a.isDecided ? (a.decisionDate || '') : '', keyVal: a.keyVal || '', siteExtent: a.siteExtent || null };
       saveDismissed(d);
       say(`${person} archived — bring it back any time from here or the Archive tab.`);
     } else if (btn.classList.contains('reg-unarchive-btn')) {
@@ -1582,6 +1606,7 @@ function renderFolder(main, folder){
           <div class="lr-applicant">${esc(l.applicant)}</div>
           <div class="lr-meta">${esc(l.ref)}${l.appliedDate ? ` &middot; <b style="color:var(--text)">Applied ${esc(l.appliedDate)}</b>` : ''}${l.decidedDate ? ` &middot; Decided ${esc(l.decidedDate)}` : ''}${l.description ? ' &middot; ' + esc(l.description) : ''}</div>
           ${l.appliedDate ? `<div class="lr-meta">${timingHtml(l.ref, l.appliedDate, l.decidedDate)}</div>` : ''}
+          ${l.keyVal ? `<div class="hint" style="margin:2px 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(l.keyVal)}${siteExtentHtml(l.siteExtent)}</div>` : ''}
           ${flag && flag.title ? `<div class="hint" style="margin:0 0 4px;color:var(--accent)">${esc(flag.title)}</div>` : ''}
           <input type="text" class="sal-input" value="${esc(l.salutation)}" title="Salutation — click to change">
           <div class="f-addr">${l.recipientLines.map(esc).join(' &middot; ')}</div>
@@ -1701,6 +1726,8 @@ function renderArchive(main){
       const snap = x.kind === 'sent' ? letterSnapshot(x) : null;
       const archivedLead = x.kind === 'archived' ? e.lead : null;
       const lines = snap ? snap.recipientLines : archivedLead ? archivedLead.recipientLines : null;
+      const keyVal = e.keyVal || (archivedLead && archivedLead.keyVal) || '';
+      const siteExtent = e.siteExtent || (archivedLead && archivedLead.siteExtent) || null;
       detail = `
         <div class="f-edit-panel">
           ${lines ? `<div class="f-addr" style="margin:0 0 6px;color:var(--text)">${lines.map(esc).join('<br>')}</div>` : ''}
@@ -1709,6 +1736,7 @@ function renderArchive(main){
           ${(e.appliedDate || (archivedLead && archivedLead.appliedDate)) ? `<div class="hint" style="margin:0 0 6px"><b style="color:var(--text)">Applied ${esc(e.appliedDate || archivedLead.appliedDate)}</b>${(e.decidedDate || (archivedLead && archivedLead.decidedDate)) ? ` &middot; Decided ${esc(e.decidedDate || archivedLead.decidedDate)}` : ''}</div>` : ''}
           ${(e.appliedDate || (archivedLead && archivedLead.appliedDate)) ? `<div class="hint" style="margin:0 0 6px">${timingHtml(x.ref, e.appliedDate || archivedLead.appliedDate, e.decidedDate || (archivedLead && archivedLead.decidedDate))}</div>` : ''}
           ${e.note ? `<div class="hint" style="margin:0 0 6px">${esc(e.note)}</div>` : ''}
+          ${keyVal ? `<div class="hint" style="margin:0 0 6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(keyVal)}${siteExtentHtml(siteExtent)}</div>` : ''}
           ${snap ? `<div class="hint" style="margin:0 0 6px">Letter: <b>${COPY_LABEL[snap.folder]}</b>${e.copyNote ? ' — ' + esc(e.copyNote) : ''}</div>` : ''}
           ${e.pdfFile ? `<div class="hint" style="margin:0 0 6px">Original PDF: <b>${esc(e.pdfFile)}</b>${e.pdfPage ? `, page ${e.pdfPage}` : ''}</div>` : ''}
           <div class="row-actions" style="margin:6px 0 0">
@@ -1962,6 +1990,7 @@ function renderPrint(main, kind){
         date: today, name: l.applicant, source: leadFolder(l) === 'business' ? 'business' : 'planning',
         copy: leadFolder(l), recipientLines: l.recipientLines, salutation: l.salutation, letterDate, bodyParas: letterParas(l),
         description: l.description || '', appliedDate: l.appliedDate || '', decidedDate: l.decidedDate || '',
+        keyVal: l.keyVal || '', siteExtent: l.siteExtent || null,
         ...(pdfFile ? (kind === 'letter' ? { pdfFile, pdfPage: i + 1 } : { envelopePdfFile: pdfFile, envelopePdfPage: i + 1 }) : {})
       };
       l.alreadyProcessed = true;

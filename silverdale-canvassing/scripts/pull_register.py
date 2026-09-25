@@ -18,6 +18,7 @@ Usage:
 """
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -143,8 +144,35 @@ def fetch_detail(session, key_val):
     return fields
 
 
+def fetch_documents(session, key_val):
+    """The application's public Documents list (first page — enough to find
+    the site/location plan, which is almost always submitted early)."""
+    doc_url = f"{BASE}/online-applications/applicationDetails.do?activeTab=documents&keyVal={key_val}"
+    r = session.get(doc_url, timeout=20)
+    r.raise_for_status()
+    soup = BeautifulSoup(r.text, "html.parser")
+    docs = []
+    for row in soup.select("table tr"):
+        a = row.find("a", href=True)
+        if not a or "/files/" not in a["href"]:
+            continue
+        cells = [c.get_text(" ", strip=True) for c in row.find_all("td")]
+        docs.append({
+            "type": cells[2] if len(cells) > 2 else "",
+            "description": cells[3] if len(cells) > 3 else "",
+            "href": a["href"],
+        })
+    return docs, doc_url
+
+
 def not_available(value):
     return None if not value or value.strip().lower() == "not available" else value.strip()
+
+
+# Condition-discharge/minor-change/enforcement refs are follow-ups to an
+# earlier application — their own documents list won't hold a fresh site
+# plan, so there's no point spending a request looking.
+ADMIN_REF_SUFFIXES = ("/AIR", "/MCH", "/CON", "/ENF")
 
 
 def main():
@@ -172,6 +200,17 @@ def main():
                 existing = by_ref.setdefault(item["ref"], {})
                 existing.update({k: v for k, v in item.items() if v})
 
+    # Only measures plot size once the app's data is actually private
+    # (SUPABASE_SERVICE_KEY set) — this repo is public, and a measurement
+    # derived from an architect's own drawing shouldn't sit in it, even
+    # briefly, while the app is mid-move to private storage.
+    site_extent = None
+    if os.environ.get("SUPABASE_SERVICE_KEY"):
+        try:
+            import site_extent
+        except ImportError:
+            pass
+
     print(f"Fetching applicant/agent detail for {len(by_ref)} applications...", file=sys.stderr)
     results = []
     for i, (ref, item) in enumerate(by_ref.items(), 1):
@@ -182,6 +221,21 @@ def main():
             except requests.RequestException as e:
                 print(f"  detail fetch failed for {ref}: {e}", file=sys.stderr)
             time.sleep(DETAIL_DELAY_SECONDS)
+
+        site_extent_result = None
+        document_names = None
+        if item.get("keyVal") and site_extent and not ref.endswith(ADMIN_REF_SUFFIXES):
+            try:
+                docs, doc_url = fetch_documents(session, item["keyVal"])
+                # Kept as a clue for the value estimator (a "PROPOSED FLOOR
+                # PLANS" or "3-BED HOUSE TYPE" name says a lot on its own) —
+                # names only, never the documents themselves.
+                document_names = [d["description"] for d in docs if d.get("description")] or None
+                site_extent_result = site_extent.measure(session, BASE, doc_url, docs)
+            except requests.RequestException as e:
+                print(f"  documents fetch failed for {ref}: {e}", file=sys.stderr)
+            time.sleep(DETAIL_DELAY_SECONDS)
+
         if i % 20 == 0:
             print(f"  {i}/{len(by_ref)}", file=sys.stderr)
 
@@ -210,6 +264,8 @@ def main():
             "agentCompanyName": not_available(detail.get("Agent Company Name")),
             "agentAddress": not_available(detail.get("Agent Address")),
             "decisionLevel": not_available(detail.get("Actual Decision Level")) or not_available(detail.get("Expected Decision Level")),
+            "siteExtent": site_extent_result,
+            "documentNames": document_names,
         })
 
     output = {
@@ -220,7 +276,6 @@ def main():
         "applications": sorted(results, key=lambda r: r["ref"], reverse=True),
     }
 
-    import os
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     with open(args.out, "w") as f:
         json.dump(output, f, indent=2)
