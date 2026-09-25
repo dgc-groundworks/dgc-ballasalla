@@ -18,6 +18,7 @@ cost can be checked before it runs weekly at full size.
 """
 import argparse
 import base64
+import hashlib
 import json
 import os
 import sys
@@ -164,7 +165,10 @@ def estimate(max_apps, vision):
               + "\n\nRATE BOOK:\n" + read(RATES_PATH))
     history = load_history()
     est = load_estimates()
-    todo = [r for r in history.values() if r.get("description") and r["ref"] not in est]
+    # A changed prompt or rate book means earlier estimates are re-priced (newest first, within --max).
+    version = hashlib.sha1(system.encode("utf-8")).hexdigest()[:10]
+    todo = [r for r in history.values() if r.get("description")
+            and (r["ref"] not in est or est[r["ref"]].get("rateBook") != version)]
     todo.sort(key=lambda r: parse_date(r.get("received")) or date.min, reverse=True)
     todo = todo[:max_apps]
     print(f"pricing {len(todo)} applications with {MODEL}", file=sys.stderr)
@@ -191,12 +195,14 @@ def estimate(max_apps, vision):
             if not r:
                 continue
             res.update({"received": r.get("received"), "status": r.get("outcome") or "pending",
-                        "parish": r.get("parish"), "keyVal": r.get("keyVal"), "pricedOn": date.today().isoformat()})
+                        "parish": r.get("parish"), "keyVal": r.get("keyVal"), "pricedOn": date.today().isoformat(),
+                        "rateBook": version})
             est[res["ref"]] = res
             done += 1
         save_estimates(est)
     print(f"priced {done}; tokens {usage}", file=sys.stderr)
-    return {"model": MODEL, "priced": done, "usage": usage, "ranOn": datetime.utcnow().isoformat(timespec="minutes") + "Z"}
+    return {"model": MODEL, "priced": done, "usage": usage, "rateBook": version,
+            "ranOn": datetime.utcnow().isoformat(timespec="minutes") + "Z"}
 
 
 def mid(rng):

@@ -450,7 +450,7 @@ window.addEventListener('online', () => { if (cloud.pending.size) cloudFlush(); 
 // Private files (planning register data, letter images). Until the weekly pull
 // saves into the private store, the old public copy is used as a fallback.
 async function privateFile(path){
-  try { const r = await cloudFetch(`/storage/v1/object/authenticated/${BUCKET}/${path}`); return r.ok ? r : null; }
+  try { const r = await cloudFetch(`/storage/v1/object/authenticated/${BUCKET}/${path}`, { cache: 'no-store' }); return r.ok ? r : null; }
   catch { return null; }
 }
 async function privateJson(path, fallbackUrl){
