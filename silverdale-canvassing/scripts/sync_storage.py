@@ -16,7 +16,10 @@ from pathlib import Path
 
 import requests
 
-FILES = ["latest.json", "details.json", "history.json", "predictions.json", "timings.json"]
+FILES = ["latest.json", "details.json", "history.json", "predictions.json", "timings.json",
+         "estimates.jsonl", "market-summary.json"]
+# Set in the app (Estimator tab) and only ever read here, never uploaded by the Action.
+CONFIG = ["estimator/prompt.md", "estimator/rate_book.md"]
 LOCAL_DIR = Path(__file__).resolve().parent.parent / "register-data"
 BUCKET = "canvassing"
 
@@ -36,13 +39,14 @@ def url(name):
 
 def download():
     LOCAL_DIR.mkdir(parents=True, exist_ok=True)
-    for name in FILES:
+    (LOCAL_DIR / "estimator").mkdir(exist_ok=True)
+    for name in FILES + CONFIG:
         r = requests.get(url(name), headers=headers(), timeout=120)
         if r.status_code == 200:
             (LOCAL_DIR / name).write_bytes(r.content)
             print(f"downloaded {name} ({len(r.content) // 1024} KB)")
         elif r.status_code in (400, 404):
-            print(f"{name} not in the private store yet, keeping the local copy")
+            print(f"{name} not in the private store yet" + ("" if name in CONFIG else ", keeping the local copy"))
         else:
             sys.exit(f"could not download {name}: {r.status_code} {r.text[:200]}")
 
@@ -53,7 +57,7 @@ def upload():
         if not path.exists():
             continue
         r = requests.post(url(name), data=path.read_bytes(), timeout=300,
-                          headers=headers({"Content-Type": "application/json", "x-upsert": "true"}))
+                          headers=headers({"Content-Type": "application/x-ndjson" if name.endswith(".jsonl") else "application/json", "x-upsert": "true"}))
         if r.status_code not in (200, 201):
             sys.exit(f"could not upload {name}: {r.status_code} {r.text[:200]}")
         print(f"uploaded {name} ({path.stat().st_size // 1024} KB)")

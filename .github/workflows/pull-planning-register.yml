@@ -56,6 +56,15 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python3 silverdale-canvassing/scripts/ai_classify.py --max 150
 
+      # Prices applications for the Market tab (value range, grade, sources).
+      # Only runs once ANTHROPIC_API_KEY exists and the prompt and rate book
+      # have been saved in the app. --max keeps each run's cost in check.
+      - name: Claude estimates job values
+        if: ${{ env.SUPABASE_SERVICE_KEY != '' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 silverdale-canvassing/scripts/estimate_values.py --max 40
+
       - name: Save to the private store
         if: ${{ env.SUPABASE_SERVICE_KEY != '' }}
         run: python3 silverdale-canvassing/scripts/sync_storage.py upload

@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
+<script src="market.js?v=1"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -55,6 +56,12 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .reg-name-toggle{background:none;border:none;padding:0;margin-bottom:3px;font:inherit;font-size:0.98rem;font-weight:700;color:var(--text);cursor:pointer;text-align:left;display:block}
 .reg-name-toggle:hover{color:var(--accent)}
 .reg-name{font-size:0.98rem;font-weight:700;color:var(--text);margin-bottom:3px}
+.reg-work{background:var(--surf2);border-left:4px solid var(--accent);border-radius:6px;padding:9px 12px;margin:8px 0 6px;font-size:0.98rem;font-weight:600;color:var(--text);line-height:1.45}
+.reg-work .lbl{display:block;font-size:0.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
+.reg-plain{border:1px solid var(--bord);border-radius:6px;padding:9px 12px;margin:0 0 8px;font-size:0.82rem;color:var(--text);line-height:1.5}
+.reg-plain .lbl{font-size:0.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+.reg-plain div{margin:3px 0}
+.reg-plain b{color:var(--accent)}
 .lr-meta{font-size:0.78rem;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .lr-meta select{background:var(--bg);border:1px solid var(--bord);border-radius:5px;color:var(--muted);padding:3px 6px;font-size:0.74rem;font-family:inherit}
 .sal-input{width:100%;max-width:420px;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text);padding:6px 8px;margin-left:-8px;font-size:0.92rem;font-family:inherit}
@@ -199,6 +206,7 @@ body.locked .gate{display:flex}
   <button class="navbtn" data-tab="letters">Print — Letters<span class="nav-count" data-count="print"></span></button>
   <button class="navbtn" data-tab="envelopes">Print — Envelopes</button>
   <button class="navbtn" data-tab="archive">Archive &mdash; Sent &amp; Not chasing</button>
+  <button class="navbtn" data-tab="market">Market &mdash; Job values</button>
 </nav>
 <main class="main" id="mainArea"><p class="empty-state">Loading…</p></main>
 
@@ -929,6 +937,7 @@ function render(){
   if (state.tab === 'fPending') return renderFolder(main, 'pending');
   if (state.tab === 'fBusiness') return renderFolder(main, 'business');
   if (state.tab === 'archive') return renderArchive(main);
+  if (state.tab === 'market') return renderMarket(main);
   if (state.tab === 'letters') return renderPrint(main, 'letter');
   if (state.tab === 'envelopes') return renderPrint(main, 'envelope');
   if (state.tab === 'log') { state.tab = 'archive'; return render(); }
@@ -1070,6 +1079,79 @@ function timingHtml(ref, receivedStr, decidedStr){
   return `<span class="timing">&#9201; waiting ${fmtWeeks(daysBetween(received, new Date()))}</span>`
     + (f ? ` &middot; <b style="color:var(--text)">expected &asymp; ${fmtDay(f.date)}</b> <span class="hint" style="margin:0">(${fmtWeeks(f.days)} ${f.fromValidated ? 'from validation ' : ''}typical for ${esc(f.basis)}, ${f.n} decisions${f.lockedOn ? `, forecast locked ${esc(prettyDate(f.lockedOn))}` : ''})</span>${overdue ? ' <span class="tag tag-review">past expected date</span>' : ''}` : '')
     + chips;
+}
+
+// ---- "In plain English": what an application means and how similar ones have gone ----
+const TYPE_PLAIN = {
+  'Full (detailed approval)': 'A full planning application: the complete, detailed design, with drawings, asking for permission to build it.',
+  'Approval (in principle)': 'An approval in principle: asking whether the idea is acceptable before detailed designs are drawn up. A detailed application follows if it is approved.',
+  'Approval of Reserved Matters': 'The detailed design that follows an earlier approval in principle.',
+  'Condition Discharge': 'The project already has planning permission. This is the applicant sending details a condition of that permission asked for, which usually means the job is getting close to starting.',
+  'Minor Change Application': 'A small change to a scheme that already has planning permission.',
+  'Variation or discharge of a conditon of': 'Asking to change or remove a condition on an existing planning permission.',
+  'Change of Use': 'Permission to use a building or land for a different purpose.',
+  'Registered Building Consent': 'Consent for work to a registered (listed) building, which has extra protection.',
+  'Planning application Regsd Building': 'A planning application affecting a registered (listed) building.',
+  'Advertisements': 'Permission for signs or adverts.',
+  'Certificate of lawfulness': 'Asking the Department to confirm something is lawful without needing planning permission.'
+};
+const WORK_ON_SITE = {
+  'New homes (1)': 'A new house usually means groundworks, foundations, drainage (mains, or a septic tank or treatment plant), services and a driveway.',
+  'New homes (2-9)': 'A small housing scheme: site groundworks, foundations, drainage and sewers, services, and access roads or driveways.',
+  'New homes (10+)': 'A larger housing development: roads, sewers, drainage, foundations and services across the site.',
+  'Extension / alterations': 'Building work to an existing property, which often means new foundations and changes to the drainage.',
+  'Change of use / conversion': 'Converting a building for a new use. Often mostly internal, sometimes new drainage and services.',
+  'Access / parking': 'A new or altered access or parking area: digging out, surfacing and surface water drainage.',
+  'Demolition': 'Taking a building down, often ahead of a rebuild.',
+  'Commercial / community': 'Work on a commercial or community building. The scale varies, so check the drawings.',
+  'Agricultural': 'A farm building or agricultural work: usually a slab, foundations and yard drainage.',
+  'Infrastructure / utilities': 'Infrastructure or utility work.',
+  'Small works (doors, flues, fences...)': 'Small alterations such as windows, doors, flues or fences. Unlikely to involve groundworks.',
+  'Signage / adverts': 'Signs or adverts only, with no building work.',
+  'Trees / landscaping': 'Tree work or landscaping.',
+  'Conditions / information': 'Paperwork for a project that already has permission, so the build itself may be coming up soon.',
+  'Minor change': 'A tweak to a scheme that already has permission.',
+  'Variation of conditions': 'A change to the conditions on an existing permission.',
+  'Certificate of lawfulness': 'Confirming something is lawful, rather than new building work.'
+};
+function outcomeStats(work, type){
+  if (!timings) return null;
+  const since = new Date(Date.now() - 730 * DAY_MS);
+  const pool = timings.rows.filter(r => r.decided && r.decided >= since && r.outcome);
+  for (const [basis, pick] of [[work, r => r.work === work], [type, r => r.type === type]]) {
+    if (!basis) continue;
+    const rs = pool.filter(pick);
+    if (rs.length >= 10) {
+      const pc = o => Math.round(100 * rs.filter(r => r.outcome === o).length / rs.length);
+      return { n: rs.length, basis, approved: pc('approved'), refused: pc('refused') };
+    }
+  }
+  return null;
+}
+function plainEnglishHtml(a){
+  const t = timings && timings.byRef.get(a.ref);
+  const work = t && t.work, type = a.applicationType || (t && t.type);
+  const est = typeof MARKET !== 'undefined' ? MARKET.estimates.get(a.ref) : null;
+  const lines = [];
+  const meaning = TYPE_PLAIN[type];
+  if (est && est.what) lines.push(`<div><b>What it is:</b> ${esc(est.what)}</div>`);
+  if (meaning) lines.push(`<div><b>What this application is:</b> ${esc(meaning)}</div>`);
+  const PAPERWORK = ['Conditions / information', 'Minor change', 'Variation of conditions', 'Certificate of lawfulness'];
+  if (WORK_ON_SITE[work] && !(meaning && PAPERWORK.includes(work))) lines.push(`<div><b>On site:</b> ${esc(WORK_ON_SITE[work])}</div>`);
+  const st = outcomeStats(work, type), typ = typicalFor(work, type);
+  if (st) lines.push(`<div><b>How similar ones go:</b> ${st.approved}% approved${st.refused ? `, ${st.refused}% refused` : ''}${typ ? `, usually decided in about ${fmtWeeks(typ.days)}` : ''}. Based on ${st.n} decided in the last 2 years (${esc(st.basis)}).</div>`);
+  const r = regDate(a.received);
+  if (a.isDecided) {
+    const d = regDate(a.decisionDate);
+    lines.push(`<div><b>This one:</b> ${esc((a.decision || 'decided').toLowerCase())}${d ? ` on ${fmtDay(d)}` : ''}${r && d ? `, ${fmtWeeks(daysBetween(r, d))} after it went in` : ''}.</div>`);
+  } else if (r) {
+    const f = forecastFor(a.ref, r, t && t.validated, work, type);
+    lines.push(`<div><b>This one:</b> waiting ${fmtWeeks(daysBetween(r, new Date()))} so far${f ? `, decision expected around ${fmtDay(f.date)}` : ''}.</div>`);
+  }
+  const badge = typeof estimateBadgeHtml === 'function' ? estimateBadgeHtml(a.ref) : '';
+  const drawings = a.keyVal ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">${drawingsLinkHtml(a.keyVal)}${siteExtentHtml(a.siteExtent)}</div>` : '';
+  if (!lines.length && !badge && !drawings) return '';
+  return `<div class="reg-plain"><span class="lbl">In plain English</span>${lines.join('')}${badge}${drawings}</div>`;
 }
 
 // How good the forecasts are. Back-test: re-run the method as it would
@@ -1429,8 +1511,6 @@ function renderRegisterPullLoaded(box, data){
     const detailLine = full ? `
         <div class="hint">${a.agentAddress ? esc(a.agentAddress) : ''}</div>
         <div class="hint">${a.parish ? `Parish: ${esc(a.parish)}` : ''} &middot; Received ${esc(a.received||'?')} &middot; ${a.isDecided ? (a.decisionDate ? `Decided ${esc(a.decisionDate)}` : 'Decided') : `Validated ${esc(a.validated || '?')}`}</div>` : '';
-    const drawingsLine = a.keyVal ? `
-        <div class="hint" style="margin:4px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(a.keyVal)}${siteExtentHtml(a.siteExtent)}</div>` : '';
 
     let actions;
     if (sent) {
@@ -1463,8 +1543,8 @@ function renderRegisterPullLoaded(box, data){
           <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}</div>
           <div class="lr-meta" style="margin-bottom:2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''}</div>
           <div class="lr-meta" style="margin-bottom:2px">${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
-          <div class="hint" style="margin:2px 0">${esc(a.description || '')}</div>
-          ${drawingsLine}
+          <div class="reg-work"><span class="lbl">Applying for</span>${esc(a.description || 'No description on the register')}</div>
+          ${plainEnglishHtml(a)}
           ${agentLine}
           ${detailLine}
         </div>
@@ -2118,7 +2198,7 @@ async function boot(){
   if (mode === 'ok') cloudStatus('ok', 'Saved online');
   else if (mode === 'not-set-up') cloudStatus('warn', 'Online saving not set up yet (saved on this computer)');
   else cloudStatus('warn', "Can't reach online storage (saved on this computer)");
-  await loadLetterImages();
+  await Promise.all([loadLetterImages(), loadEstimatesCache()]);
   leads = loadLeadsFromStorage().map(classify);
   render();
 }
