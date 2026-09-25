@@ -166,8 +166,14 @@ def decision_level(raw):
         return None
     if "committee" in l:
         return "Planning Committee"
-    if "head of development" in l:
+    if "head of development" in l or "head of dm" in l:
         return "Head of Development Management"
+    if "director" in l:
+        return "Director"
+    if "council of ministers" in l:
+        return "Council of Ministers (called in)"
+    if "rbo" in l:
+        return "Planning officer (registered buildings)"
     if "enf" in l:
         return "Planning officer (enforcement)"
     if "south" in l:
