@@ -54,6 +54,7 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .lr-applicant{font-size:0.98rem;font-weight:700;margin-bottom:3px}
 .reg-name-toggle{background:none;border:none;padding:0;margin-bottom:3px;font:inherit;font-size:0.98rem;font-weight:700;color:var(--text);cursor:pointer;text-align:left;display:block}
 .reg-name-toggle:hover{color:var(--accent)}
+.reg-name{font-size:0.98rem;font-weight:700;color:var(--text);margin-bottom:3px}
 .lr-meta{font-size:0.78rem;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .lr-meta select{background:var(--bg);border:1px solid var(--bord);border-radius:5px;color:var(--muted);padding:3px 6px;font-size:0.74rem;font-family:inherit}
 .sal-input{width:100%;max-width:420px;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text);padding:6px 8px;margin-left:-8px;font-size:0.92rem;font-family:inherit}
@@ -1393,7 +1394,7 @@ function renderRegisterPullLoaded(box, data){
     const hit = standingHit(a);
     const cat = decisionCategory(a);
     const person = a.applicantName || a.agentCompanyName || a.agentName || '(applicant not on register)';
-    const full = forceFull || expandedRefs.has(a.ref);
+    const full = true;   // full application always shown (Ash, 25 Sep 2026)
     const aRef = agentRef(a);
     const agentStatus = !aRef ? '' : log[aRef] ? 'Agent already sent a letter' : leads.some(l => l.ref === aRef) ? 'Agent already in Businesses' : dismissed[aRef] ? 'Agent archived' : '';
     const agentSearchQuery = encodeURIComponent(`${a.agentCompanyName || a.agentName} Isle of Man`);
@@ -1435,9 +1436,7 @@ function renderRegisterPullLoaded(box, data){
     return `
       <div class="lead-row">
         <div class="lr-main">
-          <button type="button" class="reg-name-toggle" data-ref="${esc(a.ref)}" title="${full ? 'Click to collapse' : 'Click to see the full application'}">
-            ${esc(person)} <span class="hint">${full ? '&#9662; hide full application' : '&#9656; show full application'}</span>
-          </button>
+          <div class="reg-name">${esc(person)}</div>
           <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}</div>
           <div class="lr-meta" style="margin-bottom:2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''}</div>
           <div class="lr-meta" style="margin-bottom:2px">${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
@@ -1456,7 +1455,7 @@ function renderRegisterPullLoaded(box, data){
     log = getLog();
     dismissed = getDismissed();
     const filtered = applyFilters();
-    const full = document.getElementById('regDetailToggle').checked;
+    const full = true;
     const archivedCount = apps.filter(a => dismissed[a.ref]).length;
     document.getElementById('regCount').innerHTML = `${filtered.length} of ${apps.length} shown`
       + (archivedCount ? ` &middot; ${archivedCount} archived, ${showArchived ? '<button type="button" class="link-btn" id="regHideArchived">hide them</button>' : '<button type="button" class="link-btn" id="regShowArchived">show them</button>'}` : '');
@@ -1488,7 +1487,6 @@ function renderRegisterPullLoaded(box, data){
           <option value="other">Other decided (withdrawn etc.)</option>
         </select>
       </label>
-      <label><input type="checkbox" id="regDetailToggle"> Full detail</label>
       <input type="text" id="regSearch" placeholder="Search name, address, description&hellip;" style="min-width:220px">
     </div>
     <div class="row-actions" style="flex-wrap:wrap;gap:10px;margin-bottom:6px">
@@ -1501,7 +1499,7 @@ function renderRegisterPullLoaded(box, data){
     <div id="registerList" class="lead-list"></div>`;
 
   renderList();
-  ['regStatus', 'regFrom', 'regTo', 'regSearch', 'regDetailToggle'].forEach(id => {
+  ['regStatus', 'regFrom', 'regTo', 'regSearch'].forEach(id => {
     document.getElementById(id).addEventListener('input', renderList);
   });
   document.getElementById('registerList').addEventListener('click', e => {
