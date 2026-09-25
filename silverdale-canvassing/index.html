@@ -788,6 +788,8 @@ function loadTimings(){
                   agent: (t.agents || [])[r[9]] || '', applicant: (t.applicants || [])[r[10]] || '', applicantKey: r[11] || '' };
       o.days = daysBetween(o.received, o.decided);
       if (o.days != null && o.days < 0) o.days = null;
+      o.vdays = daysBetween(o.validated, o.decided);
+      if (o.vdays != null && o.vdays < 0) o.vdays = null;
       rows.push(o); byRef.set(o.ref, o);
     });
     timings = { rows, byRef, generated: t && t.generated };
@@ -806,14 +808,15 @@ function summarise(days){
   return { n: s.length, mean: s.reduce((a, b) => a + b, 0) / s.length, median: q(0.5), p25: q(0.25), p75: q(0.75), modeWeeks };
 }
 
-function typicalFor(work, type, asOf){
+function typicalFor(work, type, asOf, field){
   if (!timings) return null;
+  const f = field || 'days';
   const now = asOf || new Date();
   const since = new Date(now - 730 * DAY_MS);
-  const pool = timings.rows.filter(r => r.days != null && r.decided >= since && r.decided < now);
+  const pool = timings.rows.filter(r => r[f] != null && r.decided >= since && r.decided < now);
   for (const [basis, pick] of [[work, r => r.work === work], [type, r => r.type === type], ['all applications', () => true]]) {
     if (!basis) continue;
-    const ds = pool.filter(pick).map(r => r.days);
+    const ds = pool.filter(pick).map(r => r[f]);
     if (ds.length >= 10) return { days: summarise(ds).median, n: ds.length, basis };
   }
   return null;
@@ -821,11 +824,16 @@ function typicalFor(work, type, asOf){
 
 // The forecast shown for a pending application: the one locked in by the
 // weekly pull if there is one, otherwise worked out live the same way.
-function forecastFor(ref, received, work, type){
+function forecastFor(ref, received, validated, work, type){
   const p = predictions[ref];
-  if (p && regDate(p.predictedDate)) return { date: regDate(p.predictedDate), days: p.typicalDays, n: p.basedOn, basis: p.basis, lockedOn: p.madeOn };
-  const typ = received && typicalFor(work, type);
-  return typ ? { date: new Date(received.getTime() + Math.round(typ.days) * DAY_MS), days: typ.days, n: typ.n, basis: typ.basis } : null;
+  if (p && regDate(p.predictedDate)) return { date: regDate(p.predictedDate), days: p.typicalDays, n: p.basedOn, basis: p.basis, lockedOn: p.madeOn, fromValidated: p.from === 'validated' };
+  const start = validated || received;
+  const typ = start && typicalFor(work, type, null, validated ? 'vdays' : 'days');
+  if (!typ) return null;
+  const date = new Date(start.getTime() + Math.round(typ.days) * DAY_MS);
+  const dow = date.getDay();
+  if (dow === 6 || dow === 0) date.setDate(date.getDate() + (dow === 6 ? 2 : 1));
+  return { date, days: typ.days, n: typ.n, basis: typ.basis, fromValidated: !!validated };
 }
 
 function timingHtml(ref, receivedStr, decidedStr){
@@ -838,10 +846,10 @@ function timingHtml(ref, receivedStr, decidedStr){
     const typ = typicalFor(t && t.work, t && t.type);
     return `<span class="timing">&#9201; ${fmtWeeks(daysBetween(received, decided))} to decide</span>${typ ? ` <span class="hint" style="margin:0">(typical ${fmtWeeks(typ.days)} for ${esc(typ.basis)})</span>` : ''}${chips}`;
   }
-  const f = forecastFor(ref, received, t && t.work, t && t.type);
+  const f = forecastFor(ref, received, t && t.validated, t && t.work, t && t.type);
   const overdue = f && f.date < new Date();
   return `<span class="timing">&#9201; waiting ${fmtWeeks(daysBetween(received, new Date()))}</span>`
-    + (f ? ` &middot; <b style="color:var(--text)">expected &asymp; ${fmtDay(f.date)}</b> <span class="hint" style="margin:0">(${fmtWeeks(f.days)} typical for ${esc(f.basis)}, ${f.n} decisions${f.lockedOn ? `, forecast locked ${esc(prettyDate(f.lockedOn))}` : ''})</span>${overdue ? ' <span class="tag tag-review">past expected date</span>' : ''}` : '')
+    + (f ? ` &middot; <b style="color:var(--text)">expected &asymp; ${fmtDay(f.date)}</b> <span class="hint" style="margin:0">(${fmtWeeks(f.days)} ${f.fromValidated ? 'from validation ' : ''}typical for ${esc(f.basis)}, ${f.n} decisions${f.lockedOn ? `, forecast locked ${esc(prettyDate(f.lockedOn))}` : ''})</span>${overdue ? ' <span class="tag tag-review">past expected date</span>' : ''}` : '')
     + chips;
 }
 
@@ -849,19 +857,24 @@ function timingHtml(ref, receivedStr, decidedStr){
 // have stood on each application's received date, over applications
 // received 6-12 months ago. Live: forecasts locked in by the weekly pull
 // that have since been decided.
+let accuracyCache = null;
 function forecastAccuracy(){
+  if (accuracyCache) return accuracyCache;
+  return accuracyCache = computeForecastAccuracy();
+}
+function computeForecastAccuracy(){
   const score = errs => errs.length ? { n: errs.length, within14: Math.round(100 * errs.filter(e => Math.abs(e) <= 14).length / errs.length), medianMiss: Math.round(summarise(errs.map(Math.abs)).median) } : null;
   const live = score(Object.values(predictions).filter(p => p.errorDays != null).map(p => p.errorDays));
   let back = null;
   if (timings) {
     const now = Date.now();
-    const test = timings.rows.filter(r => r.days != null && r.received && now - r.received >= 183 * DAY_MS && now - r.received < 365 * DAY_MS && !ADMIN_WORK.includes(r.work));
+    const test = timings.rows.filter(r => r.vdays != null && r.received && now - r.received >= 183 * DAY_MS && now - r.received < 365 * DAY_MS && !ADMIN_WORK.includes(r.work));
     const cache = new Map(), errs = [];
     test.forEach(r => {
       const key = `${r.work}|${r.type}|${r.received.toISOString().slice(0, 7)}`;
-      if (!cache.has(key)) cache.set(key, typicalFor(r.work, r.type, r.received));
+      if (!cache.has(key)) cache.set(key, typicalFor(r.work, r.type, r.received, 'vdays'));
       const typ = cache.get(key);
-      if (typ) errs.push(r.days - Math.round(typ.days));
+      if (typ) errs.push(r.vdays - Math.round(typ.days));
     });
     back = score(errs);
   }
@@ -906,7 +919,8 @@ function renderTimingPanel(el){
         <b>Mean</b> &mdash; the ordinary average: add them all up and divide. Pulled up by the slow ones, so it's usually higher than the median.<br>
         <b>Mode</b> &mdash; the most common time, to the nearest week.<br>
         <b>Middle half</b> &mdash; a quarter were quicker than the first figure and a quarter slower than the second, so it's the realistic range to quote.<br>
-        <b>Forecasts:</b> each pending application gets the median for its kind of work over the last 2 years (or its official application type, then all applications, if fewer than 10 decisions). The weekly pull locks each forecast in on the day it's made, so it can be scored honestly when the decision lands.
+        <b>Forecasts:</b> each pending application gets the median time <i>from validation</i> (the day the register accepted it as complete) for its kind of work over the last 2 years &mdash; or its official application type, then all applications, if fewer than 10 decisions. The weekly pull locks each forecast in on the day it's made, so it can be scored honestly when the decision lands. Planning decisions vary a lot, so treat a forecast date as the middle of a range, not a promise.<br>
+        <b>Worth knowing:</b> who decides matters more than anything &mdash; Planning Committee decisions take about twice as long as officer decisions &mdash; but the register only says who decides once it's decided, so forecasts can't use it.
       </div>
       <div class="hint" style="margin:0 0 6px"><b>Forecast accuracy</b><br>
         Back-test (the method re-run as it would have stood at the time, on applications received 6&ndash;12 months ago): ${acc && acc.back ? accLine(acc.back) : 'not enough data yet'}<br>
@@ -1024,7 +1038,7 @@ function renderWhoDetail(el){
       ${apps.map(a => { const x = det(a.ref); return `<tr>
         <td>${x[2] ? `<a href="https://pbc.gov.im/online-applications/applicationDetails.do?activeTab=summary&amp;keyVal=${encodeURIComponent(x[2])}" target="_blank" rel="noopener">${esc(a.ref)}</a>` : esc(a.ref)}</td>
         <td>${a.received ? esc(fmtDay(a.received)) : ''}</td>
-        <td>${a.decided ? esc(fmtDay(a.decided)) : '<span class="tag tag-review">pending</span>'}</td>
+        <td>${a.decided ? esc(fmtDay(a.decided)) : predictions[a.ref] ? '<span class="tag tag-review">pending</span>' : '<span class="hint" style="margin:0">date not given</span>'}</td>
         <td>${a.days != null ? fmtWeeks(a.days) : ''}</td>
         <td>${esc(x[7] || a.outcome || '')}</td>
         <td><span class="tag tag-dupe">${esc(a.work || '')}</span> ${esc(x[0] || '')}<div class="hint" style="margin:2px 0 0">${esc(x[1] || '')}${kind === 'agents' && x[6] ? ` &middot; applicant: ${esc(x[6])}` : ''}${kind === 'applicants' && (x[4] || x[3]) ? ` &middot; agent: ${esc(x[4] || x[3])}` : ''}</div></td>

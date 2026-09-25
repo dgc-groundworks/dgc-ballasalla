@@ -392,11 +392,11 @@ def backfill(frm, to, delay, workers=3, newest_first=True):
 
 # ---- Stats + predictions ----
 
-def decided_durations(history, since=None, until=None):
+def decided_durations(history, since=None, until=None, start_field="received"):
     rows = []
     for r in history.values():
         dd = parse_date(r.get("decisionDate"))
-        days = days_between(r.get("received"), r.get("decisionDate"))
+        days = days_between(r.get(start_field), r.get("decisionDate"))
         if days is None or not dd:
             continue
         if since and dd < since:
@@ -447,6 +447,12 @@ def update(latest_path):
     for r in history.values():
         r["workType"] = effective_work(r)
     rows = decided_durations(history, since=today - timedelta(days=PREDICTION_WINDOW_DAYS))
+    # Counting from validation (the application accepted as complete) back-tested
+    # slightly better than from receipt, so forecasts use it when it's known.
+    rows_v = decided_durations(history, since=today - timedelta(days=PREDICTION_WINDOW_DAYS), start_field="validated")
+    # Only applications the latest pull shows as still undecided get a
+    # forecast — an old record with an outcome but no issued date is not pending.
+    pending_now = {a["ref"] for a in latest if not a.get("isDecided")}
     for ref, r in history.items():
         p = predictions.get(ref)
         if r.get("decisionDate"):
@@ -455,13 +461,16 @@ def update(latest_path):
                 pd, ad = parse_date(p["predictedDate"]), parse_date(r["decisionDate"])
                 p["errorDays"] = (ad - pd).days if pd and ad else None
             continue
-        if p or not parse_date(r.get("received")):
+        if p or ref not in pending_now or r.get("decision") or not parse_date(r.get("received")):
             continue
-        med, n, basis = typical_days(rows, r.get("workType"), r.get("applicationType"))
+        start_field = "validated" if parse_date(r.get("validated")) else "received"
+        med, n, basis = typical_days(rows_v if start_field == "validated" else rows, r.get("workType"), r.get("applicationType"))
         if med is None:
             continue
-        predicted = parse_date(r["received"]) + timedelta(days=round(med))
-        predictions[ref] = {"madeOn": today.isoformat(), "received": r["received"], "workType": r.get("workType"),
+        predicted = parse_date(r[start_field]) + timedelta(days=round(med))
+        predicted += timedelta(days=(7 - predicted.weekday()) % 7 if predicted.weekday() >= 5 else 0)  # no weekend decisions
+        predictions[ref] = {"madeOn": today.isoformat(), "received": r["received"], "validated": r.get("validated"),
+                            "from": start_field, "workType": r.get("workType"),
                             "predictedDate": predicted.strftime("%a %d %b %Y"), "typicalDays": round(med),
                             "basedOn": n, "basis": basis}
     save_history(history)
