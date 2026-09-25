@@ -1,2 +1,6 @@
 # Local-only test data — never commit real timesheet photos (names/personal data)
 planner/dayworks-test-images/
+
+# Silverdale Canvassing: kept in the private Supabase store, never in this public repo (Ash, 26 Sep 2026)
+silverdale-canvassing/register-data/
+silverdale-canvassing/assets/harry-signature.jpeg
