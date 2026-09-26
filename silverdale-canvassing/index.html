@@ -1831,6 +1831,7 @@ function renderRegisterPullLoaded(box, data){
   }
 
   const byRefApp = new Map(apps.map(a => [a.ref, a]));
+  let relWait = false;
   function applyFilters(){
     const status = document.getElementById('regStatus').value;
     const when = document.getElementById('regWhen').value;
@@ -2009,7 +2010,8 @@ function renderRegisterPullLoaded(box, data){
       const root = byRefApp.get(k) || { ref: k, description: relIdx && relIdx.rec.get(k) ? relIdx.rec.get(k).description : '' };
       const est = typeof estimateFor === 'function' ? estimateFor(k, null) : null;
       const who = (root.applicantName || (relIdx && relIdx.rec.get(k) ? relIdx.rec.get(k).applicant : '')) || '';
-      return `<div class="proj-hdr"><b>Project ${esc(k)}</b>${who ? ` &middot; ${esc(who)}` : ''}${est ? ` &middot; job ${moneyRange(est.total)}` : ''} &middot; ${xs.length} applications on this list${root.description ? `<div class="hint" style="margin:2px 0 0">${esc(root.description.slice(0, 180))}</div>` : ''}</div>`
+      const banned = STANDING_EXCLUDE.find(n => who.toLowerCase().includes(n));
+      return `<div class="proj-hdr"><b>Project ${esc(k)}</b>${who ? ` &middot; ${esc(who)}` : ''}${banned ? ` <span class="tag tag-excl">Never contact</span>` : ''}${est ? ` &middot; job ${moneyRange(est.total)}` : ''} &middot; ${xs.length} applications on this list${root.description ? `<div class="hint" style="margin:2px 0 0">${esc(root.description.slice(0, 180))}</div>` : ''}</div>`
         + xs.map(a => rowHtml(a, true)).join('');
     }).join('');
   }
@@ -2027,6 +2029,8 @@ function renderRegisterPullLoaded(box, data){
       : '<p class="empty-state">Nothing matches those filters.</p>';
     const showBtn = document.getElementById('regShowArchived');
     if (showBtn) showBtn.addEventListener('click', () => { showArchived = true; renderList(); });
+    // Project headers and chains need the 5-year history; redraw once it has loaded.
+    if (!relIdx && !relWait) { relWait = true; loadRelatedIndex().then(() => renderList()); }
     const hideBtn = document.getElementById('regHideArchived');
     if (hideBtn) hideBtn.addEventListener('click', () => { showArchived = false; renderList(); });
     updateNavCounts();
