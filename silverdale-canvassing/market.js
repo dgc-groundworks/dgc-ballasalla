@@ -71,7 +71,8 @@ async function loadEstimatesCache(){
 function money(n){
   if (n == null || isNaN(n)) return '?';
   if (n >= 1e6) return '£' + (Math.round(n / 1e5) / 10) + 'm';
-  if (n >= 1e3) return '£' + Math.round(n / 1e3) + 'k';
+  if (n >= 1e4) return '£' + Math.round(n / 1e3) + 'k';
+  if (n >= 1e3) return '£' + (Math.round(n / 100) / 10) + 'k';
   return '£' + Math.round(n);
 }
 function moneyRange(r){ return r ? `${money(r[0])} to ${money(r[1])}` : '?'; }
