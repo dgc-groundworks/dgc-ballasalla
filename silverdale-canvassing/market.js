@@ -43,6 +43,8 @@
   .est-what{font-size:0.85rem;color:var(--text);line-height:1.4}
   .est-note{font-size:0.78rem;color:var(--muted);margin-top:3px}
   .est-none{font-size:0.8rem;color:var(--muted);margin:6px 0 4px}
+  .est-orig{font-size:0.8rem;color:var(--text);margin:4px 0 2px;line-height:1.4}
+  .est-orig b{color:var(--accent)}
   .est-facts{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
   .est-fact{background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:2px 8px;font-size:0.78rem;color:var(--text)}
   .est-fact b{color:var(--muted);font-weight:700;margin-right:4px}
@@ -102,17 +104,18 @@ function estimateBadgeHtml(ref){
 // The estimate panel on each register row: job value, groundworks share, grade, Silverdale angle and
 // a one-line "what it is", so it's clear at a glance who is worth writing to. Paperwork on an
 // earlier permission (parentRef) shows the original application's estimate instead of its own.
-function estimateRowHtml(ref, parentRef){
+function estimateRowHtml(ref, parentRef, origHtml){
   const own = MARKET.estimates.get(ref);
   const par = parentRef ? MARKET.estimates.get(parentRef) : null;
-  if (own && own.total) return estPanelHtml(own, '');
-  if (par && par.total) return estPanelHtml(par, `Value of the original permission, ${parentRef}. Paperwork like this usually means the build is about to start.`);
-  if (par) return `<div class="est-none">Estimate: paperwork on ${esc(parentRef)}, which wasn't priced: ${esc(par.why || par.what || 'no building work to price.')}</div>`;
-  if (parentRef) return `<div class="est-none">Estimate: this is paperwork on ${esc(parentRef)}. Its value shows here once that application is priced (originals with recent paperwork are priced first on the Monday run).</div>`;
+  origHtml = origHtml || '';
+  if (own && own.total) return estPanelHtml(own, '', origHtml);
+  if (par && par.total) return estPanelHtml(par, `Value of the original permission, ${parentRef}. Paperwork like this usually means the build is about to start.`, origHtml);
+  if (par) return `<div class="est-none">Estimate: the original, ${esc(parentRef)}, wasn't priced: ${esc(par.why || par.what || 'no building work to price.')}</div>${par.what ? `<div class="est-orig">${esc(par.what)}</div>` : ''}${origHtml}`;
+  if (parentRef) return `<div class="est-none">Estimate: this belongs to ${esc(parentRef)}. Its value shows here once that application is priced (originals named on the list are priced first on the Monday run).</div>${origHtml}`;
   if (own) return `<div class="est-none">Estimate: not priced. ${esc(own.why || own.what || 'No building work to price.')}</div>`;
   return `<div class="est-none">Estimate: not priced yet. The Monday 7am run prices 40 a week, newest first.</div>`;
 }
-function estPanelHtml(e, note){
+function estPanelHtml(e, note, origHtml){
   const fit = silverdaleFit(e);
   return `<div class="est-panel">
     <span class="lbl">Estimate</span>
@@ -125,6 +128,7 @@ function estPanelHtml(e, note){
     ${estFactsHtml(e)}
     ${e.what ? `<div class="est-what">${esc(e.what)}</div>` : ''}
     ${note ? `<div class="est-note">${esc(note)}</div>` : ''}
+    ${origHtml || ''}
     ${estMaterialsHtml(e)}
     ${estimateBadgeHtml(e.ref).replace(/^<div class="est-badge">[\s\S]*?<\/div>\s*/, '')}
   </div>`;

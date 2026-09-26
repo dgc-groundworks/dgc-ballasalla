@@ -88,6 +88,13 @@ jobs:
         if: ${{ github.event.inputs.pricing_only != 'true' }}
         run: python3 silverdale-canvassing/scripts/planning_history.py --update silverdale-canvassing/register-data/latest.json
 
+      # Paperwork and follow-ons name their original application; when that is
+      # older than the history held, look it up on the register so it can be
+      # priced and its applied/decided dates shown. Runs in pricing-only runs too.
+      - name: Find the original applications behind paperwork
+        if: ${{ env.SUPABASE_SERVICE_KEY != '' }}
+        run: python3 silverdale-canvassing/scripts/fetch_originals.py --max 150
+
       # Only does anything once an ANTHROPIC_API_KEY repository secret exists.
       - name: Claude reads new applications (type, complexity, homes)
         if: ${{ github.event.inputs.pricing_only != 'true' }}

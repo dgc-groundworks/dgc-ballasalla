@@ -119,6 +119,9 @@ def save_estimates(est):
 REF_RE = re.compile(r"(?<!\d)\d{2}/\d{5}/[A-Z]{1,4}\b")
 PAPERWORK = {"Conditions / information", "Minor change", "Variation of conditions"}
 CLOSE_DAYS = 180   # paperwork this recent marks its original application as "build close"
+# Grade D because the size wasn't known (not because there's nothing to build): worth one more go
+# with the plan drawing in front of the model.
+UNSURE_RE = re.compile(r"unknown|avoid guess|no floor area given|floor area not|not enough information|too little information", re.I)
 
 
 def parent_ref(r, history):
@@ -266,20 +269,31 @@ def estimate(max_apps, vision):
     # Only what the canvassing list shows (it keeps every application it has ever pulled), plus the
     # originals behind recent paperwork. Order: new in the last fortnight, then originals whose build
     # looks close, then everything else newest first.
-    on_list = {a["ref"] for a in (json.loads(read(LATEST_PATH)).get("applications", []) if os.path.exists(LATEST_PATH) else [])}
+    listed = json.loads(read(LATEST_PATH)).get("applications", []) if os.path.exists(LATEST_PATH) else []
+    on_list = {a["ref"] for a in listed}
     cutoff, fortnight = date.today() - timedelta(days=CLOSE_DAYS), date.today() - timedelta(days=14)
     close = {parent_ref(r, history) for r in history.values()
              if (parse_date(r.get("received")) or date.min) >= cutoff} - {None}
+    # Every original named by something on the list (fetch_originals.py adds the old ones to history).
+    named = {m for a in listed for m in REF_RE.findall(a.get("description") or "") if m != a["ref"] and m in history}
+    def needs(ref):
+        e = est.get(ref)
+        if not e:
+            return True
+        if e.get("grade") == "D":
+            return bool(UNSURE_RE.search(e.get("why") or "")) and e.get("retried") != version
+        return e.get("rateBook") != version
     todo = [r for r in history.values() if r.get("description") and not parent_ref(r, history)
-            and (not on_list or r["ref"] in on_list or r["ref"] in close)
-            and (r["ref"] not in est or (est[r["ref"]].get("rateBook") != version and est[r["ref"]].get("grade") != "D"))]
+            and (not on_list or r["ref"] in on_list or r["ref"] in close or r["ref"] in named) and needs(r["ref"])]
     received = lambda r: parse_date(r.get("received")) or date.min
-    todo.sort(key=lambda r: (received(r) >= fortnight, r["ref"] in close, received(r)), reverse=True)
+    todo.sort(key=lambda r: (received(r) >= fortnight, r["ref"] in close or r["ref"] in named, received(r)), reverse=True)
     todo = todo[:max_apps]
+    retry = {r["ref"] for r in todo if r["ref"] in est and est[r["ref"]].get("grade") == "D"}
     print(f"{sum(r['ref'] in close for r in todo)} of these are originals with recent condition paperwork", file=sys.stderr)
     print(f"pricing {len(todo)} applications with {MODEL}", file=sys.stderr)
     usage, done = {}, 0
-    with_image = [r for r in todo if vision and effective_work(r) in BUILD_WORK]
+    with_image = [r for r in todo if vision and (effective_work(r) in BUILD_WORK or r["ref"] in retry
+                                                 or r["ref"].endswith("/REM") or effective_work(r) == "Other")]
     text_only = [r for r in todo if r not in with_image]
     jobs = [[r] for r in with_image] + [text_only[i:i + BATCH] for i in range(0, len(text_only), BATCH)]
     for batch in jobs:
@@ -309,7 +323,8 @@ def estimate(max_apps, vision):
             res["margin"] = {"pct": tidy_range(mg.get("pct")), "gw": tidy_range(mg.get("gw")), "note": mg.get("note", "")}
             res.update({"received": r.get("received"), "status": r.get("outcome") or "pending",
                         "parish": r.get("parish"), "keyVal": r.get("keyVal"), "pricedOn": date.today().isoformat(),
-                        "rateBook": version})
+                        "rateBook": version, "decided": r.get("decisionDate"),
+                        **({"retried": version} if res["ref"] in retry else {})})
             est[res["ref"]] = res
             done += 1
         save_estimates(est)
