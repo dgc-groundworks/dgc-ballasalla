@@ -148,7 +148,7 @@ function estFactsHtml(e){
   const concrete = (e.materials || []).find(m => /concrete/i.test(m.item) && m.qty);
   const facts = [];
   if (w.build) facts.push(`<span class="est-fact"><b>Build</b>${weeksText(w.build)}</span>`);
-  if (w.groundworks && w.build && w.groundworks[0] > w.build[1] * 0.8) facts.push(`<span class="est-fact" title="Groundworks on a scheme this size is done in phases alongside the build, not before it"><b>Groundworks</b>phased through the build</span>`);
+  if (w.groundworks && w.build && (w.groundworks[1] > w.build[1] || midOf(w.groundworks) > 0.9 * midOf(w.build))) facts.push(`<span class="est-fact" title="Groundworks on a scheme this size is done in phases alongside the build, not before it"><b>Groundworks</b>phased through the build</span>`);
   else if (w.groundworks) facts.push(`<span class="est-fact"><b>Groundworks</b>${weeksText(w.groundworks)}</span>`);
   if (concrete) facts.push(`<span class="est-fact"><b>Concrete</b>${numRange(concrete.qty)} ${esc(concrete.unit || 'm³')}</span>`);
   if (mg.gw) facts.push(`<span class="est-fact" title="${esc(mg.note || 'Overheads and profit inside the groundworks figure, not clear profit')}"><b>Margin (OH&amp;P)</b>${moneyRange(mg.gw)}${mg.pct ? ` &middot; ${mg.pct[0] === mg.pct[1] ? mg.pct[0] : mg.pct[0] + '-' + mg.pct[1]}%` : ''}</span>`);

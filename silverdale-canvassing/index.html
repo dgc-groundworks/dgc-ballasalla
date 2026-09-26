@@ -10,7 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
-<script src="market.js?v=11"></script>
+<script src="market.js?v=12"></script>
 <script src="contacts.js?v=5"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
@@ -1328,7 +1328,9 @@ function whoInvolvedHtml(a){
   if (known(team.architect) && personNorm(team.architect) !== personNorm(agent)) parts.push(`<b>Architect:</b> ${esc(team.architect)}`);
   if (known(team.engineer)) parts.push(`<b>Engineer:</b> ${esc(team.engineer)}`);
   parts.push(`<b>Builder:</b> ${known(team.contractor) ? esc(team.contractor) : '<span class="hint" style="margin:0">not named yet</span>'}`);
-  return `<div class="who-inv" data-ref="${esc(a.ref)}"><b style="color:var(--accent)">Who's involved</b> &middot; ${parts.join(' &middot; ')}</div>`;
+  // The developer behind paperwork can be on the never-contact list even when the person who sent it in isn't.
+  const banned = STANDING_EXCLUDE.find(n => `${client} ${agent}`.toLowerCase().includes(n));
+  return `<div class="who-inv" data-ref="${esc(a.ref)}"><b style="color:var(--accent)">Who's involved</b> &middot; ${parts.join(' &middot; ')}${banned ? ` <span class="tag tag-excl">Never contact: ${esc(banned)}</span>` : ''}</div>`;
 }
 
 function plainEnglishHtml(a){
