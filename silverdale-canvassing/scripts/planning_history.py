@@ -31,7 +31,7 @@ from datetime import date, datetime, timedelta
 import requests
 from bs4 import BeautifulSoup
 
-from pull_register import BASE, DETAIL_DELAY_SECONDS, fetch_detail, new_session, not_available
+from pull_register import ADMIN_REF_SUFFIXES, BASE, DETAIL_DELAY_SECONDS, fetch_detail, fetch_documents, new_session, not_available
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "..", "register-data")
@@ -451,6 +451,36 @@ def update(latest_path):
         rec["outcome"] = outcome(rec["decision"])
         rec["firstSeen"] = prev.get("firstSeen") or today.isoformat()
         history[a["ref"]] = rec
+
+    # Reads each application's own Documents tab and, where a site plan
+    # matches, its printed scale + red boundary — once per application,
+    # ever. "documentsCheckedAt" is set whether or not anything useful was
+    # found, so a run only pays this cost for applications genuinely new
+    # since the last one, not the whole window every week.
+    if os.environ.get("SUPABASE_SERVICE_KEY"):
+        try:
+            import site_extent
+        except ImportError:
+            site_extent = None
+        if site_extent:
+            todo = [a for a in latest if a.get("keyVal") and not a["ref"].endswith(ADMIN_REF_SUFFIXES)
+                    and not history[a["ref"]].get("documentsCheckedAt")]
+            print(f"Reading documents for {len(todo)} new applications...", file=sys.stderr)
+            session = new_session()
+            for i, a in enumerate(todo, 1):
+                try:
+                    docs, doc_url = fetch_documents(session, a["keyVal"])
+                    # Kept as a clue for the value estimator (a "PROPOSED
+                    # FLOOR PLANS" or "3-BED HOUSE TYPE" name says a lot on
+                    # its own) — names only, never the documents themselves.
+                    history[a["ref"]]["documentNames"] = [d["description"] for d in docs if d.get("description")] or None
+                    history[a["ref"]]["siteExtent"] = site_extent.measure(session, BASE, doc_url, docs)
+                except requests.RequestException as e:
+                    print(f"  documents fetch failed for {a['ref']}: {e}", file=sys.stderr)
+                history[a["ref"]]["documentsCheckedAt"] = today.isoformat()
+                time.sleep(DETAIL_DELAY_SECONDS)
+                if i % 20 == 0:
+                    print(f"  {i}/{len(todo)}", file=sys.stderr)
 
     for r in history.values():
         r["workType"] = effective_work(r)

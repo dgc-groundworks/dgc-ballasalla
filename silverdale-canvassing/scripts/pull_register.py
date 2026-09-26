@@ -200,17 +200,6 @@ def main():
                 existing = by_ref.setdefault(item["ref"], {})
                 existing.update({k: v for k, v in item.items() if v})
 
-    # Only measures plot size once the app's data is actually private
-    # (SUPABASE_SERVICE_KEY set) — this repo is public, and a measurement
-    # derived from an architect's own drawing shouldn't sit in it, even
-    # briefly, while the app is mid-move to private storage.
-    site_extent = None
-    if os.environ.get("SUPABASE_SERVICE_KEY"):
-        try:
-            import site_extent
-        except ImportError:
-            pass
-
     print(f"Fetching applicant/agent detail for {len(by_ref)} applications...", file=sys.stderr)
     results = []
     for i, (ref, item) in enumerate(by_ref.items(), 1):
@@ -220,20 +209,6 @@ def main():
                 detail = fetch_detail(session, item["keyVal"])
             except requests.RequestException as e:
                 print(f"  detail fetch failed for {ref}: {e}", file=sys.stderr)
-            time.sleep(DETAIL_DELAY_SECONDS)
-
-        site_extent_result = None
-        document_names = None
-        if item.get("keyVal") and site_extent and not ref.endswith(ADMIN_REF_SUFFIXES):
-            try:
-                docs, doc_url = fetch_documents(session, item["keyVal"])
-                # Kept as a clue for the value estimator (a "PROPOSED FLOOR
-                # PLANS" or "3-BED HOUSE TYPE" name says a lot on its own) —
-                # names only, never the documents themselves.
-                document_names = [d["description"] for d in docs if d.get("description")] or None
-                site_extent_result = site_extent.measure(session, BASE, doc_url, docs)
-            except requests.RequestException as e:
-                print(f"  documents fetch failed for {ref}: {e}", file=sys.stderr)
             time.sleep(DETAIL_DELAY_SECONDS)
 
         if i % 20 == 0:
@@ -264,8 +239,6 @@ def main():
             "agentCompanyName": not_available(detail.get("Agent Company Name")),
             "agentAddress": not_available(detail.get("Agent Address")),
             "decisionLevel": not_available(detail.get("Actual Decision Level")) or not_available(detail.get("Expected Decision Level")),
-            "siteExtent": site_extent_result,
-            "documentNames": document_names,
         })
 
     output = {
