@@ -112,6 +112,10 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .tp-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .who-inv{font-size:0.85rem;margin:6px 0 4px;padding:6px 10px;border-left:3px solid rgba(56,153,207,.7);background:var(--surf2);border-radius:0 6px 6px 0;color:var(--text);line-height:1.5}
 .who-inv b{color:#7cc4ea;font-weight:700}
+.orig-banner{margin-top:8px;padding-top:8px;border-top:1px solid var(--bord);font-weight:400}
+.orig-banner .est-orig{font-size:0.86rem;margin:0}
+.proj-hdr{margin:18px 0 6px;padding:8px 12px;border-radius:8px;background:rgba(56,153,207,.1);border:1px solid rgba(56,153,207,.35);font-size:0.85rem;color:var(--text)}
+.proj-hdr b{color:#7cc4ea}
 .tp-btn{background:rgba(245,158,11,.14);border:1px solid var(--accent);color:var(--text);border-radius:10px;padding:10px 18px;font:inherit;font-size:1.08rem;font-weight:800;cursor:pointer}
 .tp-btn:hover{background:rgba(245,158,11,.24)}
 .tp-sum{font-size:0.85rem}
@@ -1290,8 +1294,7 @@ function originalLineHtml(ref, row){
   const t = timings && timings.byRef.get(ref);
   const rec = relIdx && relIdx.rec.get(ref);
   const day = d => d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-  const lead = 'This application is only paperwork or a change on an earlier permission; the whole job is the original.';
-  if (!t) return `<div class="est-orig">${lead} Original application <b>${esc(ref)}</b> is older than the history held; the Monday run looks it up on the register.</div>`;
+  if (!t) return `<div class="est-orig">Original application <b>${esc(ref)}</b> is older than the history held; the Monday run looks it up on the register.</div>`;
   const verb = { approved: 'approved', refused: 'refused', withdrawn: 'withdrawn' }[t.outcome] || 'decided';
   const months = t.decided ? Math.round((Date.now() - t.decided) / (30.44 * 86400000)) : null;
   const ago = months == null ? '' : months < 1 ? ' (this month)' : months < 24 ? ` (${months} month${months === 1 ? '' : 's'} ago)` : ` (${Math.round(months / 12)} years ago)`;
@@ -1299,14 +1302,19 @@ function originalLineHtml(ref, row){
   const own = row ? (regDate(row.decisionDate || row.decidedDate) || regDate(row.received || row.appliedDate)) : null;
   const ownRecent = own && (Date.now() - own) < 183 * DAY_MS;
   const ownWork = row && timings && timings.byRef.get(row.ref) ? timings.byRef.get(row.ref).work : '';
-  const hint = !t.decided ? 'The original is still waiting for a decision.'
+  // How long after the approval this paperwork came in. Conditions cleared soon after approval
+  // usually come before a start; changes or conditions a long while after often mean the job is
+  // already going and the design is being adjusted as it goes (Ash, 26 Sep 2026).
+  const gapMonths = own && t.decided ? Math.round((own - t.decided) / (30.44 * DAY_MS)) : null;
+  const isChange = ['Minor change', 'Variation of conditions'].includes(ownWork);
+  const hint = !t.decided ? 'The original is still waiting for a decision, so nothing has started.'
     : t.outcome !== 'approved' ? ''
-    : ownRecent && ownWork === 'Conditions / information'
-      ? `Conditions on it are still being signed off (this one ${regDate(row.decisionDate || row.decidedDate) ? 'decided' : 'sent in'} ${day(own)}). Many conditions have to be cleared before work starts, so the build probably hasn't started, or is only just starting: a good time to write.`
-    : months <= 9 ? 'Approved recently, so the build may be about to start: a good time to write.'
-    : ownRecent ? `Approved ${Math.round(months)} months ago but still being worked on (this application ${day(own)}), so the build may be about to start or just under way. Worth a check before writing.`
-    : 'Approved a while ago, so the work may already be under way or done, and they may already have a builder. Worth a check before writing.';
-  return `<div class="est-orig">${lead} Original application <b>${esc(ref)}</b>: applied ${day(t.received) || '(date not known)'}, ${decided}.${rec && rec.description ? ` ${esc(rec.description)}.` : ''} ${hint}</div>`;
+    : isChange ? `This is a change to the approved scheme${gapMonths != null ? `, ${gapMonths} months after approval` : ''}. Designs often change once a job is going, so it is <b>probably already under way</b> and they may have a builder.`
+    : ownWork === 'Conditions / information' && gapMonths != null && gapMonths <= 6 ? `Conditions being cleared ${gapMonths <= 1 ? 'straight after' : gapMonths + ' months after'} approval. Many have to be cleared before work starts, so it is <b>probably just before the build starts</b>: a good time to write.`
+    : ownWork === 'Conditions / information' && gapMonths != null ? `Conditions still being cleared ${gapMonths} months after approval. It <b>may already be under way</b> (some conditions are cleared during the build), or it has been slow to start. Worth a check.`
+    : months <= 9 ? 'Approved recently, so the build <b>may be about to start</b>: a good time to write.'
+    : 'Approved a while ago, so the work <b>may already be under way or done</b>, and they may already have a builder. Worth a check before writing.';
+  return `<div class="est-orig"><b style="color:var(--text)">Original application ${esc(ref)} started ${day(t.received) || '(date not known)'}</b>, ${decided}.${rec && rec.description ? ` ${esc(rec.description)}.` : ''} ${hint}</div>`;
 }
 
 // Who's behind it, in one line (Ash, 26 Sep 2026): who it's for (the original applicant for
@@ -1337,7 +1345,7 @@ function plainEnglishHtml(a){
   const t = timings && timings.byRef.get(a.ref);
   const work = t && t.work, type = a.applicationType || (t && t.type);
   const parent = parentRefOf(a);
-  const badge = typeof estimateRowHtml === 'function' ? estimateRowHtml(a.ref, parent, originalLineHtml(parent, a)) : '';
+  const badge = typeof estimateRowHtml === 'function' ? estimateRowHtml(a.ref, parent, '') : '';
   const drawings = a.keyVal ? `<div class="reg-links">${drawingsLinkHtml(a.keyVal)}${siteExtentHtml(a.siteExtent)}</div>` : '';
 
   // The same explanation and stats apply to every application of a given
@@ -1822,14 +1830,20 @@ function renderRegisterPullLoaded(box, data){
     return STANDING_EXCLUDE.find(n => hay.includes(n)) || null;
   }
 
+  const byRefApp = new Map(apps.map(a => [a.ref, a]));
   function applyFilters(){
     const status = document.getElementById('regStatus').value;
+    const when = document.getElementById('regWhen').value;
+    const kind = document.getElementById('regKind').value;
+    const whenSince = when === 'all' ? null : new Date(Date.now() - Number(when) * DAY_MS);
     const from = document.getElementById('regFrom').value;
     const to = document.getElementById('regTo').value;
     const q = document.getElementById('regSearch').value.trim().toLowerCase();
     return apps.filter(a => {
       if (!showArchived && dismissed[a.ref]) return false;
       if (status !== 'all' && decisionCategory(a) !== status) return false;
+      if (kind !== 'all' && (isFollowUp(a) ? kind === 'new' : kind === 'follow')) return false;
+      if (whenSince && !from && !to) { const rd = regDate(a.received); if (rd && rd < whenSince) return false; }
       const d = a.validated || a.received;
       const parsed = d ? new Date(d.replace(/^\w+\s/, '')) : null; // strip leading "Tue " etc
       if (from && parsed && parsed < new Date(from)) return false;
@@ -1842,6 +1856,7 @@ function renderRegisterPullLoaded(box, data){
     })
     .sort((x, y) => {
       const sort = document.getElementById('regSort').value;
+      if (sort === 'name') return (x.applicantName || x.agentCompanyName || x.agentName || '').localeCompare(y.applicantName || y.agentCompanyName || y.agentName || '');
       if (sort !== 'new' && typeof estimateFor === 'function') {
         const v = a => { const e = estimateFor(a.ref, parentRefOf(a)); return e ? midOf(sort === 'gw' ? e.groundworks : e.total) : -1; };
         const d = v(y) - v(x);
@@ -1956,7 +1971,7 @@ function renderRegisterPullLoaded(box, data){
         <div class="lr-main">
           <div class="reg-name">${nameBtn(a.ref, person)}</div>
           <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}${a.parish ? ` &middot; ${esc(a.parish)}` : ''}</div>
-          <div class="reg-work"><span class="lbl">Applying for</span>${whatThisIsHtml(a)}</div>
+          <div class="reg-work"><span class="lbl">Applying for</span>${whatThisIsHtml(a)}${parentRefOf(a) ? `<div class="orig-banner">${originalLineHtml(parentRefOf(a), a)}</div>` : ''}</div>
           ${whoInvolvedHtml(a)}
           <div class="lr-meta" style="margin:4px 0 2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''} &middot; ${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
           ${plainEnglishHtml(a)}
@@ -1970,6 +1985,35 @@ function renderRegisterPullLoaded(box, data){
       </div>`;
   }
 
+  // Paperwork, changes and follow-ons on an earlier permission (not the start of a paper trail).
+  function isFollowUp(a){
+    const t = timings && timings.byRef.get(a.ref);
+    return !!parentRefOf(a) || (t && PAPERWORK.includes(t.work)) || a.applicationType === 'Condition Discharge' || /Minor Change|Variation/i.test(a.applicationType || '');
+  }
+  // The project an application belongs to: follow its "PA xx/xxxxx" references back to the first original.
+  function projectOf(a){
+    let ref = a.ref, desc = a.description || '';
+    for (let i = 0; i < 4; i++) {
+      const up = (desc.match(REL_REF_RE) || []).find(r => r !== ref);
+      if (!up) break;
+      ref = up;
+      desc = (byRefApp.get(up) || {}).description || (relIdx && relIdx.rec.get(up) ? relIdx.rec.get(up).description : '');
+    }
+    return ref;
+  }
+  function groupedHtml(list){
+    const groups = new Map();
+    list.forEach(a => { const k = projectOf(a); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(a); });
+    return [...groups].map(([k, xs]) => {
+      if (xs.length < 2) return rowHtml(xs[0], true);
+      const root = byRefApp.get(k) || { ref: k, description: relIdx && relIdx.rec.get(k) ? relIdx.rec.get(k).description : '' };
+      const est = typeof estimateFor === 'function' ? estimateFor(k, null) : null;
+      const who = (root.applicantName || (relIdx && relIdx.rec.get(k) ? relIdx.rec.get(k).applicant : '')) || '';
+      return `<div class="proj-hdr"><b>Project ${esc(k)}</b>${who ? ` &middot; ${esc(who)}` : ''}${est ? ` &middot; job ${moneyRange(est.total)}` : ''} &middot; ${xs.length} applications on this list${root.description ? `<div class="hint" style="margin:2px 0 0">${esc(root.description.slice(0, 180))}</div>` : ''}</div>`
+        + xs.map(a => rowHtml(a, true)).join('');
+    }).join('');
+  }
+
   function renderList(){
     log = getLog();
     dismissed = getDismissed();
@@ -1979,7 +2023,7 @@ function renderRegisterPullLoaded(box, data){
     document.getElementById('regCount').innerHTML = `${filtered.length} of ${apps.length} shown`
       + (archivedCount ? ` &middot; ${archivedCount} archived, ${showArchived ? '<button type="button" class="link-btn" id="regHideArchived">hide them</button>' : '<button type="button" class="link-btn" id="regShowArchived">show them</button>'}` : '');
     document.getElementById('registerList').innerHTML = filtered.length
-      ? filtered.map(a => rowHtml(a, full)).join('')
+      ? (document.getElementById('regGroup').checked ? groupedHtml(filtered) : filtered.map(a => rowHtml(a, full)).join(''))
       : '<p class="empty-state">Nothing matches those filters.</p>';
     const showBtn = document.getElementById('regShowArchived');
     if (showBtn) showBtn.addEventListener('click', () => { showArchived = true; renderList(); });
@@ -1997,6 +2041,23 @@ function renderRegisterPullLoaded(box, data){
     <div class="row-actions" style="flex-wrap:wrap;gap:10px">
       <label>From <input type="date" id="regFrom"></label>
       <label>To <input type="date" id="regTo"></label>
+      <label>Received
+        <select id="regWhen">
+          <option value="30">Last 30 days</option>
+          <option value="60" selected>Last 60 days</option>
+          <option value="91">Last 3 months</option>
+          <option value="365">Last year</option>
+          <option value="1826">Last 5 years</option>
+          <option value="all">Everything on the list</option>
+        </select>
+      </label>
+      <label>Kind
+        <select id="regKind">
+          <option value="all">All applications</option>
+          <option value="new">New applications only (start of the paper trail)</option>
+          <option value="follow">Follow-up paperwork and changes only</option>
+        </select>
+      </label>
       <label>Status
         <select id="regStatus">
           <option value="all">All</option>
@@ -2011,8 +2072,10 @@ function renderRegisterPullLoaded(box, data){
           <option value="new">Newest first</option>
           <option value="gw">Biggest groundworks value</option>
           <option value="job">Biggest job value</option>
+          <option value="name">Name A to Z</option>
         </select>
       </label>
+      <label class="hint" style="margin:0"><input type="checkbox" id="regGroup" checked> Group by project</label>
       <input type="text" id="regSearch" placeholder="Search name, address, description&hellip;" style="min-width:220px">
     </div>
     <div class="row-actions" style="flex-wrap:wrap;gap:10px;margin-bottom:6px">
@@ -2025,7 +2088,7 @@ function renderRegisterPullLoaded(box, data){
     <div id="registerList" class="lead-list"></div>`;
 
   renderList();
-  ['regStatus', 'regSort', 'regFrom', 'regTo', 'regSearch'].forEach(id => {
+  ['regStatus', 'regSort', 'regFrom', 'regTo', 'regSearch', 'regWhen', 'regKind', 'regGroup'].forEach(id => {
     document.getElementById(id).addEventListener('input', renderList);
   });
   document.getElementById('registerList').addEventListener('click', e => {
