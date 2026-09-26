@@ -36,6 +36,12 @@
   details.est-work ul{margin:6px 0 0 18px;color:var(--muted)}
   .mk-editor textarea{min-height:260px;font-size:0.8rem}
   .est-panel{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:8px 12px;margin:6px 0 4px}
+  details.est-panel > summary{cursor:pointer;list-style:none}
+  details.est-panel > summary::-webkit-details-marker{display:none}
+  details.est-panel > summary .est-more{font-size:0.75rem;color:var(--muted);margin-left:4px}
+  details.est-panel[open] > summary .est-more{display:none}
+  table.est-mat tr.tot td{border-top:2px solid var(--bord);font-weight:800}
+  table.est-mat tr.rest td{color:var(--muted)}
   .est-panel .lbl{display:block;font-size:0.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
   .est-panel .est-badge{margin:2px 0 4px}
   .est-panel .est-val{font-size:0.88rem}
@@ -116,16 +122,19 @@ function estimateRowHtml(ref, parentRef, origHtml){
   if (own) return `<div class="est-none">Estimate: not priced. ${esc(own.why || own.what || 'No building work to price.')}</div>`;
   return `<div class="est-none">Estimate: not priced yet. The Monday 7am run prices 40 a week, newest first.</div>`;
 }
+// Collapsed to one line of prices by default; open it for the breakdown (Ash, 26 Sep 2026).
 function estPanelHtml(e, note, origHtml){
   const fit = silverdaleFit(e);
-  return `<div class="est-panel">
-    <span class="lbl">Estimate</span>
+  const flagged = estChecks(e).length > 0;
+  return `<details class="est-panel"${flagged ? ' open' : ''}>
+    <summary><span class="lbl">Estimate</span>
     <div class="est-badge">
       <span class="est-val" title="Estimated whole-job value">Job ${moneyRange(e.total)}</span>
       ${e.groundworks ? `<span class="est-val est-gw" title="Groundworks and drainage share (DGC)">Groundworks ${moneyRange(e.groundworks)}</span>` : ''}
       <span class="grade ${esc(e.grade)}" title="${esc(GRADE_TEXT[e.grade] || '')}">${esc(e.grade)}</span>
       ${fit ? `<span class="est-val est-sd" title="${esc(e.silverdale || '')}">Silverdale: ${esc(fit)}</span>` : ''}
-    </div>
+      <span class="est-more">&#9662; details, materials, time and margin</span>
+    </div></summary>
     ${estFactsHtml(e)}
     ${e.what ? `<div class="est-what">${esc(e.what)}</div>` : ''}
     ${estChecks(e).length ? `<div class="est-check">&#9888; Treat with care, the automatic check found: ${estChecks(e).map(esc).join('; ')}. It's queued to be re-priced.</div>` : ''}
@@ -133,7 +142,7 @@ function estPanelHtml(e, note, origHtml){
     ${origHtml || ''}
     ${estMaterialsHtml(e)}
     ${estimateBadgeHtml(e.ref).replace(/^<div class="est-badge">[\s\S]*?<\/div>\s*/, '')}
-  </div>`;
+  </details>`;
 }
 // "about 9 to 12 months" for long builds, "4 to 6 weeks" for short ones.
 function weeksText(r){
@@ -157,9 +166,16 @@ function estFactsHtml(e){
 function estMaterialsHtml(e){
   const ms = (e.materials || []).filter(m => m.item);
   if (!ms.length) return '';
-  return `<details class="est-work"><summary>Quantities and materials (${ms.length})</summary>
+  // A total for the listed items, and what's left of the groundworks figure for everything not listed.
+  const costed = ms.filter(m => m.cost);
+  const sum = costed.length ? [costed.reduce((n, m) => n + m.cost[0], 0), costed.reduce((n, m) => n + m.cost[1], 0)] : null;
+  const rest = sum && e.groundworks ? Math.max(0, midOf(e.groundworks) - midOf(sum)) : null;
+  return `<details class="est-work" open><summary>Quantities and materials (${ms.length})</summary>
     <table class="est-mat"><tr><th>Item</th><th>Quantity</th><th>Installed cost</th></tr>
     ${ms.map(m => `<tr><td>${esc(m.item)}</td><td class="n">${m.qty ? `${numRange(m.qty)} ${esc(m.unit || '')}` : ''}</td><td class="n">${m.cost ? moneyRange(m.cost) : ''}</td></tr>`).join('')}
+    ${sum ? `<tr class="tot"><td>Total of the items above</td><td></td><td class="n">${moneyRange(sum)}</td></tr>` : ''}
+    ${rest ? `<tr class="rest"><td>Other materials and work not listed (drainage fittings, ducts, kerbs, prelims, small items)</td><td></td><td class="n">&asymp; ${money(rest)}</td></tr>` : ''}
+    ${e.groundworks ? `<tr class="tot"><td>Groundworks and drainage in total</td><td></td><td class="n">${moneyRange(e.groundworks)}</td></tr>` : ''}
     </table><div class="hint" style="margin:2px 0 0">Installed cost = supply, labour, plant and overheads, from our own rates. ${e.margin && e.margin.note ? esc(e.margin.note) : ''}</div></details>`;
 }
 
@@ -293,8 +309,8 @@ async function renderMarket(main){
     <div class="mk-cards">
       <div class="mk-card"><div class="k">Applications</div><div class="v">${t.count}</div><div class="s">${t.priced} priced &middot; A ${t.grades[0]} &middot; B ${t.grades[1]} &middot; C ${t.grades[2]} &middot; D ${t.grades[3]}</div></div>
       <div class="mk-card"><div class="k">Estimated work value</div><div class="v">${money(midOf(t.total))}</div><div class="s">range ${moneyRange(t.total)}</div></div>
-      <div class="mk-card"><div class="k">DGC groundworks and drainage share</div><div class="v">${money(midOf(t.groundworks))}</div><div class="s">range ${moneyRange(t.groundworks)}</div></div>
       <div class="mk-card"><div class="k">Same work in England</div><div class="v">${money(midOf(t.england))}</div><div class="s">Isle of Man prices are higher; this shows by how much</div></div>
+      <div class="mk-card"><div class="k">DGC groundworks and drainage share</div><div class="v">${money(midOf(t.groundworks))}</div><div class="s">range ${moneyRange(t.groundworks)}</div></div>
       <div class="mk-card"><div class="k">Silverdale pipeline</div><div class="v">${money(midOf(silTotal))}</div><div class="s">${t.silverdale.length} jobs that suit a full build, project management or design</div></div>
       <div class="mk-card"><div class="k">Off-mains new homes</div><div class="v">${t.offMainsHomes}</div><div class="s">each likely needs a septic tank or treatment plant and drainage field</div></div>
     </div>

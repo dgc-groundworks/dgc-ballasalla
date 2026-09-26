@@ -155,6 +155,32 @@ function statusOf(ref){
 const statusTagHtml = ref => { const s = statusOf(ref); return `<span class="status-tag ${s.key}">${esc(s.text)}</span>`; };
 const nameBtn = (ref, name) => `<button type="button" class="prof-name" data-profile="${esc(ref)}" title="Everything about them">${esc(name)}</button>`;
 
+// Has this person or firm been written to, or are they already in Businesses? (who's-involved line)
+function partyStatus(name, company){
+  const n = personNorm(name), co = personNorm(company || '');
+  const sent = sentContacts().find(c => (n && samePerson(n, c.n)) || (co && co.length > 3 && (c.n === co || personNorm((c.lines || [])[1] || '') === co)));
+  if (sent) return { kind: 'sent', text: `Written to ${prettyDate(sent.e.date)}`, ref: sent.ref };
+  const lead = leads.find(l => (n && samePerson(n, personNorm(l.applicant))) || (co && co.length > 3 && personNorm((l.recipientLines || [])[1] || '') === co));
+  if (lead) return { kind: 'lead', text: lead.include ? 'On the print list' : `In ${FOLDERS[leadFolder(lead)]}`, ref: lead.ref };
+  return null;
+}
+// "+ Add as business" for anyone named on an application: agent, architect, engineer, builder.
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-add-biz]');
+  if (!b || typeof addBusinessLead !== 'function') return;
+  e.preventDefault();
+  const name = b.dataset.addBiz, company = b.dataset.company || '', role = b.dataset.role || '';
+  const ref = 'ARCH-' + slugify(name + '-' + company);
+  const ok = addBusinessLead({ ref, name, company, address: b.dataset.address || '', description: `${role ? role[0].toUpperCase() + role.slice(1) : 'Named'} on ${b.dataset.app || 'a planning application'}` });
+  const lead = leads.find(l => l.ref === ref);
+  if (ok && lead) {
+    lead.trade = { architect: 'Architect', engineer: 'Engineer', builder: 'Builder' }[role] || guessTrade(`${name} ${company}`) || 'Planning agent';
+    if (!b.dataset.address) { lead.needsReview = true; lead.extraReviewNote = 'No address yet: Google them and add it before sending.'; lead.reviewNote = lead.extraReviewNote; }
+    saveLeadsToStorage();
+  }
+  b.outerHTML = `<span class="tag tag-approved">${ok ? 'Added to Businesses' : 'Already in Businesses, sent or not chasing'}</span>`;
+});
+
 // ---- Business trades ----
 const TRADES = ['Architect', 'Engineer', 'Planning agent', 'Surveyor', 'Builder', 'Groundworks', 'Electrician', 'Plumber',
   'Painter & decorator', 'Roofer', 'Joiner', 'Landscaper', 'Estate agent', 'Advocate', 'Accountant', 'Other'];
