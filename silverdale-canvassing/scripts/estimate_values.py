@@ -124,6 +124,14 @@ CLOSE_DAYS = 180   # paperwork this recent marks its original application as "bu
 UNSURE_RE = re.compile(r"unknown|avoid guess|no floor area given|floor area not|not enough information|too little information", re.I)
 
 
+def valued_under(e):
+    """Refs an unpriced estimate says its value is counted under ("valued under 23/00860/CON")."""
+    if not e or e.get("total"):
+        return []
+    text = " ".join(str(e.get(k) or "") for k in ("why", "what", "opportunity"))
+    return re.findall(r"valued under\s+((?:\d{2}/\d{5}/[A-Z]{1,4}))", text, re.I)
+
+
 def parent_ref(r, history):
     """The original application a piece of paperwork belongs to, when it names one we hold."""
     if effective_work(r) not in PAPERWORK:
@@ -276,6 +284,8 @@ def estimate(max_apps, vision):
              if (parse_date(r.get("received")) or date.min) >= cutoff} - {None}
     # Every original named by something on the list (fetch_originals.py adds the old ones to history).
     named = {m for a in listed for m in REF_RE.findall(a.get("description") or "") if m != a["ref"] and m in history}
+    # ...and the originals that unpriced follow-ons were "valued under".
+    named |= {m for a in listed for m in valued_under(est.get(a["ref"])) if m != a["ref"] and m in history}
     def needs(ref):
         e = est.get(ref)
         if not e:

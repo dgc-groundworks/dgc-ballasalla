@@ -10,7 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
-<script src="market.js?v=7"></script>
+<script src="market.js?v=8"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -1266,10 +1266,17 @@ function originalLineHtml(ref){
   const t = timings && timings.byRef.get(ref);
   const rec = relIdx && relIdx.rec.get(ref);
   const day = d => d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-  if (!t) return `<div class="est-orig">Original application <b>${esc(ref)}</b>: older than the history held. The Monday run looks it up on the register.</div>`;
+  const lead = 'This application is only paperwork or a change on an earlier permission; the whole job is the original.';
+  if (!t) return `<div class="est-orig">${lead} Original application <b>${esc(ref)}</b> is older than the history held; the Monday run looks it up on the register.</div>`;
   const verb = { approved: 'approved', refused: 'refused', withdrawn: 'withdrawn' }[t.outcome] || 'decided';
-  const decided = t.decided ? `${verb} ${day(t.decided)}` : 'not decided yet';
-  return `<div class="est-orig">Original application <b>${esc(ref)}</b>: applied ${day(t.received) || '(date not known)'}, ${decided}.${rec && rec.description ? ` ${esc(rec.description)}` : ''}</div>`;
+  const months = t.decided ? Math.round((Date.now() - t.decided) / (30.44 * 86400000)) : null;
+  const ago = months == null ? '' : months < 1 ? ' (this month)' : months < 24 ? ` (${months} month${months === 1 ? '' : 's'} ago)` : ` (${Math.round(months / 12)} years ago)`;
+  const decided = t.decided ? `${verb} ${day(t.decided)}${ago}` : 'not decided yet';
+  const hint = !t.decided ? 'The original is still waiting for a decision.'
+    : t.outcome !== 'approved' ? ''
+    : months <= 9 ? 'Approved recently, so the build may be about to start: a good time to write.'
+    : 'Approved a while ago, so the work may already be under way or done, and they may already have a builder. Worth a check before writing.';
+  return `<div class="est-orig">${lead} Original application <b>${esc(ref)}</b>: applied ${day(t.received) || '(date not known)'}, ${decided}.${rec && rec.description ? ` ${esc(rec.description)}.` : ''} ${hint}</div>`;
 }
 
 function plainEnglishHtml(a){

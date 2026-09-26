@@ -25,6 +25,7 @@ from datetime import date
 import requests
 from bs4 import BeautifulSoup
 
+from estimate_values import load_estimates, valued_under
 from planning_history import DATA, load_history, record_from, save_history, write_timings
 from pull_register import BASE, DETAIL_DELAY_SECONDS, fetch_detail, new_session, not_available
 
@@ -59,7 +60,9 @@ def main(max_lookups):
     history = load_history()
     with open(LATEST) as f:
         on_list = json.load(f).get("applications", [])
-    wanted = list(dict.fromkeys(m for a in on_list for m in mentioned(a) if m not in history))
+    est = load_estimates()
+    wanted = list(dict.fromkeys([m for a in on_list for m in mentioned(a) if m not in history]
+                                + [m for a in on_list for m in valued_under(est.get(a["ref"])) if m not in history and m != a["ref"]]))
     print(f"{len(wanted)} originals named on the list are older than the history held", file=sys.stderr)
     session, found, missing, looked = new_session(), 0, [], 0
     for depth in (1, 2):
