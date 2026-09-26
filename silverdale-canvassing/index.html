@@ -2573,6 +2573,15 @@ function renderArchive(main){
     };
   }
 
+  // The business (practice) name for a business entry: from the lead's site ("Practice, Town"), or the
+  // second address line when it isn't a street address.
+  function bizName(x){
+    const lead = leads.find(l => l.ref === x.ref) || x.e.lead;
+    if (lead && lead.site) { const first = lead.site.split(',')[0].trim(); if (first && personNorm(first) !== personNorm(lead.applicant)) return first; }
+    const lines = x.e.recipientLines || (lead && lead.recipientLines) || [];
+    const second = (lines[1] || '').trim();
+    return second && !/^\d|\broad\b|\bstreet\b|\blane\b|\bavenue\b|\bterrace\b|\bIM\d/i.test(second) ? second : '';
+  }
   function entryHtml(x){
     const e = x.e;
     const key = x.kind + ':' + x.ref;
@@ -2613,7 +2622,7 @@ function renderArchive(main){
       <div class="lead-row" style="display:block">
         <button type="button" class="reg-name-toggle ar-toggle" data-key="${esc(key)}" style="width:100%">
           <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <span style="flex:1;min-width:200px">${esc(e.name || x.ref)} <span class="hint">${isOpen ? '&#9662;' : '&#9656;'} ${esc(x.ref)}</span></span>
+            <span style="flex:1;min-width:200px">${esc(e.name || x.ref)}${x.biz && bizName(x) ? ` &middot; <b style="color:#7cc4ea">${esc(bizName(x))}</b>` : ''}${x.biz && typeof tradeOf === 'function' ? `<span class="trade-tag">${esc(tradeOf(leads.find(l => l.ref === x.ref) || e.lead || { ref: x.ref, description: e.description || '' }))}</span>` : ''} <span class="hint">${isOpen ? '&#9662;' : '&#9656;'} ${esc(x.ref)}</span></span>
             ${statusTag}
           </span>
         </button>
