@@ -10,7 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
-<script src="market.js?v=8"></script>
+<script src="market.js?v=9"></script>
 <script src="contacts.js?v=3"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
@@ -1615,7 +1615,45 @@ function renderWhoDetail(el){
   const box = el.querySelector('#whoDetail');
   if (!box) return;
   const kind = state.whoKind || 'agents';
-  const apps = timings.rows.filter(r => whoKey(kind, r) === state.whoOpen).sort((a, b) => (b.received || 0) - (a.received || 0));
+  const apps = timings.rows.filter(r => !r.original && whoKey(kind, r) === state.whoOpen).sort((a, b) => (b.received || 0) - (a.received || 0));
+  // A value on every application (Ash, 26 Sep 2026): the estimate where it's been priced, otherwise
+  // the typical value for that kind of work (marked ≈), paperwork left out; totals by year below.
+  const PAPER = ['Conditions / information', 'Minor change', 'Certificate of lawfulness', 'Variation of conditions'];
+  const typ = typeof typicalValues === 'function' ? typicalValues() : new Map();
+  const valueOf = a => {
+    if (PAPER.includes(a.work)) return { kind: 'paper' };
+    const e = typeof MARKET !== 'undefined' ? MARKET.estimates.get(a.ref) : null;
+    if (e && e.total) return { kind: 'priced', job: midOf(e.total), gw: e.groundworks ? midOf(e.groundworks) : 0, e };
+    if (e) return { kind: 'none', why: e.why || 'not priced' };
+    const t = typ.get(a.work);
+    return t ? { kind: 'typical', job: t.job, gw: t.gw || 0 } : { kind: 'unknown' };
+  };
+  const valueCell = a => {
+    const v = valueOf(a);
+    return v.kind === 'priced' ? `<button type="button" class="prof-name" data-profile="${esc(a.ref)}">${moneyRange(v.e.total)}</button>${v.e.groundworks ? `<div class="hint" style="margin:0">groundworks ${moneyRange(v.e.groundworks)}</div>` : ''}`
+      : v.kind === 'typical' ? `<span class="hint" style="margin:0" title="Not priced individually: the typical value for ${esc(a.work || '')}">&asymp; ${money(v.job)} typical</span>`
+      : v.kind === 'paper' ? '<span class="hint" style="margin:0" title="Paperwork on an earlier permission: its value is counted under the original">paperwork</span>'
+      : v.kind === 'none' ? `<span class="hint" style="margin:0" title="${esc(v.why)}">not priced</span>` : '';
+  };
+  const pipeline = () => {
+    const vals = apps.map(a => ({ a, v: valueOf(a) }));
+    const counted = vals.filter(x => x.v.kind === 'priced' || x.v.kind === 'typical');
+    if (!counted.length) return '';
+    const sum = xs => xs.reduce((n, x) => n + x.v.job, 0), sumGw = xs => xs.reduce((n, x) => n + (x.v.gw || 0), 0);
+    const byYear = new Map();
+    counted.forEach(x => { const y = x.a.received ? x.a.received.getFullYear() : 'date unknown'; if (!byYear.has(y)) byYear.set(y, []); byYear.get(y).push(x); });
+    const dated = counted.filter(x => x.a.received).map(x => +x.a.received);
+    const years = dated.length ? Math.max(1, Math.round((Math.max(...dated) - Math.min(...dated)) / (365.25 * DAY_MS) * 10) / 10) : 1;
+    const priced = counted.filter(x => x.v.kind === 'priced').length, typical = counted.length - priced;
+    const paper = vals.filter(x => x.v.kind === 'paper').length;
+    const toPrice = vals.filter(x => x.v.kind === 'typical' || x.v.kind === 'unknown').map(x => x.a.ref);
+    return `<div class="tp-explain" style="margin-top:10px">
+      <b>Their pipeline: roughly ${money(sum(counted))} of building work across ${counted.length} projects</b> in ${years} year${years === 1 ? '' : 's'}, about <b>${money(sum(counted) / years)} a year</b>; the groundworks and drainage part roughly ${money(sumGw(counted))}.<br>
+      By year: ${[...byYear].sort((x, y) => String(y[0]).localeCompare(String(x[0]))).map(([y, xs]) => `<b>${y}</b> ${money(sum(xs))} (${xs.length})`).join(' &middot; ')}<br>
+      <span class="hint" style="margin:0">${priced} priced individually; ${typical} at the typical value for that kind of work (marked &asymp;, a rough guide only)${paper ? `; ${paper} paperwork left out (counted under the original)` : ''}. Pending applications are included. Click a value or reference for the full profile.</span>
+      ${toPrice.length ? `<div style="margin-top:8px"><button type="button" class="btn-secondary" id="whoPriceBtn">Price the other ${toPrice.length} properly (about &pound;${Math.max(1, Math.round(toPrice.length * 0.04))})</button> <span id="whoPriceMsg" class="hint" style="margin:0"></span></div>` : ''}
+    </div>`;
+  };
   loadDetails().then(d => {
     const det = ref => (d.apps || {})[ref] || [];
     const latestDet = det(apps[0] && apps[0].ref);
@@ -1636,16 +1674,25 @@ function renderWhoDetail(el){
       </div>
       ${kind === 'agents' && people.length ? `<div class="hint" style="margin:0 0 4px">People: ${people.map(esc).join(', ')}</div>` : ''}
       ${latestDet[5] ? `<div class="hint" style="margin:0 0 8px">Address: ${esc(latestDet[5])}</div>` : ''}
-      <table class="leads tstats"><thead><tr><th>Ref</th><th>Applied</th><th>Decided</th><th>Time</th><th>Outcome</th><th>What for</th></tr></thead><tbody>
+      <table class="leads tstats"><thead><tr><th>Ref</th><th>Applied</th><th>Decided</th><th>Time</th><th>Outcome</th><th>Estimated value</th><th>What for</th></tr></thead><tbody>
       ${apps.map(a => { const x = det(a.ref); return `<tr>
-        <td>${x[2] ? `<a href="https://pbc.gov.im/online-applications/applicationDetails.do?activeTab=summary&amp;keyVal=${encodeURIComponent(x[2])}" target="_blank" rel="noopener">${esc(a.ref)}</a>` : esc(a.ref)}</td>
+        <td><button type="button" class="prof-name" data-profile="${esc(a.ref)}" title="Everything about this application">${esc(a.ref)}</button>${x[2] ? ` <a href="https://pbc.gov.im/online-applications/applicationDetails.do?activeTab=summary&amp;keyVal=${encodeURIComponent(x[2])}" target="_blank" rel="noopener" title="Open on the planning register">&#8599;</a>` : ''}</td>
         <td>${a.received ? esc(fmtDay(a.received)) : ''}</td>
         <td>${a.decided ? esc(fmtDay(a.decided)) : predictions[a.ref] ? '<span class="tag tag-review">pending</span>' : '<span class="hint" style="margin:0">date not given</span>'}</td>
         <td>${a.days != null ? fmtWeeks(a.days) : ''}</td>
         <td>${esc(x[7] || a.outcome || '')}</td>
+        <td>${valueCell(a)}</td>
         <td><span class="tag tag-dupe">${esc(a.work || '')}</span> ${esc(x[0] || '')}<div class="hint" style="margin:2px 0 0">${esc(x[1] || '')}${kind === 'agents' && x[6] ? ` &middot; applicant: ${esc(x[6])}` : ''}${kind === 'applicants' && (x[4] || x[3]) ? ` &middot; agent: ${esc(x[4] || x[3])}` : ''}</div>${x[2] ? `<div class="hint" style="margin:2px 0 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(x[2])}${siteExtentHtml(x[8])}</div>` : ''}</td>
       </tr>`; }).join('')}
-      </tbody></table>`;
+      </tbody></table>
+      ${pipeline()}`;
+    const priceBtn = box.querySelector('#whoPriceBtn');
+    if (priceBtn) priceBtn.addEventListener('click', async () => {
+      const refs = apps.filter(a => { const v = valueOf(a); return v.kind === 'typical' || v.kind === 'unknown'; }).map(a => a.ref);
+      priceBtn.disabled = true;
+      const ok = await queueForPricing(refs);
+      box.querySelector('#whoPriceMsg').textContent = ok ? `Added ${refs.length} to the pricing list. The Monday 7am run prices them (40 a week alongside new applications), or run a catch-up to do them straight away.` : 'Could not save the pricing list, try again.';
+    });
     const add = box.querySelector('#whoAddBiz');
     if (add) add.addEventListener('click', () => {
       const ok = addBusinessLead({ ref: bizRef, name: person, company, address: latestDet[5], description: `${apps.length} planning applications on the register (latest ${apps[0] && apps[0].ref})` });

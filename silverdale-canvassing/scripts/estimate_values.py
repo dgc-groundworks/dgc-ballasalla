@@ -37,6 +37,7 @@ SUMMARY_PATH = os.path.join(DATA, "market-summary.json")
 PROMPT_PATH = os.path.join(DATA, "estimator", "prompt.md")
 RATES_PATH = os.path.join(DATA, "estimator", "rate_book.md")
 LATEST_PATH = os.path.join(DATA, "latest.json")
+QUEUE_PATH = os.path.join(DATA, "estimator", "queue.json")   # refs Ash asked to have priced, from the app
 MODEL = os.environ.get("ESTIMATOR_MODEL", "claude-opus-5-5")
 BATCH = 15
 BUILD_WORK = {"New homes (1)", "New homes (2-9)", "New homes (10+)", "Extension / alterations",
@@ -286,6 +287,7 @@ def estimate(max_apps, vision):
     named = {m for a in listed for m in REF_RE.findall(a.get("description") or "") if m != a["ref"] and m in history}
     # ...and the originals that unpriced follow-ons were "valued under".
     named |= {m for a in listed for m in valued_under(est.get(a["ref"])) if m != a["ref"] and m in history}
+    queued = set(json.loads(read(QUEUE_PATH)).get("refs", [])) & set(history) if os.path.exists(QUEUE_PATH) else set()
     def needs(ref):
         e = est.get(ref)
         if not e:
@@ -294,9 +296,9 @@ def estimate(max_apps, vision):
             return bool(UNSURE_RE.search(e.get("why") or "")) and e.get("retried") != version
         return e.get("rateBook") != version
     todo = [r for r in history.values() if r.get("description") and not parent_ref(r, history)
-            and (not on_list or r["ref"] in on_list or r["ref"] in close or r["ref"] in named) and needs(r["ref"])]
+            and (not on_list or r["ref"] in on_list or r["ref"] in close or r["ref"] in named or r["ref"] in queued) and needs(r["ref"])]
     received = lambda r: parse_date(r.get("received")) or date.min
-    todo.sort(key=lambda r: (received(r) >= fortnight, r["ref"] in close or r["ref"] in named, received(r)), reverse=True)
+    todo.sort(key=lambda r: (received(r) >= fortnight, r["ref"] in close or r["ref"] in named or r["ref"] in queued, received(r)), reverse=True)
     todo = todo[:max_apps]
     retry = {r["ref"] for r in todo if r["ref"] in est and est[r["ref"]].get("grade") == "D"}
     print(f"{sum(r['ref'] in close for r in todo)} of these are originals with recent condition paperwork", file=sys.stderr)

@@ -19,7 +19,7 @@ import requests
 FILES = ["latest.json", "details.json", "history.json", "predictions.json", "timings.json",
          "estimates.jsonl", "market-summary.json"]
 # Set in the app (Estimator tab) and only ever read here, never uploaded by the Action.
-CONFIG = ["estimator/prompt.md", "estimator/rate_book.md"]
+CONFIG = ["estimator/prompt.md", "estimator/rate_book.md", "estimator/queue.json"]
 LOCAL_DIR = Path(__file__).resolve().parent.parent / "register-data"
 BUCKET = "canvassing"
 

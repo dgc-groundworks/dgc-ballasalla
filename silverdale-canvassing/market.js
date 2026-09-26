@@ -160,6 +160,33 @@ function estMaterialsHtml(e){
     </table><div class="hint" style="margin:2px 0 0">Installed cost = supply, labour, plant and overheads, from our own rates. ${e.margin && e.margin.note ? esc(e.margin.note) : ''}</div></details>`;
 }
 
+// Typical value for each kind of work (the middle of everything we've priced of that kind), used as
+// a clearly labelled stand-in for applications not individually priced (5-year pipelines, 26 Sep 2026).
+const TYPICAL = { size: -1, map: new Map() };
+function typicalValues(){
+  if (TYPICAL.size === MARKET.estimates.size) return TYPICAL.map;
+  const by = new Map();
+  const med = xs => { const s = xs.slice().sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  MARKET.estimates.forEach(e => {
+    const t = typeof timings !== 'undefined' && timings ? timings.byRef.get(e.ref) : null;
+    if (!e.total || !t || !t.work) return;
+    if (!by.has(t.work)) by.set(t.work, { job: [], gw: [] });
+    by.get(t.work).job.push(midOf(e.total));
+    if (e.groundworks) by.get(t.work).gw.push(midOf(e.groundworks));
+  });
+  TYPICAL.map = new Map([...by].filter(([, v]) => v.job.length >= 3).map(([w, v]) => [w, { job: med(v.job), gw: v.gw.length ? med(v.gw) : null, n: v.job.length }]));
+  TYPICAL.size = MARKET.estimates.size;
+  return TYPICAL.map;
+}
+// Ask for applications to be priced properly: they go on a list the next estimator run picks up.
+async function queueForPricing(refs){
+  let cur = [];
+  try { const q = await privateJson('register-data/estimator/queue.json', 'register-data/estimator/queue.json'); cur = (q && q.refs) || []; } catch {}
+  const body = JSON.stringify({ refs: [...new Set([...cur, ...refs])], updated: new Date().toISOString() });
+  const r = await cloudFetch(`/storage/v1/object/${BUCKET}/register-data/estimator/queue.json`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-upsert': 'true' }, body });
+  return r.ok;
+}
+
 // For sorting the register by value: the application's own estimate, or its original's.
 function estimateFor(ref, parentRef){
   const own = MARKET.estimates.get(ref);
