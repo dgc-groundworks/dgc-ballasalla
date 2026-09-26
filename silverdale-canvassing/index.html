@@ -1346,7 +1346,9 @@ function whoInvolvedHtml(a){
   const parts = [];
   parts.push(`<b>For:</b> ${client ? esc(client) : '<span class="hint" style="margin:0">not named on the register</span>'}${pr && pr.applicant && a.applicantName && personNorm(pr.applicant) !== personNorm(a.applicantName) ? ` <span class="hint" style="margin:0">(this paperwork sent in by ${esc(a.applicantName)})</span>` : ''}`);
   if (agent) parts.push(tools('Agent / designer', a.agentName && a.agentCompanyName && !pr ? `${a.agentName}, ${a.agentCompanyName}` : agent, 'agent', !pr ? a.agentAddress : ''));
-  if (known(team.architect) && personNorm(clean(team.architect)) !== personNorm(agent)) parts.push(tools('Architect', team.architect, 'architect'));
+  // Skip the architect when it's the same firm as the agent (e.g. "Barry Murphy, Construction Design Ltd").
+  const archN = personNorm(clean(team.architect)), agN = personNorm(agent);
+  if (known(team.architect) && !(agN && (archN.includes(agN) || agN.includes(archN)))) parts.push(tools('Architect', team.architect, 'architect'));
   if (known(team.engineer)) parts.push(tools('Engineer', team.engineer, 'engineer'));
   parts.push(known(team.contractor) ? tools('Builder', team.contractor, 'builder') : `<b>Builder:</b> <span class="hint" style="margin:0">not named yet</span>`);
   // The developer behind paperwork can be on the never-contact list even when the person who sent it in isn't.
