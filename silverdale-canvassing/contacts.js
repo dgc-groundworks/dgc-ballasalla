@@ -280,6 +280,7 @@ async function openProfile(ref){
     sections.push(`<h3>The application</h3>
       <div><b>${esc(a.ref)}</b> &middot; ${esc(a.address || '')}${a.parish ? ` &middot; ${esc(a.parish)}` : ''}</div>
       <div class="reg-work" style="margin-top:8px"><span class="lbl">Applying for</span>${typeof whatThisIsHtml === 'function' ? whatThisIsHtml(a) : esc(a.description || '')}</div>
+      ${typeof whoInvolvedHtml === 'function' ? whoInvolvedHtml(a) : ''}
       <div class="lr-meta">Applied ${esc(a.received || '?')}${a.isDecided && a.decisionDate ? ` &middot; ${esc(a.decision || 'Decided')} ${esc(a.decisionDate)}` : ' &middot; not decided yet'}</div>
       ${a.applicantName ? `<div class="hint" style="margin:6px 0 0">Applicant: ${esc(a.applicantName)}</div>` : ''}
       ${a.agentName || a.agentCompanyName ? `<div class="hint" style="margin:4px 0 0">Agent: ${esc(a.agentName || '')}${a.agentCompanyName ? ` (${esc(a.agentCompanyName)})` : ''}${a.agentAddress ? `, ${esc(a.agentAddress)}` : ''}</div>` : ''}

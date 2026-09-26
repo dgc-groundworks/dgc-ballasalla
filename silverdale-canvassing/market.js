@@ -44,6 +44,7 @@
   .est-note{font-size:0.78rem;color:var(--muted);margin-top:3px}
   .est-none{font-size:0.8rem;color:var(--muted);margin:6px 0 4px}
   .est-orig{font-size:0.8rem;color:var(--text);margin:4px 0 2px;line-height:1.4}
+  .est-check{font-size:0.8rem;color:#ef4444;margin:4px 0 2px}
   .est-orig b{color:var(--accent)}
   .est-facts{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
   .est-fact{background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:2px 8px;font-size:0.78rem;color:var(--text)}
@@ -127,6 +128,7 @@ function estPanelHtml(e, note, origHtml){
     </div>
     ${estFactsHtml(e)}
     ${e.what ? `<div class="est-what">${esc(e.what)}</div>` : ''}
+    ${estChecks(e).length ? `<div class="est-check">&#9888; Treat with care, the automatic check found: ${estChecks(e).map(esc).join('; ')}. It's queued to be re-priced.</div>` : ''}
     ${note ? `<div class="est-note">${esc(note)}</div>` : ''}
     ${origHtml || ''}
     ${estMaterialsHtml(e)}
@@ -186,6 +188,17 @@ async function queueForPricing(refs){
   const body = JSON.stringify({ refs: [...new Set([...cur, ...refs])], updated: new Date().toISOString() });
   const r = await cloudFetch(`/storage/v1/object/${BUCKET}/register-data/estimator/queue.json`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-upsert': 'true' }, body });
   return r.ok;
+}
+
+// The same consistency checks the estimator now runs, for estimates made before it did.
+function estChecks(e){
+  if (e.checks) return e.checks;
+  const out = [], w = e.weeks || {};
+  if (!e.total) return out;
+  if (w.groundworks && w.build && (w.groundworks[1] > w.build[1] || midOf(w.groundworks) > midOf(w.build))) out.push('the groundworks time was longer than the whole build');
+  if (e.england && midOf(e.england) > midOf(e.total) * 1.02) out.push('the England figure came out higher than the Isle of Man one');
+  if (e.groundworks && e.groundworks[0] > e.total[1]) out.push('the groundworks value was bigger than the whole job');
+  return out;
 }
 
 // For sorting the register by value: the application's own estimate, or its original's.

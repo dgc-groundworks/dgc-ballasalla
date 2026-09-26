@@ -58,6 +58,8 @@ MATERIAL = {"type": "object", "properties": {"item": {"type": "string"}, "qty": 
             "required": ["item", "qty", "unit", "cost"], "additionalProperties": False}
 MARGIN = {"type": "object", "properties": {"pct": NULLABLE_RANGE, "gw": NULLABLE_RANGE, "note": {"type": "string"}},
           "required": ["pct", "gw", "note"], "additionalProperties": False}
+TEAM = {"type": "object", "properties": {k: {"type": "string"} for k in ("client", "architect", "engineer", "contractor")},
+        "required": ["client", "architect", "engineer", "contractor"], "additionalProperties": False}
 SCHEMA = {
     "type": "object",
     "properties": {"results": {"type": "array", "items": {
@@ -78,6 +80,7 @@ SCHEMA = {
             "weeks": WEEKS,
             "materials": {"type": "array", "items": MATERIAL},
             "margin": MARGIN,
+            "team": TEAM,
             "silverdaleFit": {"type": "string", "enum": ["full build", "project management", "design and planning", "not a fit"]},
             "silverdale": {"type": "string"},
             "grade": {"type": "string", "enum": ["A", "B", "C", "D"]},
@@ -86,7 +89,7 @@ SCHEMA = {
             "sources": {"type": "array", "items": {"type": "string"}},
         },
         "required": ["ref", "what", "type", "homes", "client", "offMains", "floorM2", "siteM2", "sizeFrom",
-                     "total", "groundworks", "england", "weeks", "materials", "margin", "silverdaleFit", "silverdale", "grade", "why", "opportunity", "sources"],
+                     "total", "groundworks", "england", "weeks", "materials", "margin", "team", "silverdaleFit", "silverdale", "grade", "why", "opportunity", "sources"],
         "additionalProperties": False,
     }}},
     "required": ["results"],
@@ -131,6 +134,44 @@ def valued_under(e):
         return []
     text = " ".join(str(e.get(k) or "") for k in ("why", "what", "opportunity"))
     return re.findall(r"valued under\s+((?:\d{2}/\d{5}/[A-Z]{1,4}))", text, re.I)
+
+
+def tidy_result(res):
+    for key in ("total", "groundworks", "england", "floorM2"):
+        res[key] = tidy_range(res.get(key))
+    res["weeks"] = {k: tidy_range((res.get("weeks") or {}).get(k)) for k in ("build", "groundworks")}
+    res["materials"] = [{**m, "qty": tidy_range(m.get("qty")), "cost": tidy_range(m.get("cost"))}
+                        for m in (res.get("materials") or [])[:8]]
+    mg = res.get("margin") or {}
+    res["margin"] = {"pct": tidy_range(mg.get("pct")), "gw": tidy_range(mg.get("gw")), "note": mg.get("note", "")}
+    return res
+
+
+def sanity(res):
+    """Things that can't all be true at once. Added 26 Sep 2026 after Ash spotted a 153-home estate
+    whose groundworks ran longer than the whole build: every answer is now checked, and anything
+    that fails goes back to Claude once to be corrected; what still fails is flagged in the app."""
+    probs = []
+    if not res.get("total"):
+        return probs
+    w = res.get("weeks") or {}
+    if w.get("groundworks") and w.get("build") and (w["groundworks"][1] > w["build"][1] or mid(w["groundworks"]) > mid(w["build"])):
+        probs.append("the groundworks duration is longer than the whole build; groundworks runs within the build (60-90% of it on a phased estate)")
+    if res.get("england") and mid(res["england"]) > mid(res["total"]) * 1.02:
+        probs.append("the England equivalent is higher than the Isle of Man value; it must be lower (divide each part by its factor)")
+    if res.get("groundworks") and res["groundworks"][0] > res["total"][1]:
+        probs.append("the groundworks value is bigger than the whole job")
+    mg = (res.get("margin") or {}).get("gw")
+    if mg and res.get("groundworks") and not 0.08 <= mid(mg) / mid(res["groundworks"]) <= 0.18:
+        probs.append("the margin should be about 11.5-13% of the groundworks value")
+    mats = [m for m in (res.get("materials") or []) if m.get("cost")]
+    if len(mats) >= 3 and res.get("groundworks"):
+        tot = sum(mid(m["cost"]) for m in mats)
+        if not 0.35 <= tot / mid(res["groundworks"]) <= 1.6:
+            probs.append("the materials lines don't roughly add up to the groundworks value")
+    if res.get("grade") == "D":
+        probs.append("grade D must have no values")
+    return probs
 
 
 def parent_ref(r, history):
@@ -210,7 +251,8 @@ def app_payload(r, related=None):
         "ref": r["ref"], "description": r.get("description"), "applicationType": r.get("applicationType"),
         "workCategory": effective_work(r), "parish": r.get("parish"), "address": r.get("address"),
         "status": r.get("outcome") or "pending", "received": r.get("received"), "decided": r.get("decisionDate"),
-        "agent": r.get("agentCompanyName") or r.get("agentName"), "documentNames": r.get("documentNames"),
+        "applicant": r.get("applicantName"), "agent": r.get("agentCompanyName") or r.get("agentName"),
+        "documentNames": r.get("documentNames"),
         "siteExtent": r.get("siteExtent"), "relatedApplications": related,
     }.items() if v not in (None, "", [])}
 
@@ -323,16 +365,27 @@ def estimate(max_apps, vision):
             break
         by_ref = {r["ref"]: r for r in batch}
         for res in results:
+            tidy_result(res)
+        # One go at correcting anything inconsistent, with the problems spelled out.
+        faulty = {res["ref"]: sanity(res) for res in results if res.get("ref") in by_ref and sanity(res)}
+        if faulty:
+            fix = [c for c in content if c.get("type") == "image"] + [
+                {"type": "text", "text": json.dumps([app_payload(by_ref[ref], related_for(by_ref[ref], history, idx)) for ref in faulty], ensure_ascii=False)},
+                {"type": "text", "text": "Your first estimate for these had problems. Re-estimate them and fix: "
+                 + json.dumps(faulty) + " Keep everything else consistent with the rate book."}]
+            try:
+                again = {x["ref"]: x for x in ask(client, system, fix, usage)}
+            except anthropic.RateLimitError:
+                again = {}
+            for x in again.values():
+                tidy_result(x)
+            results = [again.get(res.get("ref"), res) for res in results]
+            print(f"corrected {len(again)} of {len(faulty)} inconsistent estimates", file=sys.stderr)
+        for res in results:
             r = by_ref.get(res["ref"])
             if not r:
                 continue
-            for key in ("total", "groundworks", "england", "floorM2"):
-                res[key] = tidy_range(res.get(key))
-            res["weeks"] = {k: tidy_range((res.get("weeks") or {}).get(k)) for k in ("build", "groundworks")}
-            res["materials"] = [{**m, "qty": tidy_range(m.get("qty")), "cost": tidy_range(m.get("cost"))}
-                                for m in (res.get("materials") or [])[:8]]
-            mg = res.get("margin") or {}
-            res["margin"] = {"pct": tidy_range(mg.get("pct")), "gw": tidy_range(mg.get("gw")), "note": mg.get("note", "")}
+            res["checks"] = sanity(res)
             res.update({"received": r.get("received"), "status": r.get("outcome") or "pending",
                         "parish": r.get("parish"), "keyVal": r.get("keyVal"), "pricedOn": date.today().isoformat(),
                         "rateBook": version, "decided": r.get("decisionDate"),
