@@ -109,7 +109,7 @@ function estimateRowHtml(ref, parentRef, origHtml){
   const par = parentRef ? MARKET.estimates.get(parentRef) : null;
   origHtml = origHtml || '';
   if (own && own.total) return estPanelHtml(own, '', origHtml);
-  if (par && par.total) return estPanelHtml(par, `Value of the original permission, ${parentRef}. Paperwork like this usually means the build is about to start.`, origHtml);
+  if (par && par.total) return estPanelHtml(par, `Value of the original permission, ${parentRef}.`, origHtml);
   if (par) return `<div class="est-none">Estimate: the original, ${esc(parentRef)}, wasn't priced: ${esc(par.why || par.what || 'no building work to price.')}</div>${par.what ? `<div class="est-orig">${esc(par.what)}</div>` : ''}${origHtml}`;
   if (parentRef) return `<div class="est-none">Estimate: this belongs to ${esc(parentRef)}. Its value shows here once that application is priced (originals named on the list are priced first on the Monday run).</div>${origHtml}`;
   if (own) return `<div class="est-none">Estimate: not priced. ${esc(own.why || own.what || 'No building work to price.')}</div>`;
@@ -146,7 +146,8 @@ function estFactsHtml(e){
   const concrete = (e.materials || []).find(m => /concrete/i.test(m.item) && m.qty);
   const facts = [];
   if (w.build) facts.push(`<span class="est-fact"><b>Build</b>${weeksText(w.build)}</span>`);
-  if (w.groundworks) facts.push(`<span class="est-fact"><b>Groundworks</b>${weeksText(w.groundworks)}</span>`);
+  if (w.groundworks && w.build && w.groundworks[0] > w.build[1] * 0.8) facts.push(`<span class="est-fact" title="Groundworks on a scheme this size is done in phases alongside the build, not before it"><b>Groundworks</b>phased through the build</span>`);
+  else if (w.groundworks) facts.push(`<span class="est-fact"><b>Groundworks</b>${weeksText(w.groundworks)}</span>`);
   if (concrete) facts.push(`<span class="est-fact"><b>Concrete</b>${numRange(concrete.qty)} ${esc(concrete.unit || 'm³')}</span>`);
   if (mg.gw) facts.push(`<span class="est-fact" title="${esc(mg.note || 'Overheads and profit inside the groundworks figure, not clear profit')}"><b>Margin (OH&amp;P)</b>${moneyRange(mg.gw)}${mg.pct ? ` &middot; ${mg.pct[0] === mg.pct[1] ? mg.pct[0] : mg.pct[0] + '-' + mg.pct[1]}%` : ''}</span>`);
   return facts.length ? `<div class="est-facts">${facts.join('')}</div>` : '';

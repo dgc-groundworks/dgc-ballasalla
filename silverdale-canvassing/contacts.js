@@ -284,7 +284,7 @@ async function openProfile(ref){
       ${a.applicantName ? `<div class="hint" style="margin:6px 0 0">Applicant: ${esc(a.applicantName)}</div>` : ''}
       ${a.agentName || a.agentCompanyName ? `<div class="hint" style="margin:4px 0 0">Agent: ${esc(a.agentName || '')}${a.agentCompanyName ? ` (${esc(a.agentCompanyName)})` : ''}${a.agentAddress ? `, ${esc(a.agentAddress)}` : ''}</div>` : ''}
       <h3>Estimate</h3>
-      ${typeof estimateRowHtml === 'function' ? estimateRowHtml(a.ref, parent, typeof originalLineHtml === 'function' ? originalLineHtml(parent) : '') : ''}
+      ${typeof estimateRowHtml === 'function' ? estimateRowHtml(a.ref, parent, typeof originalLineHtml === 'function' ? originalLineHtml(parent, a) : '') : ''}
       ${typeof relatedListHtml === 'function' && relIdx ? relatedListHtml(a) : ''}`);
   }
 

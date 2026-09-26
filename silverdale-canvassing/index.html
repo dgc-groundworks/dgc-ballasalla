@@ -10,8 +10,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
-<script src="market.js?v=9"></script>
-<script src="contacts.js?v=3"></script>
+<script src="market.js?v=10"></script>
+<script src="contacts.js?v=4"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -1278,7 +1278,9 @@ function parentRefOf(a){
   return (under && under[1] !== a.ref ? under[1] : named[0]) || null;
 }
 // "Original application 19/01234/B: applied 3 Mar 2019, approved 10 Jun 2019."
-function originalLineHtml(ref){
+// `row` is the paperwork itself (register app or folder lead): recent paperwork on a permission
+// says more about whether the build has started than the age of the permission does.
+function originalLineHtml(ref, row){
   if (!ref) return '';
   const t = timings && timings.byRef.get(ref);
   const rec = relIdx && relIdx.rec.get(ref);
@@ -1289,9 +1291,15 @@ function originalLineHtml(ref){
   const months = t.decided ? Math.round((Date.now() - t.decided) / (30.44 * 86400000)) : null;
   const ago = months == null ? '' : months < 1 ? ' (this month)' : months < 24 ? ` (${months} month${months === 1 ? '' : 's'} ago)` : ` (${Math.round(months / 12)} years ago)`;
   const decided = t.decided ? `${verb} ${day(t.decided)}${ago}` : 'not decided yet';
+  const own = row ? (regDate(row.decisionDate || row.decidedDate) || regDate(row.received || row.appliedDate)) : null;
+  const ownRecent = own && (Date.now() - own) < 183 * DAY_MS;
+  const ownWork = row && timings && timings.byRef.get(row.ref) ? timings.byRef.get(row.ref).work : '';
   const hint = !t.decided ? 'The original is still waiting for a decision.'
     : t.outcome !== 'approved' ? ''
+    : ownRecent && ownWork === 'Conditions / information'
+      ? `Conditions on it are still being signed off (this one ${regDate(row.decisionDate || row.decidedDate) ? 'decided' : 'sent in'} ${day(own)}). Many conditions have to be cleared before work starts, so the build probably hasn't started, or is only just starting: a good time to write.`
     : months <= 9 ? 'Approved recently, so the build may be about to start: a good time to write.'
+    : ownRecent ? `Approved ${Math.round(months)} months ago but still being worked on (this application ${day(own)}), so the build may be about to start or just under way. Worth a check before writing.`
     : 'Approved a while ago, so the work may already be under way or done, and they may already have a builder. Worth a check before writing.';
   return `<div class="est-orig">${lead} Original application <b>${esc(ref)}</b>: applied ${day(t.received) || '(date not known)'}, ${decided}.${rec && rec.description ? ` ${esc(rec.description)}.` : ''} ${hint}</div>`;
 }
@@ -1300,7 +1308,7 @@ function plainEnglishHtml(a){
   const t = timings && timings.byRef.get(a.ref);
   const work = t && t.work, type = a.applicationType || (t && t.type);
   const parent = parentRefOf(a);
-  const badge = typeof estimateRowHtml === 'function' ? estimateRowHtml(a.ref, parent, originalLineHtml(parent)) : '';
+  const badge = typeof estimateRowHtml === 'function' ? estimateRowHtml(a.ref, parent, originalLineHtml(parent, a)) : '';
   const drawings = a.keyVal ? `<div class="reg-links">${drawingsLinkHtml(a.keyVal)}${siteExtentHtml(a.siteExtent)}</div>` : '';
 
   // The same explanation and stats apply to every application of a given
@@ -2184,7 +2192,7 @@ function renderFolder(main, folder){
           ${typeof contactFlagHtml === 'function' ? contactFlagHtml(l) : ''}
           ${l.keyVal ? `<div class="hint" style="margin:2px 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(l.keyVal)}${siteExtentHtml(l.siteExtent)}</div>` : ''}
           ${flag && flag.title ? `<div class="hint" style="margin:0 0 4px;color:var(--accent)">${esc(flag.title)}</div>` : ''}
-          ${personal && typeof estimateRowHtml === 'function' ? estimateRowHtml(l.ref, l.parentRef || null, originalLineHtml(l.parentRef || null)) : ''}
+          ${personal && typeof estimateRowHtml === 'function' ? estimateRowHtml(l.ref, l.parentRef || null, originalLineHtml(l.parentRef || null, l)) : ''}
           <input type="text" class="sal-input" value="${esc(l.salutation)}" title="Salutation — click to change">
           <div class="f-addr">${l.recipientLines.map(esc).join(' &middot; ')}</div>
           ${editing ? `
