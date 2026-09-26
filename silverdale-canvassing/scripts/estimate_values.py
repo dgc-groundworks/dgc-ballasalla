@@ -252,7 +252,7 @@ def app_payload(r, related=None):
         "workCategory": effective_work(r), "parish": r.get("parish"), "address": r.get("address"),
         "status": r.get("outcome") or "pending", "received": r.get("received"), "decided": r.get("decisionDate"),
         "applicant": r.get("applicantName"), "agent": r.get("agentCompanyName") or r.get("agentName"),
-        "documentNames": r.get("documentNames"),
+        "documentNames": r.get("documentNames"), "namedParties": r.get("namedParties"),
         "siteExtent": r.get("siteExtent"), "relatedApplications": related,
     }.items() if v not in (None, "", [])}
 
