@@ -55,6 +55,11 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .lr-applicant{font-size:0.98rem;font-weight:700;margin-bottom:3px}
 .reg-name-toggle{background:none;border:none;padding:0;margin-bottom:3px;font:inherit;font-size:0.98rem;font-weight:700;color:var(--text);cursor:pointer;text-align:left;display:block}
 .reg-name-toggle:hover{color:var(--accent)}
+.reg-related{margin:6px 0;font-size:0.82rem}
+.reg-related summary{cursor:pointer;color:var(--accent);font-weight:700}
+.reg-related ol{margin:8px 0 2px 20px}
+.reg-related li{margin:0 0 8px;color:var(--text)}
+.reg-related li div{color:var(--muted);margin-top:2px}
 .reg-name{font-size:0.98rem;font-weight:700;color:var(--text);margin-bottom:3px}
 .reg-work{background:var(--surf2);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;margin:6px 0 4px;font-size:1.02rem;font-weight:700;color:var(--text);line-height:1.4}
 .reg-work .lbl{display:block;font-size:0.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
@@ -1163,6 +1168,79 @@ function outcomeStats(work, type){
   }
   return null;
 }
+// ---- Further details: the same job's other applications ----
+// Follow-on applications (condition details, design changes, reserved matters)
+// only make sense next to the original, so each row can list the job's other
+// applications: refs it mentions (and theirs), later ones that mention it, the
+// same site (postcode plus house name or number) and the same applicant.
+const REL_REF_RE = /(?<!\d)\d{2}\/\d{5}\/[A-Z]{1,4}\b/g;
+const REL_PC_RE = /\bIM\d{1,2}\s?\d[A-Z]{2}\b/i;
+const REL_SKIP = new Set(['the', 'and', 'land', 'at', 'of', 'to', 'site', 'adjacent', 'adj', 'rear', 'plot', 'plots']);
+const REL_WHY = { mentioned: 'mentioned in this application', 'follow-on': 'follows on from this one', sibling: 'follows on from the same original', 'same site': 'same site', 'same applicant': 'same applicant' };
+let relIdx = null, relIdxPromise = null;
+const relPending = new Map();
+function relSiteKey(addr){
+  const m = (addr || '').match(REL_PC_RE);
+  if (!m) return null;
+  const words = addr.toLowerCase().replace('isle of man', '').replace(REL_PC_RE, '').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w && !REL_SKIP.has(w));
+  return words.length ? m[0].toLowerCase().replace(/\s/g, '') + '|' + words.slice(0, 2).join(' ') : null;
+}
+function loadRelatedIndex(){
+  if (!relIdxPromise) relIdxPromise = Promise.all([loadDetails(), loadTimings()]).then(([d]) => {
+    const F = d.fields || [], at = n => F.indexOf(n), idx = { rec: new Map(), site: new Map(), applicant: new Map(), mentions: new Map() };
+    const push = (m, k, v) => { if (!m.has(k)) m.set(k, []); m.get(k).push(v); };
+    Object.entries(d.apps || {}).forEach(([ref, x]) => {
+      const t = timings && timings.byRef.get(ref);
+      const rec = { ref, description: x[at('description')] || '', address: x[at('address')] || '', keyVal: x[at('keyVal')] || '',
+                    decision: x[at('decision')] || '', received: t && t.received, applicantKey: t && t.applicantKey };
+      idx.rec.set(ref, rec);
+      const k = relSiteKey(rec.address); if (k) push(idx.site, k, ref);
+      if (rec.applicantKey) push(idx.applicant, rec.applicantKey, ref);
+      (rec.description.match(REL_REF_RE) || []).forEach(m => { if (m !== ref) push(idx.mentions, m, ref); });
+    });
+    relIdx = idx;
+    relPending.forEach((a, ref) => document.querySelectorAll(`.reg-related-slot[data-ref="${ref}"]`).forEach(el => { el.outerHTML = relatedListHtml(a); }));
+    relPending.clear();
+    return idx;
+  }).catch(() => null);
+  return relIdxPromise;
+}
+function relatedFor(a){
+  if (!relIdx) return [];
+  const found = new Map(), add = (ref, why) => { if (ref !== a.ref && !found.has(ref)) found.set(ref, why); };
+  const parents = (a.description || '').match(REL_REF_RE) || [];
+  for (let i = 0; i < parents.length && i < 12; i++) {   // follow the chain back, e.g. condition details -> reserved matters -> approval in principle
+    const up = relIdx.rec.get(parents[i]);
+    ((up && up.description.match(REL_REF_RE)) || []).forEach(g => { if (!parents.includes(g)) parents.push(g); });
+  }
+  parents.forEach(m => add(m, 'mentioned'));
+  (relIdx.mentions.get(a.ref) || []).forEach(c => add(c, 'follow-on'));
+  parents.forEach(m => (relIdx.mentions.get(m) || []).forEach(c => add(c, 'sibling')));
+  (relIdx.site.get(relSiteKey(a.address)) || []).forEach(s => add(s, 'same site'));
+  const t = timings && timings.byRef.get(a.ref);
+  const same = (t && t.applicantKey && relIdx.applicant.get(t.applicantKey)) || [];
+  if (same.length > 1 && same.length <= 8) same.forEach(s => add(s, 'same applicant'));
+  const rank = { mentioned: 0, 'follow-on': 1, sibling: 2, 'same site': 3, 'same applicant': 4 };
+  return [...found.entries()].sort((x, y) => rank[x[1]] - rank[y[1]]).slice(0, 12)
+    .map(([ref, why]) => ({ ref, why, rec: relIdx.rec.get(ref) || { ref, description: '(older than the 5-year history)' } }))
+    .sort((x, y) => (x.rec.received || 0) - (y.rec.received || 0));
+}
+function relatedListHtml(a){
+  const list = relatedFor(a);
+  if (!list.length) return '';
+  const day = d => d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'date not known';
+  return `<details class="reg-related"><summary>&#128279; Further details: ${list.length} related application${list.length === 1 ? '' : 's'}, oldest first</summary><ol>
+    ${list.map(({ ref, why, rec }) => `<li><b>${esc(ref)}</b> &middot; ${esc(day(rec.received))} &middot; ${esc(rec.decision || 'pending')} <span class="tag tag-dupe">${esc(REL_WHY[why])}</span>
+      <div>${esc(rec.description)}</div>${rec.keyVal ? `<div class="reg-links">${drawingsLinkHtml(rec.keyVal)}</div>` : ''}</li>`).join('')}
+  </ol></details>`;
+}
+function relatedHtml(a){
+  if (relIdx) return relatedListHtml(a);
+  relPending.set(a.ref, a);
+  loadRelatedIndex();
+  return `<div class="reg-related-slot" data-ref="${esc(a.ref)}"></div>`;
+}
+
 function plainEnglishHtml(a){
   const t = timings && timings.byRef.get(a.ref);
   const work = t && t.work, type = a.applicationType || (t && t.type);
@@ -1180,8 +1258,9 @@ function plainEnglishHtml(a){
   if (st) lines.push(`<div><b>How similar ones go:</b> ${st.approved}% approved${st.refused ? `, ${st.refused}% refused` : ''}${typ ? `, usually decided in about ${fmtWeeks(typ.days)}` : ''}. Based on ${st.n} decided in the last 2 years (${esc(st.basis)}).</div>`);
   const why = lines.length ? `<details class="reg-why"><summary>What this means &amp; how similar ones usually go</summary>${lines.join('')}</details>` : '';
 
-  if (!badge && !drawings && !why) return '';
-  return `<div class="reg-plain">${badge}${drawings}${why}</div>`;
+  const related = relatedHtml(a);
+  if (!badge && !drawings && !why && !related) return '';
+  return `<div class="reg-plain">${badge}${drawings}${related}${why}</div>`;
 }
 
 // How good the forecasts are. Back-test: re-run the method as it would

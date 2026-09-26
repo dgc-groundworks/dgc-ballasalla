@@ -21,6 +21,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import sys
 from datetime import date, datetime, timedelta
 
@@ -99,13 +100,72 @@ def save_estimates(est):
     os.replace(tmp, EST_PATH)
 
 
-def app_payload(r):
+REF_RE = re.compile(r"(?<!\d)\d{2}/\d{5}/[A-Z]{1,4}\b")
+POSTCODE_RE = re.compile(r"\bIM\d{1,2}\s?\d[A-Z]{2}\b", re.I)
+SKIP_WORDS = {"the", "and", "land", "at", "of", "to", "site", "adjacent", "adj", "rear", "plot", "plots"}
+
+
+def site_key(address):
+    """Postcode plus the first two words of the address (house name or number), e.g. 'im12ez|holly lodge'."""
+    m = POSTCODE_RE.search(address or "")
+    if not m:
+        return None
+    rest = POSTCODE_RE.sub("", address.lower().replace("isle of man", ""))
+    words = [w for w in re.sub(r"[^a-z0-9 ]", " ", rest).split() if w not in SKIP_WORDS]
+    return m.group(0).lower().replace(" ", "") + "|" + " ".join(words[:2]) if words else None
+
+
+def related_index(history):
+    idx = {"site": {}, "applicant": {}, "mentions": {}}
+    for ref, r in history.items():
+        k = site_key(r.get("address"))
+        if k:
+            idx["site"].setdefault(k, []).append(ref)
+        if r.get("applicantKey"):
+            idx["applicant"].setdefault(r["applicantKey"], []).append(ref)
+        for m in REF_RE.findall(r.get("description") or ""):
+            if m != ref:
+                idx["mentions"].setdefault(m, []).append(ref)
+    return idx
+
+
+def related_for(r, history, idx, limit=8):
+    """Earlier and later applications for the same job: refs it mentions (and theirs), same site, same applicant."""
+    found = {}
+    parents = [m for m in REF_RE.findall(r.get("description") or "") if m != r["ref"]]
+    for m in list(parents):
+        parents += [g for g in REF_RE.findall((history.get(m) or {}).get("description") or "") if g not in parents and g != r["ref"]]
+    for m in parents:
+        found.setdefault(m, "mentioned")
+    for c in idx["mentions"].get(r["ref"], []):
+        found.setdefault(c, "follow-on")
+    for m in parents:
+        for c in idx["mentions"].get(m, []):
+            found.setdefault(c, "same original")
+    for s in idx["site"].get(site_key(r.get("address")) or "", []):
+        found.setdefault(s, "same site")
+    same_applicant = idx["applicant"].get(r.get("applicantKey") or "", [])
+    if 1 < len(same_applicant) <= 8:
+        for s in same_applicant:
+            found.setdefault(s, "same applicant")
+    found.pop(r["ref"], None)
+    order = {"mentioned": 0, "follow-on": 1, "same original": 2, "same site": 3, "same applicant": 4}
+    picked = sorted(found.items(), key=lambda kv: order[kv[1]])[:limit]
+    out = []
+    for ref, why in picked:
+        h = history.get(ref) or {}
+        out.append({k: v for k, v in {"ref": ref, "why": why, "description": (h.get("description") or "")[:200],
+                                       "status": h.get("outcome"), "received": h.get("received")}.items() if v})
+    return out
+
+
+def app_payload(r, related=None):
     return {k: v for k, v in {
         "ref": r["ref"], "description": r.get("description"), "applicationType": r.get("applicationType"),
         "workCategory": effective_work(r), "parish": r.get("parish"), "address": r.get("address"),
         "status": r.get("outcome") or "pending", "received": r.get("received"), "decided": r.get("decisionDate"),
         "agent": r.get("agentCompanyName") or r.get("agentName"), "documentNames": r.get("documentNames"),
-        "siteExtent": r.get("siteExtent"),
+        "siteExtent": r.get("siteExtent"), "relatedApplications": related,
     }.items() if v not in (None, "", [])}
 
 
@@ -165,6 +225,7 @@ def estimate(max_apps, vision):
     system = (read(PROMPT_PATH) + "\n\n" + GRADES + "\n\nWORK TYPES: " + json.dumps(WORK_TYPES)
               + "\n\nRATE BOOK:\n" + read(RATES_PATH))
     history = load_history()
+    idx = related_index(history)
     est = load_estimates()
     # A changed prompt or rate book means earlier estimates are re-priced (newest first, within --max).
     version = hashlib.sha1(system.encode("utf-8")).hexdigest()[:10]
@@ -178,7 +239,7 @@ def estimate(max_apps, vision):
     text_only = [r for r in todo if r not in with_image]
     jobs = [[r] for r in with_image] + [text_only[i:i + BATCH] for i in range(0, len(text_only), BATCH)]
     for batch in jobs:
-        content = [{"type": "text", "text": json.dumps([app_payload(r) for r in batch], ensure_ascii=False)}]
+        content = [{"type": "text", "text": json.dumps([app_payload(r, related_for(r, history, idx)) for r in batch], ensure_ascii=False)}]
         if len(batch) == 1 and batch[0] in with_image:
             img = plan_image(batch[0])
             if img:
