@@ -1926,10 +1926,16 @@ function renderRegisterPullLoaded(box, data){
       const actual = a.isDecided ? regDate(a.decisionDate) : null;
       const forecast = p ? regDate(p.predictedDate) : null;
       const diff = actual && forecast ? daysBetween(forecast, actual) : null;
+      const follow = leads.find(l => l.baseRef === a.ref);
       actions = `<span class="tag tag-dupe" title="Already sent a letter — see Archive">Sent ${esc(prettyDate(sent.date))}${sent.copy ? ` &middot; ${FOLDERS[sent.copy] || sent.copy} letter` : ''}</span>`
+        + `<div class="reg-actions" style="margin-top:6px">${follow ? `<span class="tag tag-approved">Follow-up in ${FOLDERS[leadFolder(follow)]}</span>`
+          : `<button type="button" class="btn-secondary reg-followup" data-ref="${esc(a.ref)}" title="Keeps the first letter on record and puts a personalised follow-up in the Personalised folder">&#9998; Personalised follow-up</button>`}
+          <button type="button" class="btn-secondary reg-unsend" data-ref="${esc(a.ref)}" title="Only if the letter never actually went out">&#8617; Undo &ldquo;sent&rdquo;</button></div>`
         + (sent.copy === 'pending' && actual ? `<div class="hint" style="margin:4px 0 0;text-align:right">You sent the pending letter ${esc(prettyDate(sent.date))}.<br>${forecast ? `Forecast &asymp; ${fmtDay(forecast)} &middot; ` : ''}decided ${fmtDay(actual)}${diff != null ? ` (${Math.abs(diff)} days ${diff > 0 ? 'later' : diff < 0 ? 'earlier' : '&mdash; spot on'})` : ''}</div>` : '');
     }
-    else if (inLead) actions = `<span class="tag tag-approved">In ${FOLDERS[leadFolder(inLead)]}</span>`;
+    else if (inLead) actions = `<span class="tag tag-approved">In ${FOLDERS[leadFolder(inLead)]}${inLead.include ? ' &middot; on the print list' : ''}</span>
+          <div class="reg-actions" style="margin-top:6px">${leadFolder(inLead) !== 'personal' ? `<button type="button" class="btn-secondary reg-topersonal" data-ref="${esc(a.ref)}">&rarr; Personalised</button>` : ''}
+          <button type="button" class="btn-secondary reg-undo" data-ref="${esc(a.ref)}" title="Takes it back out of the folder, so you can send it a different way">&#8617; Undo</button></div>`;
     else if (arch) actions = `<span class="tag tag-dupe">Archived ${esc(prettyDate(arch.date))}</span>
           <button type="button" class="btn-secondary reg-unarchive-btn" data-ref="${esc(a.ref)}">&#8617; Bring back</button>`;
     else {
@@ -2048,6 +2054,43 @@ function renderRegisterPullLoaded(box, data){
     } else if (btn.classList.contains('reg-unarchive-btn')) {
       bringBackFromArchive(a.ref);
       say(`${person} brought back.`);
+    } else if (btn.classList.contains('reg-undo')) {
+      const i = leads.findIndex(l => l.ref === a.ref);
+      if (i < 0) return;
+      if (leads[i].include && !confirm(`${person} is on the print list. Take it off and out of the ${FOLDERS[leadFolder(leads[i])]} folder?`)) return;
+      const from = FOLDERS[leadFolder(leads[i])];
+      leads.splice(i, 1);
+      saveLeadsToStorage();
+      say(`${person} taken back out of ${from}. Send it whichever way you like.`);
+    } else if (btn.classList.contains('reg-topersonal')) {
+      const l = leads.find(x => x.ref === a.ref);
+      if (!l) return;
+      l.folder = 'personal'; l.include = false;
+      saveLeadsToStorage();
+      say(`${person} moved to Personalised. Write the letter there.`);
+    } else if (btn.classList.contains('reg-unsend')) {
+      // The sent record is the safety net against double letters, so undoing it says exactly what it knows first.
+      const e = getLog()[a.ref];
+      if (!e) return;
+      const pdf = e.pdfFile ? String(e.pdfFile).split('›').pop().trim() : '';
+      if (!confirm(`The record says the ${FOLDERS[e.copy] || ''} letter to ${e.name || person} was printed and sent on ${prettyDate(e.date)}${pdf ? ` (PDF: ${pdf})` : ''}.\n\nOnly undo this if that letter never actually went out. It comes off the sent record and goes to the Personalised folder for you to write.\n\nIf it did go out, press Cancel and use "Personalised follow-up" instead, so the first letter stays on record.`)) return;
+      const lg = getLog();
+      delete lg[a.ref];
+      saveLog(lg);
+      const l = leads.find(x => x.ref === a.ref);
+      if (l) Object.assign(l, { folder: 'personal', include: false, alreadyProcessed: false });
+      else addRegisterAppToBatch(a, 'personal');
+      saveLeadsToStorage();
+      say(`${person} taken off the sent record and put in Personalised.`);
+    } else if (btn.classList.contains('reg-followup')) {
+      if (leads.some(l => l.baseRef === a.ref)) return;
+      const e = getLog()[a.ref] || {};
+      if (!addRegisterAppToBatch({ ...a, ref: a.ref + '~2' }, 'personal')) { say('A follow-up for this one already exists.'); return; }
+      const l = leads.find(x => x.ref === a.ref + '~2');
+      l.baseRef = a.ref;
+      l.extraReviewNote = `Follow-up: the ${FOLDERS[e.copy] || 'first'} letter went out ${prettyDate(e.date)}. Write something that builds on it.`;
+      saveLeadsToStorage();
+      say(`Personalised follow-up for ${person} added. The first letter stays on record.`);
     } else return;
     renderList();
   });
@@ -2216,13 +2259,13 @@ function renderFolder(main, folder){
     return `
       <div class="lead-row ${flag ? 'flagged' : ''}" data-i="${i}">
         <div class="lr-main">
-          <div class="lr-applicant">${nameBtn(l.ref, l.applicant)}${isBiz ? `<span class="trade-tag">${esc(tradeOf(l))}</span>` : ''}</div>
+          <div class="lr-applicant">${nameBtn(l.baseRef || l.ref, l.applicant)}${l.baseRef ? ' <span class="tag tag-review">Follow-up</span>' : ''}${isBiz ? `<span class="trade-tag">${esc(tradeOf(l))}</span>` : ''}</div>
           <div class="lr-meta">${esc(l.ref)}${l.appliedDate ? ` &middot; <b style="color:var(--text)">Applied ${esc(l.appliedDate)}</b>` : ''}${l.decidedDate ? ` &middot; Decided ${esc(l.decidedDate)}` : ''}${l.description ? ' &middot; ' + esc(l.description) : ''}</div>
           ${l.appliedDate ? `<div class="lr-meta">${timingHtml(l.ref, l.appliedDate, l.decidedDate)}</div>` : ''}
           ${typeof contactFlagHtml === 'function' ? contactFlagHtml(l) : ''}
           ${l.keyVal ? `<div class="hint" style="margin:2px 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(l.keyVal)}${siteExtentHtml(l.siteExtent)}</div>` : ''}
           ${flag && flag.title ? `<div class="hint" style="margin:0 0 4px;color:var(--accent)">${esc(flag.title)}</div>` : ''}
-          ${personal && typeof estimateRowHtml === 'function' ? estimateRowHtml(l.ref, l.parentRef || null, originalLineHtml(l.parentRef || null, l)) : ''}
+          ${personal && typeof estimateRowHtml === 'function' ? estimateRowHtml(l.baseRef || l.ref, l.parentRef || null, originalLineHtml(l.parentRef || null, l)) : ''}
           <input type="text" class="sal-input" value="${esc(l.salutation)}" title="Salutation — click to change">
           <div class="f-addr">${l.recipientLines.map(esc).join(' &middot; ')}</div>
           ${editing ? `
