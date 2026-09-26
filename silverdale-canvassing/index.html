@@ -109,6 +109,20 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .doc-copy-label{font-size:0.75rem;color:var(--muted);margin-right:auto;align-self:center}
 .doc-toolbar{gap:8px}
 .timing-panel{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px 14px;font-size:0.82rem}
+.tp-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.tp-btn{background:rgba(245,158,11,.14);border:1px solid var(--accent);color:var(--text);border-radius:10px;padding:10px 18px;font:inherit;font-size:1.08rem;font-weight:800;cursor:pointer}
+.tp-btn:hover{background:rgba(245,158,11,.24)}
+.tp-sum{font-size:0.85rem}
+.tp-explain{background:var(--surf2);border-radius:8px;padding:10px 12px;margin:10px 0;line-height:1.55}
+table.tstats th button.srt{background:none;border:0;color:inherit;font:inherit;font-weight:700;cursor:pointer;padding:0}
+table.tstats th button.srt.on{color:var(--accent)}
+table.tstats tr.total td{border-top:2px solid var(--bord);font-weight:800;color:var(--text)}
+table.tstats tr.base td{color:var(--muted);font-style:italic}
+.who-score{font-weight:800;font-size:0.95rem}
+.who-good{color:#22c55e} .who-bad{color:#ef4444}
+.who-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px}
+.who-chips button{background:transparent;border:1px solid var(--bord);color:var(--muted);border-radius:6px;padding:2px 8px;font:inherit;font-size:0.75rem;cursor:pointer}
+.who-chips button.on{border-color:var(--accent);color:var(--text)}
 .timing{color:var(--text);font-weight:700}
 .tstats-h{font-size:0.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:14px 0 6px}
 table.tstats th{position:static}
@@ -1344,32 +1358,47 @@ function renderTimingPanel(el){
   const all = summarise(rows.map(r => r.days));
   const first = rows.reduce((m, r) => !m || r.decided < m ? r.decided : m, null);
   const ranges = [['365', 'last 12 months'], ['730', 'last 2 years'], ['1095', 'last 3 years'], ['1826', 'last 5 years'], ['all', 'everything pulled']];
+  // Click a heading to sort by it; click again to reverse (Ash, 26 Sep 2026).
+  const tsort = state.tsort || { key: 'n', dir: -1 };
+  const TSORT = { name: x => x[0], n: x => x[1].n, median: x => x[1].median, mean: x => x[1].mean, mode: x => x[1].modeWeeks, spread: x => x[1].p75 - x[1].p25 };
+  const th = (key, label) => `<th><button type="button" class="srt${tsort.key === key ? ' on' : ''}" data-tsort="${key}">${label}${tsort.key === key ? (tsort.dir > 0 ? ' &#9650;' : ' &#9660;') : ''}</button></th>`;
   const table = (title, keyFn) => {
     const groups = new Map();
     rows.forEach(r => { const k = keyFn(r) || 'Not stated'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r.days); });
-    const body = [...groups].map(([k, ds]) => [k, summarise(ds)]).filter(([, st]) => st.n >= 3).sort((a, b) => b[1].n - a[1].n)
-      .map(([k, st]) => `<tr><td>${esc(k)}</td><td>${st.n}</td><td><b>${fmtWeeks(st.median)}</b></td><td>${fmtWeeks(st.mean)}</td><td>${st.modeWeeks} wks</td><td>${fmtWeeks(st.p25)} &ndash; ${fmtWeeks(st.p75)}</td></tr>`).join('');
-    return `<h4 class="tstats-h">${title}</h4><table class="leads tstats"><thead><tr><th>Type</th><th>Decisions</th><th>Median</th><th>Mean</th><th>Mode</th><th>Middle half</th></tr></thead><tbody>${body}</tbody></table>`;
+    const val = TSORT[tsort.key];
+    const list = [...groups].map(([k, ds]) => [k, summarise(ds)]).filter(([, st]) => st.n >= 3)
+      .sort((a, b) => { const x = val(a), y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * tsort.dir; });
+    const line = (k, st, cls) => `<tr${cls ? ` class="${cls}"` : ''}><td>${k}</td><td>${st.n.toLocaleString('en-GB')}</td><td><b>${fmtWeeks(st.median)}</b></td><td>${fmtWeeks(st.mean)}</td><td>${st.modeWeeks} wks</td><td>${fmtWeeks(st.p25)} &ndash; ${fmtWeeks(st.p75)}</td></tr>`;
+    const hidden = [...groups.values()].filter(ds => ds.length < 3).reduce((n, ds) => n + ds.length, 0);
+    return `<h4 class="tstats-h">${title}</h4><table class="leads tstats"><thead><tr>${th('name', 'Type')}${th('n', 'Decisions')}${th('median', 'Median (typical)')}${th('mean', 'Mean (average)')}${th('mode', 'Mode (most common)')}${th('spread', 'Middle half (normal range)')}</tr></thead>
+      <tbody>${list.map(([k, st]) => line(esc(k), st)).join('')}${all ? line(`All types together${hidden ? ` <span class="hint" style="margin:0">(incl. ${hidden} in groups too small to list)</span>` : ''}`, all, 'total') : ''}</tbody></table>`;
   };
   const acc = state.timingOpen ? forecastAccuracy() : null;
-  const whoHtml = state.timingOpen ? whoAppliesHtml(rows) : '';
+  const whoHtml = state.timingOpen ? whoAppliesHtml() : '';
   const accLine = s => s ? `<b>${s.within14}%</b> within 2 weeks of the forecast &middot; typical miss ${s.medianMiss} days &middot; ${s.n} applications` : '';
+  const oldest = timings.rows.reduce((m, r) => r.decided && (!m || r.decided < m) ? r.decided : m, null);
   el.innerHTML = `
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span><b>&#9201; Planning decision time</b></span>
-      <select id="tRange" class="f-move">${ranges.map(([v, t]) => `<option value="${v}" ${v === range ? 'selected' : ''}>${t}</option>`).join('')}</select>
-      ${all ? `<span>Median <b>${fmtWeeks(all.median)}</b> &middot; Mean <b>${fmtWeeks(all.mean)}</b> &middot; Mode <b>${all.modeWeeks} wks</b> &middot; middle half ${fmtWeeks(all.p25)}&ndash;${fmtWeeks(all.p75)} &middot; ${all.n.toLocaleString('en-GB')} decisions</span>` : '<span class="hint" style="margin:0">No decisions in this range.</span>'}
-      <button type="button" class="link-btn" id="tToggle">${state.timingOpen ? 'hide detail' : 'what this means &amp; by type'}</button>
+    <div class="tp-head">
+      <button type="button" class="tp-btn" id="tToggle">&#9201; Planning Decision Time ${state.timingOpen ? '&#9650;' : '&#9660;'}</button>
+      <select id="tRange" class="f-move" title="Everything pulled = every decision we hold, back to ${oldest ? esc(fmtDay(oldest)) : 'the start of the history'}">${ranges.map(([v, t]) => `<option value="${v}" ${v === range ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      ${all ? `<span class="tp-sum">Typical <b>${fmtWeeks(all.median)}</b> &middot; average ${fmtWeeks(all.mean)} &middot; most common ${all.modeWeeks} wks &middot; normal range ${fmtWeeks(all.p25)} to ${fmtWeeks(all.p75)} &middot; <b>${all.n.toLocaleString('en-GB')}</b> decisions</span>` : '<span class="hint" style="margin:0">No decisions in this range.</span>'}
     </div>
+    ${!state.timingOpen ? '<div class="hint" style="margin:6px 0 0">Click the button for the breakdown by type of work, and who gets approved most and fastest.</div>' : ''}
     ${state.timingOpen ? `
     <div class="tstats-body">
       <label class="hint" style="margin:8px 0 0;display:block"><input type="checkbox" id="tAdmin" ${withAdmin ? 'checked' : ''}> Include condition discharges, minor changes &amp; lawfulness certificates (quick admin decisions, left out by default)</label>
+      <div class="tp-explain">
+        <b>What period this covers:</b> ${all ? all.n.toLocaleString('en-GB') : 0} decisions from the public planning register${first ? `, decided ${fmtDay(first)} to now` : ''}. "Everything pulled" is all the history we hold, which goes back 5 years (${oldest ? esc(fmtDay(oldest)) : ''}). The register itself goes back further (applications from 2008 are on it), so older years can be added if wanted; each 5 years takes a few hours to pull.<br>
+        <b>How it's measured:</b> from the day the application was received to the day the decision was issued.<br><br>
+        <b>The averages, simply.</b> Imagine lining up every decision from quickest to slowest.<br>
+        &bull; <b>Median = the typical one.</b> The one standing in the middle of the line: half were quicker, half were slower. <i>This is the one to use.</i><br>
+        &bull; <b>Mean = the ordinary average.</b> Add all the times up and divide by how many there are. A few applications take years, and they drag this number up, so it's usually higher than the median.<br>
+        &bull; <b>Mode = the most common.</b> The number of weeks that came up most often.<br>
+        &bull; <b>Middle half = the normal range.</b> Take away the quickest quarter and the slowest quarter of the line. What's left is the normal range: "7 to 15 weeks" means most ordinary applications land in there, 1 in 4 is quicker and 1 in 4 is slower.<br>
+        <i>Example:</i> five applications take 4, 6, 8, 10 and 52 weeks. Median = 8 (the middle one). Mean = 16 (80 &divide; 5, pulled up by the 52). Middle half = about 6 to 10 weeks.<br><br>
+        Click any column heading in the tables to sort by it; click again to flip the order.<br>
+      </div>
       <div class="hint" style="margin:10px 0">
-        <b>How it's measured:</b> from the day the application was received to the day the decision was issued, using ${all ? all.n.toLocaleString('en-GB') : 0} decisions from the public planning register${first ? ` (decided ${fmtDay(first)} to now)` : ''}.<br>
-        <b>Median</b> &mdash; the middle one: half were quicker, half slower. The best &ldquo;typical&rdquo; figure, because a few very slow applications can't drag it.<br>
-        <b>Mean</b> &mdash; the ordinary average: add them all up and divide. Pulled up by the slow ones, so it's usually higher than the median.<br>
-        <b>Mode</b> &mdash; the most common time, to the nearest week.<br>
-        <b>Middle half</b> &mdash; a quarter were quicker than the first figure and a quarter slower than the second, so it's the realistic range to quote.<br>
         <b>Forecasts:</b> each pending application gets the median time <i>from validation</i> (the day the register accepted it as complete) for its kind of work over the last 2 years &mdash; or its official application type, then all applications, if fewer than 10 decisions. The weekly pull locks each forecast in on the day it's made, so it can be scored honestly when the decision lands. Planning decisions vary a lot, so treat a forecast date as the middle of a range, not a promise.<br>
         <b>Worth knowing:</b> who decides matters more than anything &mdash; Planning Committee decisions take about twice as long as officer decisions &mdash; but the register only says who decides once it's decided, so forecasts can't use it.
       </div>
@@ -1388,6 +1417,11 @@ function renderTimingPanel(el){
   el.querySelector('#tToggle').addEventListener('click', () => { state.timingOpen = !state.timingOpen; renderTimingPanel(el); });
   const adm = el.querySelector('#tAdmin');
   if (adm) adm.addEventListener('change', e => { state.timingAdmin = e.target.checked; renderTimingPanel(el); });
+  el.querySelectorAll('[data-tsort]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.tsort, cur = state.tsort || { key: 'n', dir: -1 };
+    state.tsort = cur.key === k ? { key: k, dir: -cur.dir } : { key: k, dir: k === 'name' ? 1 : k === 'n' ? -1 : 1 };
+    renderTimingPanel(el);
+  }));
   wireWhoApplies(el);
 }
 
@@ -1404,14 +1438,68 @@ const whoKey = (kind, r) => kind === 'agents'
 const neverContact = name => STANDING_EXCLUDE.find(n => (name || '').toLowerCase().includes(n));
 const whoName = (kind, r) => kind === 'agents' ? r.agent : r.applicant;
 
-function whoAppliesHtml(rows){
+// Lower bound of the 95% confidence range for an approval rate (Wilson score): 3 out of 3 is
+// "at least 44%", 270 out of 300 is "at least 86%", so small samples can't top the table by luck.
+function wilsonLow(k, n){
+  if (!n) return null;
+  const z = 1.96, p = k / n, z2 = z * z;
+  return (p + z2 / (2 * n) - z * Math.sqrt(p * (1 - p) / n + z2 / (4 * n * n))) / (1 + z2 / n);
+}
+const medianOf = xs => { if (!xs.length) return null; const s = xs.slice().sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+let whoDetails = null;
+const WHO_WORDS = ['window', 'door', 'extension', 'alteration', 'dormer', 'garage', 'change of use', 'dwelling', 'conversion', 'demolition'];
+
+// Who applies most, scored like an analyst would (Ash, 26 Sep 2026): volume, approval rate, how
+// sure we can be of it, speed against the normal time for the same kind of work, one overall
+// score, and a flag when one freak application skews someone's figures. Filter by kind of work
+// or by a word in the description (e.g. "window"), so the best person for that job rises to the top.
+function whoAppliesHtml(){
   const kind = state.whoKind || 'agents';
   const q = (state.whoSearch || '').trim().toLowerCase();
   const repeatOnly = state.whoRepeat !== false;
-  const groups = new Map();
+  const workSel = state.whoWork || 'all';
+  const kw = (state.whoKw || '').trim().toLowerCase();
+  if (kw && !whoDetails) loadDetails().then(d => { whoDetails = d; const el = document.getElementById('timingPanel'); if (el) renderTimingPanel(el); });
+  const desc = ref => whoDetails ? (((whoDetails.apps || {})[ref] || [])[0] || '').toLowerCase() : '';
   // Every application in the range counts, pending ones included.
   const since = state.timingRange === 'all' ? null : new Date(Date.now() - Number(state.timingRange || '365') * DAY_MS);
-  timings.rows.filter(r => !since || (r.decided || r.received) >= since).forEach(r => {
+  const inRange = timings.rows.filter(r => !since || (r.decided || r.received) >= since);
+  const works = [...new Set(inRange.map(r => r.work).filter(Boolean))].sort();
+  const pool = inRange.filter(r => (workSel === 'all' || r.work === workSel) && (!kw || (whoDetails && desc(r.ref).includes(kw))));
+
+  // The normal time for each kind of work, so someone doing big schemes isn't marked slow.
+  const byWork = new Map();
+  pool.forEach(r => { if (r.days != null) { if (!byWork.has(r.work)) byWork.set(r.work, []); byWork.get(r.work).push(r.days); } });
+  const normal = new Map([...byWork].map(([w, ds]) => [w, medianOf(ds)]));
+
+  const measure = apps => {
+    const approved = apps.filter(a => a.outcome === 'approved').length;
+    const refused = apps.filter(a => a.outcome === 'refused').length;
+    const withdrawn = apps.filter(a => a.outcome === 'withdrawn').length;
+    const judged = approved + refused;
+    const decided = apps.filter(a => a.days != null);
+    const ratios = decided.filter(a => normal.get(a.work)).map(a => ({ a, r: a.days / normal.get(a.work) }));
+    const ratioMed = medianOf(ratios.map(x => x.r));
+    // Pulled towards "normal speed" when there are only a few decisions to go on.
+    const speed = ratioMed == null ? null : (ratios.length * ratioMed + 5) / (ratios.length + 5);
+    const low = wilsonLow(approved, judged);
+    const speedPts = speed == null ? 50 : Math.max(0, Math.min(100, (1.5 - speed) * 100));
+    const workCount = new Map();
+    apps.forEach(a => workCount.set(a.work, (workCount.get(a.work) || 0) + 1));
+    const main = [...workCount].sort((x, y) => y[1] - x[1])[0];
+    return {
+      n: apps.length, approved, refused, withdrawn, judged,
+      rate: judged ? approved / judged : null, low,
+      median: decided.length ? medianOf(decided.map(a => a.days)) : null,
+      speed, outliers: ratios.filter(x => x.r > 3).map(x => x.a),
+      score: judged >= 5 && low != null ? Math.round(0.7 * low * 100 + 0.3 * speedPts) : null,
+      latest: apps.reduce((m, a) => !m || a.received > m ? a.received : m, null),
+      main: main ? { work: main[0], share: Math.round(100 * main[1] / apps.length) } : null
+    };
+  };
+
+  const groups = new Map();
+  pool.forEach(r => {
     const k = whoKey(kind, r);
     if (!k) return;
     if (!groups.has(k)) groups.set(k, { key: k, name: whoName(kind, r), apps: [] });
@@ -1421,29 +1509,79 @@ function whoAppliesHtml(rows){
   const total = list.length;
   if (repeatOnly) list = list.filter(g => g.apps.length >= 2);
   if (q) list = list.filter(g => g.name.toLowerCase().includes(q));
-  list.sort((a, b) => b.apps.length - a.apps.length || a.name.localeCompare(b.name));
+  list.forEach(g => { g.m = measure(g.apps); });
+  const base = measure(pool);
+
+  const sort = state.whoSort || { key: 'n', dir: -1 };
+  const SORT = { name: g => g.name.toLowerCase(), n: g => g.m.n, latest: g => g.m.latest ? +g.m.latest : 0, rate: g => g.m.rate, low: g => g.m.low,
+                 median: g => g.m.median, speed: g => g.m.speed, score: g => g.m.score };
+  const val = SORT[sort.key] || SORT.n;
+  list.sort((a, b) => {
+    const x = val(a), y = val(b);
+    if (x == null && y == null) return b.m.n - a.m.n;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sort.dir || b.m.n - a.m.n;
+  });
+
+  const pct = x => x == null ? '&ndash;' : Math.round(x * 100) + '%';
+  const speedTxt = sp => sp == null ? '&ndash;' : Math.abs(sp - 1) < 0.05 ? 'about normal'
+    : sp < 1 ? `<span class="who-good">${Math.round((1 - sp) * 100)}% quicker</span>` : `<span class="who-bad">${Math.round((sp - 1) * 100)}% slower</span>`;
+  const day = d => d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : '';
+  const th = (key, label, title) => `<th title="${title || ''}"><button type="button" class="srt${sort.key === key ? ' on' : ''}" data-wsort="${key}">${label}${sort.key === key ? (sort.dir > 0 ? ' &#9650;' : ' &#9660;') : ''}</button></th>`;
   const limit = state.whoLimit || 40;
+  const cells = (m, nameCell) => `<td>${nameCell}</td>
+      <td><b>${m.n}</b><div class="hint" style="margin:0">latest ${day(m.latest)}</div></td>
+      <td>${m.approved} &#10003; &middot; ${m.refused} &#10007;${m.withdrawn ? ` &middot; ${m.withdrawn} withdrawn` : ''}</td>
+      <td><b>${pct(m.rate)}</b></td>
+      <td>${m.low == null ? '&ndash;' : `at least ${pct(m.low)}`}</td>
+      <td>${m.median != null ? fmtWeeks(m.median) : '&ndash;'}</td>
+      <td>${speedTxt(m.speed)}</td>
+      <td>${m.score == null ? '<span class="hint" style="margin:0" title="Fewer than 5 decided">too few</span>' : `<span class="who-score">${m.score}</span>`}${m.outliers.length ? ` <span class="tag tag-review" title="${esc(m.outliers.map(a => `${a.ref}: ${fmtWeeks(a.days)}`).join('; '))}. Typical time uses the middle value, so one freak case doesn't drag it.">&#9888; ${m.outliers.length} unusually slow</span>` : ''}</td>`;
   const bodyRows = list.slice(0, limit).map(g => {
-    const decided = g.apps.filter(a => a.days != null);
-    const approved = g.apps.filter(a => a.outcome === 'approved').length;
-    const latest = g.apps.reduce((m, a) => !m || a.received > m ? a.received : m, null);
-    const st = decided.length ? summarise(decided.map(a => a.days)) : null;
     const open = state.whoOpen === g.key;
-    return `<tr class="who-row" data-key="${esc(g.key)}"><td><button type="button" class="link-btn who-name" data-key="${esc(g.key)}">${open ? '&#9662;' : '&#9656;'} ${esc(g.name)}</button>${neverContact(g.name) ? ' <span class="tag tag-excl">never contact</span>' : ''}</td><td><b>${g.apps.length}</b></td><td>${latest ? esc(fmtDay(latest)) : ''}</td><td>${decided.length ? Math.round(100 * approved / decided.length) + '%' : '&ndash;'}</td><td>${st ? fmtWeeks(st.median) : '&ndash;'}</td></tr>`
-      + (open ? `<tr><td colspan="5"><div id="whoDetail" class="f-edit-panel"><span class="hint" style="margin:0">Loading their applications&hellip;</span></div></td></tr>` : '');
+    return `<tr class="who-row" data-key="${esc(g.key)}">${cells(g.m, `<button type="button" class="link-btn who-name" data-key="${esc(g.key)}">${open ? '&#9662;' : '&#9656;'} ${esc(g.name)}</button>${neverContact(g.name) ? ' <span class="tag tag-excl">never contact</span>' : ''}${g.m.main ? `<div class="hint" style="margin:0">mostly ${esc(g.m.main.work)} (${g.m.main.share}%)</div>` : ''}`)}</tr>`
+      + (open ? `<tr><td colspan="8"><div id="whoDetail" class="f-edit-panel"><span class="hint" style="margin:0">Loading their applications&hellip;</span></div></td></tr>` : '');
   }).join('');
   return `
-    <h4 class="tstats-h">Who applies most</h4>
+    <h4 class="tstats-h">Who applies most, and who gets approved</h4>
     <div class="row-actions" style="margin-bottom:8px">
       <select id="whoKind" class="f-move">
         <option value="agents" ${kind === 'agents' ? 'selected' : ''}>Agents (architects, designers, planning consultants)</option>
         <option value="applicants" ${kind === 'applicants' ? 'selected' : ''}>Applicants (developers &amp; repeat applicants)</option>
       </select>
-      <input type="text" id="whoSearch" class="f-move" placeholder="Search a name&hellip;" value="${esc(state.whoSearch || '')}" style="min-width:180px">
+      <select id="whoWork" class="f-move" title="Only count this kind of work">
+        <option value="all">All kinds of work</option>
+        ${works.map(w => `<option value="${esc(w)}" ${workSel === w ? 'selected' : ''}>${esc(w)}</option>`).join('')}
+      </select>
+      <input type="text" id="whoSearch" class="f-move" placeholder="Search a name&hellip;" value="${esc(state.whoSearch || '')}" style="min-width:160px">
       <label class="hint" style="margin:0"><input type="checkbox" id="whoRepeat" ${repeatOnly ? 'checked' : ''}> only those with 2 or more</label>
     </div>
-    <p class="hint" style="margin:0 0 6px">${list.length.toLocaleString('en-GB')} shown of ${total.toLocaleString('en-GB')} ${kind === 'agents' ? 'agents' : 'named applicants'} in this date range. Click a name to see everything they've been involved in.${kind === 'applicants' ? ' Private individuals are only named once they have applied more than once.' : ''}</p>
-    <table class="leads tstats"><thead><tr><th>Name</th><th>Applications</th><th>Latest</th><th>Approved</th><th>Typical time</th></tr></thead><tbody>${bodyRows}</tbody></table>
+    <div class="who-chips"><span class="hint" style="margin:0">Only applications mentioning:</span>
+      ${WHO_WORDS.map(w => `<button type="button" data-wkw="${esc(w)}" class="${kw === w ? 'on' : ''}">${esc(w)}</button>`).join('')}
+      <input type="text" id="whoKw" class="f-move" placeholder="or type a word&hellip;" value="${esc(state.whoKw || '')}" style="min-width:130px">
+      ${kw ? '<button type="button" data-wkw="">clear</button>' : ''}
+      ${kw && !whoDetails ? '<span class="hint" style="margin:0">loading descriptions&hellip;</span>' : ''}
+    </div>
+    <details class="hint" style="margin:0 0 8px"><summary style="cursor:pointer">How to read this table</summary>
+      <div class="tp-explain">
+        <b>Approved</b>: approved &divide; (approved + refused). Withdrawn ones are shown but don't count against them.<br>
+        <b>Likely success</b>: how sure we can be of that rate. Someone with 3 out of 3 approved is 100%, but it could be luck; we can only say they'd get <i>at least 44%</i>. Someone with 270 out of 300 is <i>at least 86%</i>. So this column stops a handful of lucky applications beating a proven track record.<br>
+        <b>Typical time</b>: the middle time to a decision (median), in weeks.<br>
+        <b>Speed</b>: their times compared with the normal time for the <i>same kind of work</i>, so an architect doing big schemes isn't marked slow next to someone doing porches. With only a few decisions it's pulled towards "normal".<br>
+        <b>Score (0 to 100)</b>: 70% likely success + 30% speed. Needs at least 5 decided applications. It's the quickest way to find who's most likely to get a job through, and quickly.<br>
+        <b>&#9888; unusually slow</b>: applications that took over 3 times the normal time. Hover to see which. The typical time uses the middle value, so one freak case doesn't drag it down.<br>
+        Filter by kind of work or a word (e.g. "change of use", "window") and every figure is worked out for just those applications, so you see who's best at that particular job.
+      </div>
+    </details>
+    <p class="hint" style="margin:0 0 6px">${list.length.toLocaleString('en-GB')} shown of ${total.toLocaleString('en-GB')} ${kind === 'agents' ? 'agents' : 'named applicants'}${workSel !== 'all' ? ` for ${esc(workSel)}` : ''}${kw ? ` mentioning "${esc(kw)}"` : ''} in this date range. Click a heading to sort, again to flip. Click a name for everything they've been involved in.${kind === 'applicants' ? ' Private individuals are only named once they have applied more than once.' : ''}</p>
+    <table class="leads tstats"><thead><tr>
+      ${th('name', 'Name')}${th('n', 'Applications', 'Click Latest to sort by date instead')}
+      <th>Decisions</th>${th('rate', 'Approved')}${th('low', 'Likely success', 'The approval rate we can be 95% sure of, given how many they have done')}
+      ${th('median', 'Typical time')}${th('speed', 'Speed vs normal')}${th('score', 'Score')}
+    </tr>
+    <tr><th></th><th><button type="button" class="srt${sort.key === 'latest' ? ' on' : ''}" data-wsort="latest" style="font-size:0.72rem">sort by latest${sort.key === 'latest' ? (sort.dir > 0 ? ' &#9650;' : ' &#9660;') : ''}</button></th><th colspan="6"></th></tr></thead>
+    <tbody>${pool.length ? `<tr class="base">${cells(base, 'Everyone together (for comparison)')}</tr>` : ''}${bodyRows}</tbody></table>
     ${list.length > limit ? `<button type="button" class="link-btn" id="whoMore">show ${Math.min(40, list.length - limit)} more</button>` : ''}`;
 }
 
@@ -1514,6 +1652,18 @@ function wireWhoApplies(el){
   search.addEventListener('change', e => { state.whoSearch = e.target.value; rerender(); });
   const more = el.querySelector('#whoMore');
   if (more) more.addEventListener('click', () => { state.whoLimit = (state.whoLimit || 40) + 40; rerender(); });
+  const work = el.querySelector('#whoWork');
+  if (work) work.addEventListener('change', e => { state.whoWork = e.target.value; state.whoOpen = null; rerender(); });
+  const kwIn = el.querySelector('#whoKw');
+  if (kwIn) kwIn.addEventListener('change', e => { state.whoKw = e.target.value; state.whoOpen = null; rerender(); });
+  el.querySelectorAll('[data-wkw]').forEach(b => b.addEventListener('click', () => { state.whoKw = state.whoKw === b.dataset.wkw ? '' : b.dataset.wkw; state.whoOpen = null; rerender(); }));
+  // Click a heading to sort; click again to flip. Sensible first direction for each.
+  const FIRST = { name: 1, n: -1, latest: -1, rate: -1, low: -1, median: 1, speed: 1, score: -1 };
+  el.querySelectorAll('[data-wsort]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.wsort, cur = state.whoSort || { key: 'n', dir: -1 };
+    state.whoSort = cur.key === k ? { key: k, dir: -cur.dir } : { key: k, dir: FIRST[k] || -1 };
+    rerender();
+  }));
   el.querySelectorAll('.who-name').forEach(b => b.addEventListener('click', () => {
     state.whoOpen = state.whoOpen === b.dataset.key ? null : b.dataset.key;
     rerender();
