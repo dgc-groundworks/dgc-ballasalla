@@ -517,9 +517,8 @@ async function loadLetterImages(){
 // before folders existed have no `folder`, so fall back to what they are.
 const FOLDERS = { approved: 'Approved', pending: 'Pending', business: 'Businesses', personal: 'Personalised' };
 // Anything dealt with (sent to a folder, archived, parked in Market research) stays on the planning
-// list for a few minutes with its Undo button, then moves off to its tab (Ash, 26 Sep 2026).
-const DEALT_GRACE_MS = 3 * 60 * 1000;
-const REG_RECENT = new Map();
+// list with its Undo button until the page is next refreshed, then lives only in its tab (Ash, 27 Sep 2026).
+const REG_RECENT = new Set();
 function leadFolder(l){ return l.folder || (l.source === 'business' ? 'business' : l.planningStatus === 'pending' ? 'pending' : 'approved'); }
 function todayISO(){ return new Date().toLocaleDateString('en-CA'); }
 function prettyDate(iso){ return iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''; }
@@ -1854,12 +1853,8 @@ function renderRegisterPullLoaded(box, data){
 
   const byRefApp = new Map(apps.map(a => [a.ref, a]));
   const isDealt = a => !!(log[a.ref] || dismissed[a.ref] || leads.some(l => l.ref === a.ref));
-  const isRecent = ref => REG_RECENT.has(ref) && Date.now() - REG_RECENT.get(ref) < DEALT_GRACE_MS;
-  function markDealt(ref){
-    REG_RECENT.set(ref, Date.now());
-    setTimeout(() => { if (document.getElementById('registerList') && !isRecent(ref)) renderList(); }, DEALT_GRACE_MS + 500);
-  }
-  const movesAt = ref => new Date(REG_RECENT.get(ref) + DEALT_GRACE_MS).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const isRecent = ref => REG_RECENT.has(ref);
+  const markDealt = ref => REG_RECENT.add(ref);
   let relWait = false;
   function applyFilters(){
     const status = document.getElementById('regStatus').value;
@@ -2000,7 +1995,7 @@ function renderRegisterPullLoaded(box, data){
     }
     if (isRecent(a.ref)) {
       const where = arch ? (arch.research ? 'Market research' : 'Archive') : inLead ? FOLDERS[leadFolder(inLead)] : sent ? 'Archive' : '';
-      if (where) actions += `<div class="hint" style="margin:6px 0 0;text-align:right;color:var(--accent)">Moves to the ${esc(where)} tab at ${movesAt(a.ref)}. Undo until then.</div>`;
+      if (where) actions += `<div class="hint" style="margin:6px 0 0;text-align:right;color:var(--accent)">Moves to the ${esc(where)} tab when you next refresh. Undo until then.</div>`;
     }
     return `
       <div class="lead-row">
@@ -2158,13 +2153,13 @@ function renderRegisterPullLoaded(box, data){
       d[a.ref] = { date: todayISO(), name: person, source: 'planning', description: a.description || '', address: a.address || '', appliedDate: a.received || '', decidedDate: a.isDecided ? (a.decisionDate || '') : '', keyVal: a.keyVal || '', siteExtent: a.siteExtent || null };
       saveDismissed(d);
       markDealt(a.ref);
-      say(`${person} archived. It moves to the Archive tab in 3 minutes; undo until then.`);
+      say(`${person} archived. It moves to the Archive tab when you next refresh; undo until then.`);
     } else if (btn.classList.contains('reg-research-btn')) {
       const d = getDismissed();
       d[a.ref] = { date: todayISO(), name: person, source: 'planning', research: true, note: '', description: a.description || '', address: a.address || '', appliedDate: a.received || '', decidedDate: a.isDecided ? (a.decisionDate || '') : '', keyVal: a.keyVal || '', siteExtent: a.siteExtent || null };
       saveDismissed(d);
       markDealt(a.ref);
-      say(`${person} parked for Market research. It moves to that tab in 3 minutes; undo until then.`);
+      say(`${person} parked for Market research. It moves to that tab when you next refresh; undo until then.`);
     } else if (btn.classList.contains('reg-unarchive-btn')) {
       bringBackFromArchive(a.ref);
       REG_RECENT.delete(a.ref);
