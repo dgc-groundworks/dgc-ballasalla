@@ -1046,7 +1046,8 @@ function loadTimings(){
     if (t) t.rows.forEach(r => {
       const o = { ref: r[0], work: t.works[r[1]], type: t.types[r[2]], level: t.levels[r[3]], outcome: t.outcomes[r[4]],
                   received: isoToDate(r[5]), validated: isoToDate(r[6]), decided: isoToDate(r[7]), complexity: r[8] || null,
-                  agent: (t.agents || [])[r[9]] || '', applicant: (t.applicants || [])[r[10]] || '', applicantKey: r[11] || '' };
+                  agent: (t.agents || [])[r[9]] || '', applicant: (t.applicants || [])[r[10]] || '', applicantKey: r[11] || '',
+                  original: r[12] === 1 };   // an old original looked up for a paperwork row, not part of the 5-year history
       o.days = daysBetween(o.received, o.decided);
       if (o.days != null && o.days < 0) o.days = null;
       o.vdays = daysBetween(o.validated, o.decided);
@@ -1353,7 +1354,7 @@ function historyStart(){
   if (!timings) return null;
   if (timings.start !== undefined) return timings.start;
   const perMonth = new Map();
-  timings.rows.forEach(r => { if (r.decided) { const k = r.decided.getFullYear() * 12 + r.decided.getMonth(); perMonth.set(k, (perMonth.get(k) || 0) + 1); } });
+  timings.rows.forEach(r => { if (r.decided && !r.original) { const k = r.decided.getFullYear() * 12 + r.decided.getMonth(); perMonth.set(k, (perMonth.get(k) || 0) + 1); } });
   const k = [...perMonth].filter(([, n]) => n >= 20).map(([m]) => m).sort((a, b) => a - b)[0];
   return timings.start = k == null ? null : new Date(Math.floor(k / 12), k % 12, 1);
 }
@@ -1366,7 +1367,7 @@ function renderTimingPanel(el){
   const range = state.timingRange || '365';
   const withAdmin = !!state.timingAdmin;
   const since = range === 'all' ? historyStart() : new Date(Date.now() - Number(range) * DAY_MS);
-  const rows = timings.rows.filter(r => r.days != null && (!since || r.decided >= since) && (withAdmin || !ADMIN_WORK.includes(r.work)));
+  const rows = timings.rows.filter(r => r.days != null && !r.original && (!since || r.decided >= since) && (withAdmin || !ADMIN_WORK.includes(r.work)));
   const all = summarise(rows.map(r => r.days));
   const first = rows.reduce((m, r) => !m || r.decided < m ? r.decided : m, null);
   const ranges = [['365', 'last 12 months'], ['730', 'last 2 years'], ['1095', 'last 3 years'], ['1826', 'last 5 years'], ['all', 'everything pulled']];
@@ -1475,7 +1476,7 @@ function whoAppliesHtml(){
   const desc = ref => whoDetails ? (((whoDetails.apps || {})[ref] || [])[0] || '').toLowerCase() : '';
   // Every application in the range counts, pending ones included.
   const since = state.timingRange === 'all' ? historyStart() : new Date(Date.now() - Number(state.timingRange || '365') * DAY_MS);
-  const inRange = timings.rows.filter(r => !since || (r.decided || r.received) >= since);
+  const inRange = timings.rows.filter(r => !r.original && (!since || (r.decided || r.received) >= since));
   const works = [...new Set(inRange.map(r => r.work).filter(Boolean))].sort();
   const pool = inRange.filter(r => (workSel === 'all' || r.work === workSel) && (!kw || (whoDetails && desc(r.ref).includes(kw))));
 
