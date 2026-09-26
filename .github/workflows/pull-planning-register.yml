@@ -21,6 +21,10 @@ on:
         type: boolean
         required: false
         default: false
+      max_price:
+        description: 'Most applications to price this run (weekly default 40; raise for a catch-up)'
+        required: false
+        default: '40'
 
 permissions:
   contents: write
@@ -98,7 +102,7 @@ jobs:
         if: ${{ env.SUPABASE_SERVICE_KEY != '' }}
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python3 silverdale-canvassing/scripts/estimate_values.py --max 40
+        run: python3 silverdale-canvassing/scripts/estimate_values.py --max "${{ github.event.inputs.max_price || '40' }}"
 
       - name: Save to the private store
         if: ${{ env.SUPABASE_SERVICE_KEY != '' }}
