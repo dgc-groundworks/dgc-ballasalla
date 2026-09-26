@@ -11,7 +11,7 @@
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
 <script src="market.js?v=8"></script>
-<script src="contacts.js?v=2"></script>
+<script src="contacts.js?v=3"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -615,7 +615,7 @@ function parseBusinessCSV(text){
   const header = parseCsvLine(lines[0]).map(h => h.toLowerCase());
   const col = name => header.indexOf(name);
   const iName = col('name'), iPractice = col('practice name'), iAddr1 = col('address line 1'),
-        iAddr2 = col('address line 2'), iTown = col('town'), iPostcode = col('postcode'), iReg = col('iom reg number');
+        iAddr2 = col('address line 2'), iTown = col('town'), iPostcode = col('postcode'), iReg = col('iom reg number'), iTrade = col('trade');
   const out = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCsvLine(lines[i]);
@@ -637,7 +637,8 @@ function parseBusinessCSV(text){
       salutation: `Dear ${firstName},`,
       edited: true,    // protects our clean CSV-built address/salutation from classify()'s auto-rebuild
       include: false,  // opt-in — Ash picks which businesses to actually approach in Review
-      hasAddress: !!(addr1 && addr1.toLowerCase() !== 'redacted' && postcode)
+      hasAddress: !!(addr1 && addr1.toLowerCase() !== 'redacted' && postcode),
+      trade: (iTrade >= 0 && cols[iTrade] ? cols[iTrade].trim() : '') || (iReg >= 0 ? 'Architect' : '')   // an IoM reg number means the architects register
     });
   }
   return out;
@@ -1644,6 +1645,7 @@ function renderRegisterPullLoaded(box, data){
     lead.include = false;
     lead.addedAt = todayISO();
     lead.description = `Agent on ${a.ref} — ${a.description || ''}`;
+    lead.trade = (typeof guessTrade === 'function' && guessTrade(`${person} ${a.agentCompanyName || ''}`)) || 'Planning agent';
     leads.push(lead);
     return true;
   }
@@ -1699,7 +1701,7 @@ function renderRegisterPullLoaded(box, data){
     return `
       <div class="lead-row">
         <div class="lr-main">
-          <div class="reg-name">${esc(person)}</div>
+          <div class="reg-name">${nameBtn(a.ref, person)}</div>
           <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}${a.parish ? ` &middot; ${esc(a.parish)}` : ''}</div>
           <div class="reg-work"><span class="lbl">Applying for</span>${whatThisIsHtml(a)}</div>
           <div class="lr-meta" style="margin:4px 0 2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''} &middot; ${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
@@ -1824,16 +1826,119 @@ const COPY_NOTE = {
 function renderFolder(main, folder){
   const label = FOLDERS[folder];
   const inFolder = leads.map((l, i) => ({ l, i })).filter(x => leadFolder(x.l) === folder);
-  const active = inFolder.filter(x => !x.l.alreadyProcessed);
-  const sentCount = inFolder.length - active.length;
-  if (!active.length) {
-    main.innerHTML = `<p class="empty-state">Nothing waiting in ${label}.<br><br>${folder === 'business'
-      ? 'Add businesses on Import — Businesses, or press "Send as Business" / "+ Add agent as business" on the planning register list (Import — Planning).'
-      : `Press "Send as ${label}" on the planning register list (Import — Planning) to put applications here.`}</p>`
-      + (sentCount ? `<p class="hint" style="text-align:center">${sentCount} from this folder already sent — see Archive.</p>` : '');
+  const activeAll = inFolder.filter(x => !x.l.alreadyProcessed);
+  const sentCount = inFolder.length - activeAll.length;
+
+  // Where everyone in this folder stands (Ash, 26 Sep 2026): waiting, on the print list,
+  // printed and sent, visited (businesses), not chasing. Businesses also filter by trade.
+  const isBiz = folder === 'business';
+  const tradeSel = isBiz ? (state.bizTrade || 'all') : 'all';
+  const tradeOk = l => tradeSel === 'all' || tradeOf(l) === tradeSel;
+  const logAll = getLog(), dismissedAll = getDismissed();
+  const asLead = (ref, e) => leads.find(l => l.ref === ref) || { ref, description: e.description || '', applicant: e.name || '', recipientLines: e.recipientLines || [] };
+  const sentItems = Object.entries(logAll).filter(([ref, e]) => contactCategory(ref, e) === folder)
+    .map(([ref, e]) => ({ ref, e, lead: asLead(ref, e) })).filter(x => tradeOk(x.lead))
+    .sort((a, b) => (b.e.date || '').localeCompare(a.e.date || ''));
+  const archivedItems = Object.entries(dismissedAll)
+    .filter(([ref, e]) => e.lead ? leadFolder(e.lead) === folder : (isBiz && ref.startsWith('ARCH-')))
+    .map(([ref, e]) => ({ ref, e })).filter(x => tradeOk(x.e.lead || { ref })).sort((a, b) => (b.e.date || '').localeCompare(a.e.date || ''));
+  const waitingAll = activeAll.filter(x => !x.l.include && tradeOk(x.l));
+  const printAll = activeAll.filter(x => x.l.include && tradeOk(x.l));
+  const visitedItems = !isBiz ? [] : [
+    ...leads.filter(l => leadFolder(l) === 'business' && l.visitedAt && tradeOk(l)).map(l => ({ ref: l.ref, name: l.applicant, at: l.visitedAt })),
+    ...Object.entries(logAll).filter(([ref, e]) => e.visitedAt && !leads.some(l => l.ref === ref) && contactCategory(ref, e) === 'business')
+      .map(([ref, e]) => ({ ref, name: e.name, at: e.visitedAt }))];
+  const view = (state.folderView || {})[folder] || 'waiting';
+  const viewBar = `<div class="fview-bar">${[['waiting', `Waiting to send (${waitingAll.length})`], ['print', `On the print list (${printAll.length})`],
+    ['sent', `Printed &amp; sent (${sentItems.length})`], ...(isBiz ? [['visited', `Visited (${visitedItems.length})`]] : []), ['archived', `Not chasing (${archivedItems.length})`]]
+    .map(([k, t]) => `<button type="button" data-fview="${k}" class="${view === k ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+  const tradeBar = !isBiz ? '' : (() => {
+    const everyone = [...inFolder.map(x => x.l), ...Object.entries(logAll).filter(([r, e]) => contactCategory(r, e) === 'business' && !leads.some(l => l.ref === r)).map(([r, e]) => asLead(r, e))];
+    const counts = {};
+    everyone.forEach(l => { const t = tradeOf(l) || 'Other'; counts[t] = (counts[t] || 0) + 1; });
+    return `<div class="trade-bar"><span class="hint" style="margin:0">Trade:</span>${[['all', `All (${everyone.length})`], ...Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([t, n]) => [t, `${t} (${n})`])]
+      .map(([k, t]) => `<button type="button" data-trade="${esc(k)}" class="${tradeSel === k ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>
+      <datalist id="bizTrades">${TRADES.map(t => `<option value="${esc(t)}">`).join('')}</datalist>`;
+  })();
+  const addBiz = !isBiz || view !== 'waiting' ? '' : `<details class="biz-add"><summary>+ Add a business, or find a trade on Google</summary>
+    <div class="grid">
+      <label>Trade <input id="bizTrade" list="bizTrades" placeholder="e.g. Builder, Advocate"></label>
+      <label>Person's name <input id="bizName" placeholder="e.g. John Smith"></label>
+      <label>Business name <input id="bizCompany" placeholder="e.g. Smith Builders Ltd"></label>
+    </div>
+    <label style="display:block;margin-top:8px">Address, one line each, postcode last<textarea id="bizAddr" rows="3"></textarea></label>
+    <div class="row-actions" style="margin-top:8px"><button class="btn" id="bizAddBtn">Add to Businesses</button>
+      <button class="btn-secondary" id="bizFindBtn">Find this trade on Google</button><span id="bizAddMsg" class="hint" style="margin:0"></span></div>
+    <p class="hint">For a long list, paste a spreadsheet on Import &mdash; Businesses (a Trade column is picked up). Agents from planning applications come in with "+ Add agent as business". The Businesses letter is written for architects and engineers; other trades may need their own letter.</p>
+  </details>`;
+  const visitBtn = (ref, at) => `<button type="button" class="btn-secondary f-visit" data-ref="${esc(ref)}">${at ? `&#10003; Visited ${esc(prettyDate(at))} (undo)` : 'Mark visited'}</button>`;
+  const compactRow = (ref, name, sub, side) => `<div class="lead-row"><div class="lr-main">${nameBtn(ref, name)}<div class="lr-meta">${sub}</div></div>
+    <div class="lr-side" style="flex-direction:column;align-items:flex-end;gap:6px">${side}</div></div>`;
+  function wireChrome(){
+    main.querySelectorAll('[data-fview]').forEach(b => b.addEventListener('click', () => { state.folderView = { ...(state.folderView || {}), [folder]: b.dataset.fview }; render(); }));
+    main.querySelectorAll('[data-trade]').forEach(b => b.addEventListener('click', () => { state.bizTrade = b.dataset.trade; render(); }));
+    main.querySelectorAll('.f-visit').forEach(b => b.addEventListener('click', () => {
+      const l = leads.find(x => x.ref === b.dataset.ref);
+      if (l) { l.visitedAt = l.visitedAt ? '' : todayISO(); saveLeadsToStorage(); }
+      else { const lg = getLog(); if (lg[b.dataset.ref]) { lg[b.dataset.ref].visitedAt = lg[b.dataset.ref].visitedAt ? '' : todayISO(); saveLog(lg); } }
+      render();
+    }));
+    main.querySelectorAll('.f-bringback').forEach(b => b.addEventListener('click', () => { bringBackFromArchive(b.dataset.ref); render(); }));
+    const find = document.getElementById('bizFindBtn');
+    if (find) find.addEventListener('click', () => {
+      const trade = document.getElementById('bizTrade').value.trim() || 'builders';
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(trade + ' Isle of Man')}`, '_blank', 'noopener');
+      window.open(`https://www.google.com/maps/search/${encodeURIComponent(trade + ' Isle of Man')}`, '_blank', 'noopener');
+    });
+    const add = document.getElementById('bizAddBtn');
+    if (add) add.addEventListener('click', () => {
+      const trade = document.getElementById('bizTrade').value.trim();
+      const person = document.getElementById('bizName').value.trim();
+      const company = document.getElementById('bizCompany').value.trim();
+      const addr = document.getElementById('bizAddr').value.split('\n').map(x => x.trim()).filter(Boolean);
+      const msg = document.getElementById('bizAddMsg');
+      const name = person || company;
+      if (!name || !addr.length) { msg.textContent = 'A name and an address are needed.'; return; }
+      const ref = 'ARCH-' + slugify(name + '-' + company);
+      if (leads.some(l => l.ref === ref) || getLog()[ref] || getDismissed()[ref]) { msg.textContent = 'Already in Businesses, sent or not chasing.'; return; }
+      const lead = classify({ ref, applicant: name, site: [company, addr[addr.length - 1]].filter(Boolean).join(', '),
+        recipientLines: [name, ...(person && company ? [company] : []), ...addr], salutation: person ? `Dear ${person.split(' ')[0]},` : 'Dear Sir/Madam,',
+        edited: true, include: false });
+      Object.assign(lead, { type: 'Company', source: 'business', folder: 'business', addedAt: todayISO(), trade: trade || guessTrade(company) || 'Other' });
+      leads.push(lead);
+      saveLeadsToStorage();
+      const p = priorContacts(lead).filter(c => c.why !== 'this application');
+      state.folderMsg = `${name} added${p.length ? `. Careful: ${p[0].name} was already written to (${p[0].why}, ${prettyDate(p[0].date)}).` : '.'}`;
+      render();
+    });
+  }
+
+  if (['sent', 'visited', 'archived'].includes(view)) {
+    const rows = view === 'sent'
+      ? sentItems.map(x => compactRow(x.ref, x.e.name || (x.e.recipientLines || [])[0] || x.ref,
+          `${isBiz ? esc(tradeOf(x.lead)) : esc(x.ref)}${x.e.description ? ' &middot; ' + esc(x.e.description.slice(0, 140)) : ''}`,
+          `<span class="status-tag sent">Printed &amp; sent ${esc(prettyDate(x.e.date))}</span>${x.e.pdfFile ? `<div class="hint" style="margin:0;text-align:right">PDF: ${esc(String(x.e.pdfFile).split('›').pop().trim())}</div>` : ''}${isBiz ? visitBtn(x.ref, x.lead.visitedAt || x.e.visitedAt) : ''}`))
+      : view === 'visited'
+      ? visitedItems.map(v => compactRow(v.ref, v.name, statusTagHtml(v.ref), visitBtn(v.ref, v.at)))
+      : archivedItems.map(x => compactRow(x.ref, x.e.name || x.ref, x.e.lead && x.e.lead.description ? esc(x.e.lead.description.slice(0, 140)) : esc(x.ref),
+          `<span class="status-tag archived">Not chasing since ${esc(prettyDate(x.e.date))}</span><button type="button" class="btn-secondary f-bringback" data-ref="${esc(x.ref)}">&#8617; Bring back</button>`));
+    const note = view === 'sent' ? 'Printed and sent. The date is the day the PDF was made and the letters were marked as sent. Click a name for everything about them, including the letter.'
+      : view === 'visited' ? 'Businesses you have been to see in person.' : 'Looked at and not chasing. Bring any back to send another day.';
+    main.innerHTML = `${viewBar}${tradeBar}<p class="hint">${note}</p>${rows.length ? `<div class="lead-list">${rows.join('')}</div>` : '<p class="empty-state">None here.</p>'}`;
+    wireChrome();
     return;
   }
-  const onPrint = active.filter(x => x.l.include).length;
+  const active = view === 'print' ? printAll : waitingAll;
+  if (!active.length) {
+    main.innerHTML = `${viewBar}${tradeBar}${addBiz}<p class="empty-state">${view === 'print' ? `Nothing from ${label} on the print list.` : `Nothing waiting in ${label}.`}<br><br>${view === 'print' ? '' : isBiz
+      ? 'Add businesses above, on Import — Businesses, or with "+ Add agent as business" on the planning register list (Import — Planning).'
+      : `Press "Send as ${label}" on the planning register list (Import — Planning) to put applications here.`}</p>`
+      + (state.folderMsg ? `<p class="hint" style="text-align:center">${esc(state.folderMsg)}</p>` : '');
+    state.folderMsg = '';
+    wireChrome();
+    return;
+  }
+  const onPrint = printAll.length;
   const personal = folder === 'personal';
   // Personalised letters only go to print once written and saved.
   const sendable = active.filter(x => !x.l.include && !x.l.excludedReason && !x.l.needsReview && (!personal || x.l.personalDone));
@@ -1863,7 +1968,7 @@ function renderFolder(main, folder){
     return `
       <div class="lead-row ${flag ? 'flagged' : ''}" data-i="${i}">
         <div class="lr-main">
-          <div class="lr-applicant">${esc(l.applicant)}</div>
+          <div class="lr-applicant">${nameBtn(l.ref, l.applicant)}${isBiz ? `<span class="trade-tag">${esc(tradeOf(l))}</span>` : ''}</div>
           <div class="lr-meta">${esc(l.ref)}${l.appliedDate ? ` &middot; <b style="color:var(--text)">Applied ${esc(l.appliedDate)}</b>` : ''}${l.decidedDate ? ` &middot; Decided ${esc(l.decidedDate)}` : ''}${l.description ? ' &middot; ' + esc(l.description) : ''}</div>
           ${l.appliedDate ? `<div class="lr-meta">${timingHtml(l.ref, l.appliedDate, l.decidedDate)}</div>` : ''}
           ${typeof contactFlagHtml === 'function' ? contactFlagHtml(l) : ''}
@@ -1899,6 +2004,7 @@ function renderFolder(main, folder){
           <div class="f-actions">
             ${personal ? `<button class="btn f-letter-btn">&#9998; ${writing ? 'Close the letter' : l.personalDone ? 'Edit the letter' : 'Write the letter'}</button>` : ''}
             <button class="btn-secondary f-edit-btn">&#9998; Edit name / address</button>
+            ${isBiz ? `<label class="hint" style="margin:0">Trade <input class="f-trade" list="bizTrades" value="${esc(tradeOf(l))}" style="width:140px"></label>${visitBtn(l.ref, l.visitedAt)}` : ''}
             <label class="hint" style="margin:0">Move to <select class="f-move">${moveOpts}</select></label>
             <button class="btn-secondary f-archive-btn" title="Not chasing — goes to the Archive tab, where you can bring it back">Archive</button>
             <button class="btn-danger f-remove-btn">Delete</button>
@@ -1914,7 +2020,7 @@ function renderFolder(main, folder){
       <button class="btn-secondary" id="fGoPrintBtn">Go to Print &rarr;</button>
       <span id="fMsg" class="hint" style="margin:0">${state.folderMsg ? esc(state.folderMsg) : ''}</span>
     </div>
-    ${typeof contactedBarHtml === 'function' ? contactedBarHtml(active.map(x => x.l)) : ''}
+    ${viewBar}${tradeBar}${addBiz}
     <div class="stat-bar">
       <span><b>${active.length}</b> waiting in ${label}</span>
       <span style="color:var(--accent)"><b>${onPrint}</b> on the print list</span>
@@ -1936,7 +2042,8 @@ function renderFolder(main, folder){
     done();
   });
   const unsendAll = document.getElementById('fUnsendAllBtn');
-  if (unsendAll) unsendAll.addEventListener('click', () => { active.forEach(x => { x.l.include = false; }); done(); });
+  if (unsendAll) unsendAll.addEventListener('click', () => { printAll.forEach(x => { x.l.include = false; }); done(); });
+  wireChrome();
   document.getElementById('fGoPrintBtn').addEventListener('click', () => { state.tab = 'letters'; render(); });
 
   main.querySelectorAll('.lead-row[data-i]').forEach(rowEl => {
@@ -1961,6 +2068,8 @@ function renderFolder(main, folder){
     const cancel = rowEl.querySelector('.f-edit-cancel');
     if (cancel) cancel.addEventListener('click', () => { state.editRef = null; render(); });
     rowEl.querySelector('.f-move').addEventListener('change', e => { l.folder = e.target.value; done(); });
+    const tradeIn = rowEl.querySelector('.f-trade');
+    if (tradeIn) tradeIn.addEventListener('change', e => { l.trade = e.target.value.trim(); done(); });
     const letterBtn = rowEl.querySelector('.f-letter-btn');
     if (letterBtn) letterBtn.addEventListener('click', () => { state.letterRef = state.letterRef === l.ref ? null : l.ref; render(); });
     const text = rowEl.querySelector('.pl-text');
