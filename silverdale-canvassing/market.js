@@ -43,6 +43,13 @@
   .est-what{font-size:0.85rem;color:var(--text);line-height:1.4}
   .est-note{font-size:0.78rem;color:var(--muted);margin-top:3px}
   .est-none{font-size:0.8rem;color:var(--muted);margin:6px 0 4px}
+  .est-facts{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
+  .est-fact{background:var(--surf2);border:1px solid var(--bord);border-radius:6px;padding:2px 8px;font-size:0.78rem;color:var(--text)}
+  .est-fact b{color:var(--muted);font-weight:700;margin-right:4px}
+  table.est-mat{border-collapse:collapse;margin:6px 0 2px;font-size:0.78rem;color:var(--text)}
+  table.est-mat td,table.est-mat th{padding:3px 10px 3px 0;text-align:left;border-bottom:1px solid var(--bord)}
+  table.est-mat th{color:var(--muted);font-weight:700}
+  table.est-mat td.n{text-align:right;font-variant-numeric:tabular-nums}
   `;
   const el = document.createElement('style'); el.textContent = css; document.head.appendChild(el);
 })();
@@ -99,6 +106,7 @@ function estimateRowHtml(ref, parentRef){
   const par = parentRef ? MARKET.estimates.get(parentRef) : null;
   if (own && own.total) return estPanelHtml(own, '');
   if (par && par.total) return estPanelHtml(par, `Value of the original permission, ${parentRef}. Paperwork like this usually means the build is about to start.`);
+  if (par) return `<div class="est-none">Estimate: paperwork on ${esc(parentRef)}, which wasn't priced: ${esc(par.why || par.what || 'no building work to price.')}</div>`;
   if (parentRef) return `<div class="est-none">Estimate: this is paperwork on ${esc(parentRef)}. Its value shows here once that application is priced (originals with recent paperwork are priced first on the Monday run).</div>`;
   if (own) return `<div class="est-none">Estimate: not priced. ${esc(own.why || own.what || 'No building work to price.')}</div>`;
   return `<div class="est-none">Estimate: not priced yet. The Monday 7am run prices 40 a week, newest first.</div>`;
@@ -113,11 +121,40 @@ function estPanelHtml(e, note){
       <span class="grade ${esc(e.grade)}" title="${esc(GRADE_TEXT[e.grade] || '')}">${esc(e.grade)}</span>
       ${fit ? `<span class="est-val est-sd" title="${esc(e.silverdale || '')}">Silverdale: ${esc(fit)}</span>` : ''}
     </div>
+    ${estFactsHtml(e)}
     ${e.what ? `<div class="est-what">${esc(e.what)}</div>` : ''}
     ${note ? `<div class="est-note">${esc(note)}</div>` : ''}
+    ${estMaterialsHtml(e)}
     ${estimateBadgeHtml(e.ref).replace(/^<div class="est-badge">[\s\S]*?<\/div>\s*/, '')}
   </div>`;
 }
+// "about 9 to 12 months" for long builds, "4 to 6 weeks" for short ones.
+function weeksText(r){
+  if (!r) return '';
+  if (r[1] >= 20) { const m = x => Math.max(1, Math.round(x / 4.33)); return m(r[0]) === m(r[1]) ? `about ${m(r[1])} months` : `about ${m(r[0])} to ${m(r[1])} months`; }
+  return r[0] === r[1] ? `${r[1]} week${r[1] === 1 ? '' : 's'}` : `${r[0]} to ${r[1]} weeks`;
+}
+const numRange = r => r ? (r[0] === r[1] ? r[0].toLocaleString('en-GB') : `${r[0].toLocaleString('en-GB')} to ${r[1].toLocaleString('en-GB')}`) : '?';
+// Duration, concrete and margin at a glance (estimates priced before 26 Sep 2026 don't have these).
+function estFactsHtml(e){
+  const w = e.weeks || {}, mg = e.margin || {};
+  const concrete = (e.materials || []).find(m => /concrete/i.test(m.item) && m.qty);
+  const facts = [];
+  if (w.build) facts.push(`<span class="est-fact"><b>Build</b>${weeksText(w.build)}</span>`);
+  if (w.groundworks) facts.push(`<span class="est-fact"><b>Groundworks</b>${weeksText(w.groundworks)}</span>`);
+  if (concrete) facts.push(`<span class="est-fact"><b>Concrete</b>${numRange(concrete.qty)} ${esc(concrete.unit || 'm³')}</span>`);
+  if (mg.gw) facts.push(`<span class="est-fact" title="${esc(mg.note || 'Overheads and profit inside the groundworks figure, not clear profit')}"><b>Margin (OH&amp;P)</b>${moneyRange(mg.gw)}${mg.pct ? ` &middot; ${mg.pct[0] === mg.pct[1] ? mg.pct[0] : mg.pct[0] + '-' + mg.pct[1]}%` : ''}</span>`);
+  return facts.length ? `<div class="est-facts">${facts.join('')}</div>` : '';
+}
+function estMaterialsHtml(e){
+  const ms = (e.materials || []).filter(m => m.item);
+  if (!ms.length) return '';
+  return `<details class="est-work"><summary>Quantities and materials (${ms.length})</summary>
+    <table class="est-mat"><tr><th>Item</th><th>Quantity</th><th>Installed cost</th></tr>
+    ${ms.map(m => `<tr><td>${esc(m.item)}</td><td class="n">${m.qty ? `${numRange(m.qty)} ${esc(m.unit || '')}` : ''}</td><td class="n">${m.cost ? moneyRange(m.cost) : ''}</td></tr>`).join('')}
+    </table><div class="hint" style="margin:2px 0 0">Installed cost = supply, labour, plant and overheads, from our own rates. ${e.margin && e.margin.note ? esc(e.margin.note) : ''}</div></details>`;
+}
+
 // For sorting the register by value: the application's own estimate, or its original's.
 function estimateFor(ref, parentRef){
   const own = MARKET.estimates.get(ref);

@@ -50,6 +50,13 @@ D = not priced: not building work, or not enough information (value fields null)
 
 RANGE = {"type": "array", "items": {"type": "integer"}}   # [low, high]; the API only allows minItems 0 or 1, so pairs are tidied in code
 NULLABLE_RANGE = {"anyOf": [RANGE, {"type": "null"}]}
+WEEKS = {"type": "object", "properties": {"build": NULLABLE_RANGE, "groundworks": NULLABLE_RANGE},
+         "required": ["build", "groundworks"], "additionalProperties": False}
+MATERIAL = {"type": "object", "properties": {"item": {"type": "string"}, "qty": NULLABLE_RANGE, "unit": {"type": "string"},
+                                             "cost": NULLABLE_RANGE},
+            "required": ["item", "qty", "unit", "cost"], "additionalProperties": False}
+MARGIN = {"type": "object", "properties": {"pct": NULLABLE_RANGE, "gw": NULLABLE_RANGE, "note": {"type": "string"}},
+          "required": ["pct", "gw", "note"], "additionalProperties": False}
 SCHEMA = {
     "type": "object",
     "properties": {"results": {"type": "array", "items": {
@@ -67,6 +74,9 @@ SCHEMA = {
             "total": NULLABLE_RANGE,
             "groundworks": NULLABLE_RANGE,
             "england": NULLABLE_RANGE,
+            "weeks": WEEKS,
+            "materials": {"type": "array", "items": MATERIAL},
+            "margin": MARGIN,
             "silverdaleFit": {"type": "string", "enum": ["full build", "project management", "design and planning", "not a fit"]},
             "silverdale": {"type": "string"},
             "grade": {"type": "string", "enum": ["A", "B", "C", "D"]},
@@ -75,7 +85,7 @@ SCHEMA = {
             "sources": {"type": "array", "items": {"type": "string"}},
         },
         "required": ["ref", "what", "type", "homes", "client", "offMains", "floorM2", "siteM2", "sizeFrom",
-                     "total", "groundworks", "england", "silverdaleFit", "silverdale", "grade", "why", "opportunity", "sources"],
+                     "total", "groundworks", "england", "weeks", "materials", "margin", "silverdaleFit", "silverdale", "grade", "why", "opportunity", "sources"],
         "additionalProperties": False,
     }}},
     "required": ["results"],
@@ -262,7 +272,7 @@ def estimate(max_apps, vision):
              if (parse_date(r.get("received")) or date.min) >= cutoff} - {None}
     todo = [r for r in history.values() if r.get("description") and not parent_ref(r, history)
             and (not on_list or r["ref"] in on_list or r["ref"] in close)
-            and (r["ref"] not in est or est[r["ref"]].get("rateBook") != version)]
+            and (r["ref"] not in est or (est[r["ref"]].get("rateBook") != version and est[r["ref"]].get("grade") != "D"))]
     received = lambda r: parse_date(r.get("received")) or date.min
     todo.sort(key=lambda r: (received(r) >= fortnight, r["ref"] in close, received(r)), reverse=True)
     todo = todo[:max_apps]
@@ -292,6 +302,11 @@ def estimate(max_apps, vision):
                 continue
             for key in ("total", "groundworks", "england", "floorM2"):
                 res[key] = tidy_range(res.get(key))
+            res["weeks"] = {k: tidy_range((res.get("weeks") or {}).get(k)) for k in ("build", "groundworks")}
+            res["materials"] = [{**m, "qty": tidy_range(m.get("qty")), "cost": tidy_range(m.get("cost"))}
+                                for m in (res.get("materials") or [])[:8]]
+            mg = res.get("margin") or {}
+            res["margin"] = {"pct": tidy_range(mg.get("pct")), "gw": tidy_range(mg.get("gw")), "note": mg.get("note", "")}
             res.update({"received": r.get("received"), "status": r.get("outcome") or "pending",
                         "parish": r.get("parish"), "keyVal": r.get("keyVal"), "pricedOn": date.today().isoformat(),
                         "rateBook": version})
