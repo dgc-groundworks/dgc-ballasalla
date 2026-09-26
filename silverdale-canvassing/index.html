@@ -242,6 +242,7 @@ body.locked .gate{display:flex}
   <button class="navbtn" data-tab="fPersonal">Personalised<span class="nav-count" data-count="personal"></span></button>
   <button class="navbtn" data-tab="letters">Print — Letters<span class="nav-count" data-count="print"></span></button>
   <button class="navbtn" data-tab="envelopes">Print — Envelopes</button>
+  <button class="navbtn" data-tab="research">Market research<span class="nav-count" data-count="research"></span></button>
   <button class="navbtn" data-tab="archive">Archive &mdash; Sent &amp; Not chasing</button>
   <button class="navbtn" data-tab="market">Market &mdash; Job values</button>
 </nav>
@@ -544,7 +545,8 @@ function updateNavCounts(){
   const counts = { approved: 0, pending: 0, business: 0, personal: 0 };
   active.forEach(l => counts[leadFolder(l)]++);
   counts.print = active.filter(l => l.include).length;
-  counts.archive = Object.keys(getDismissed()).length;
+  counts.archive = Object.values(getDismissed()).filter(e => !e.research).length;
+  counts.research = Object.values(getDismissed()).filter(e => e.research).length;
   document.querySelectorAll('.nav-count').forEach(el => { el.textContent = counts[el.dataset.count] || ''; });
 }
 
@@ -976,6 +978,7 @@ function render(){
   if (state.tab === 'fBusiness') return renderFolder(main, 'business');
   if (state.tab === 'fPersonal') return renderFolder(main, 'personal');
   if (state.tab === 'archive') return renderArchive(main);
+  if (state.tab === 'research') return renderResearch(main);
   if (state.tab === 'market') return renderMarket(main);
   if (state.tab === 'letters') return renderPrint(main, 'letter');
   if (state.tab === 'envelopes') return renderPrint(main, 'envelope');
@@ -1967,7 +1970,7 @@ function renderRegisterPullLoaded(box, data){
     else if (inLead) actions = `<span class="tag tag-approved">In ${FOLDERS[leadFolder(inLead)]}${inLead.include ? ' &middot; on the print list' : ''}</span>
           <div class="reg-actions" style="margin-top:6px">${leadFolder(inLead) !== 'personal' ? `<button type="button" class="btn-secondary reg-topersonal" data-ref="${esc(a.ref)}">&rarr; Personalised</button>` : ''}
           <button type="button" class="btn-secondary reg-undo" data-ref="${esc(a.ref)}" title="Takes it back out of the folder, so you can send it a different way">&#8617; Undo</button></div>`;
-    else if (arch) actions = `<span class="tag tag-dupe">Archived ${esc(prettyDate(arch.date))}</span>
+    else if (arch) actions = `<span class="tag tag-dupe">${arch.research ? 'In Market research' : 'Archived'} ${esc(prettyDate(arch.date))}</span>
           <button type="button" class="btn-secondary reg-unarchive-btn" data-ref="${esc(a.ref)}">&#8617; Bring back</button>`;
     else {
       const sendBtn = (folder, text) => `<button type="button" class="btn-secondary reg-send-btn${cat === folder ? ' natural' : ''}" data-ref="${esc(a.ref)}" data-folder="${folder}">${text}</button>`;
@@ -1980,6 +1983,7 @@ function renderRegisterPullLoaded(box, data){
             ${sendBtn('approved', 'Send as Approved')}
             ${sendBtn('personal', 'Send as Personalised')}
             <button type="button" class="btn-secondary reg-dismiss-btn" data-ref="${esc(a.ref)}" title="Looked at it, not chasing it — goes to the Archive tab, where you can bring it back">Archive</button>
+            <button type="button" class="btn-secondary reg-research-btn" data-ref="${esc(a.ref)}" title="Park it to look into later: goes to the Market research tab, where you can add notes and bring it back">Market research</button>
           </div>`;
     }
     return `
@@ -2035,9 +2039,11 @@ function renderRegisterPullLoaded(box, data){
     dismissed = getDismissed();
     const filtered = applyFilters();
     const full = true;
-    const archivedCount = apps.filter(a => dismissed[a.ref]).length;
+    const archivedCount = apps.filter(a => dismissed[a.ref] && !dismissed[a.ref].research).length;
+    const researchCount = apps.filter(a => dismissed[a.ref] && dismissed[a.ref].research).length;
+    const parked = [archivedCount ? `${archivedCount} archived` : '', researchCount ? `${researchCount} in Market research` : ''].filter(Boolean).join(', ');
     document.getElementById('regCount').innerHTML = `${filtered.length} of ${apps.length} shown`
-      + (archivedCount ? ` &middot; ${archivedCount} archived, ${showArchived ? '<button type="button" class="link-btn" id="regHideArchived">hide them</button>' : '<button type="button" class="link-btn" id="regShowArchived">show them</button>'}` : '');
+      + (parked ? ` &middot; ${parked}, ${showArchived ? '<button type="button" class="link-btn" id="regHideArchived">hide them</button>' : '<button type="button" class="link-btn" id="regShowArchived">show them</button>'}` : '');
     document.getElementById('registerList').innerHTML = filtered.length
       ? (document.getElementById('regGroup').checked ? groupedHtml(filtered) : filtered.map(a => rowHtml(a, full)).join(''))
       : '<p class="empty-state">Nothing matches those filters.</p>';
@@ -2132,6 +2138,11 @@ function renderRegisterPullLoaded(box, data){
       d[a.ref] = { date: todayISO(), name: person, source: 'planning', description: a.description || '', address: a.address || '', appliedDate: a.received || '', decidedDate: a.isDecided ? (a.decisionDate || '') : '', keyVal: a.keyVal || '', siteExtent: a.siteExtent || null };
       saveDismissed(d);
       say(`${person} archived — bring it back any time from here or the Archive tab.`);
+    } else if (btn.classList.contains('reg-research-btn')) {
+      const d = getDismissed();
+      d[a.ref] = { date: todayISO(), name: person, source: 'planning', research: true, note: '', description: a.description || '', address: a.address || '', appliedDate: a.received || '', decidedDate: a.isDecided ? (a.decisionDate || '') : '', keyVal: a.keyVal || '', siteExtent: a.siteExtent || null };
+      saveDismissed(d);
+      say(`${person} parked in Market research, to look into later.`);
     } else if (btn.classList.contains('reg-unarchive-btn')) {
       bringBackFromArchive(a.ref);
       say(`${person} brought back.`);
@@ -2212,7 +2223,7 @@ function renderFolder(main, folder){
     .map(([ref, e]) => ({ ref, e, lead: asLead(ref, e) })).filter(x => tradeOk(x.lead))
     .sort((a, b) => (b.e.date || '').localeCompare(a.e.date || ''));
   const archivedItems = Object.entries(dismissedAll)
-    .filter(([ref, e]) => e.lead ? leadFolder(e.lead) === folder : (isBiz && ref.startsWith('ARCH-')))
+    .filter(([ref, e]) => !e.research && (e.lead ? leadFolder(e.lead) === folder : (isBiz && ref.startsWith('ARCH-'))))
     .map(([ref, e]) => ({ ref, e })).filter(x => tradeOk(x.e.lead || { ref })).sort((a, b) => (b.e.date || '').localeCompare(a.e.date || ''));
   const waitingAll = activeAll.filter(x => !x.l.include && tradeOk(x.l));
   const printAll = activeAll.filter(x => x.l.include && tradeOk(x.l));
@@ -2471,6 +2482,44 @@ function renderFolder(main, folder){
   });
 }
 
+// Market research: applications parked to look into later (Ash, 26 Sep 2026). Stored with the
+// archive (so they leave the list and sync online) but flagged research, with notes.
+function renderResearch(main){
+  const d = getDismissed();
+  const items = Object.entries(d).filter(([, e]) => e.research).sort((x, y) => (y[1].date || '').localeCompare(x[1].date || ''));
+  if (!items.length) {
+    main.innerHTML = '<p class="empty-state">Nothing parked yet.<br><br>Press "Market research" on any application in the planning list (Import — Planning) to park it here and look into it later.</p>';
+    return;
+  }
+  const rowFor = ([ref, e]) => {
+    const a = { ref, description: e.description || '', address: e.address || '', received: e.appliedDate || '', decisionDate: e.decidedDate || '', isDecided: !!e.decidedDate, keyVal: e.keyVal || '' };
+    const parent = parentRefOf(a);
+    return `<div class="lead-row" data-ref="${esc(ref)}"><div class="lr-main">
+        <div class="lr-applicant">${nameBtn(ref, e.name || ref)}</div>
+        <div class="lr-meta">${esc(ref)} &middot; ${esc(e.address || '')}${e.appliedDate ? ` &middot; <b style="color:var(--text)">Applied ${esc(e.appliedDate)}</b>` : ''}${e.decidedDate ? ` &middot; Decided ${esc(e.decidedDate)}` : ''}</div>
+        <div class="reg-work"><span class="lbl">Applying for</span>${whatThisIsHtml(a)}${parent ? `<div class="orig-banner">${originalLineHtml(parent, a)}</div>` : ''}</div>
+        ${whoInvolvedHtml(a)}
+        ${typeof estimateRowHtml === 'function' ? estimateRowHtml(ref, parent, '') : ''}
+        ${e.keyVal ? `<div class="reg-links">${drawingsLinkHtml(e.keyVal)}</div>` : ''}
+        <label class="hint" style="display:block;margin:8px 0 0">Your research notes<textarea class="rs-note" rows="2" placeholder="Who to call, what you found, next step&hellip;">${esc(e.note || '')}</textarea></label>
+      </div>
+      <div class="lr-side" style="flex-direction:column;align-items:flex-end;gap:6px">
+        <span class="tag tag-dupe">Parked ${esc(prettyDate(e.date))}</span>
+        <button type="button" class="btn-secondary rs-back">&#8617; Back to the planning list</button>
+        <button type="button" class="btn-secondary rs-archive" title="Looked into it, not chasing it">Archive (not chasing)</button>
+      </div></div>`;
+  };
+  main.innerHTML = `<p class="hint">Applications parked to look into later. Add notes as you go. "Back to the planning list" puts it back on Import — Planning, where you can send it as Business, Pending, Approved or Personalised.</p>
+    <div class="lead-list">${items.map(rowFor).join('')}</div>`;
+  main.querySelectorAll('.lead-row[data-ref]').forEach(r => {
+    const ref = r.dataset.ref;
+    r.querySelector('.rs-note').addEventListener('change', ev => { const dd = getDismissed(); if (dd[ref]) { dd[ref].note = ev.target.value; saveDismissed(dd); } });
+    r.querySelector('.rs-back').addEventListener('click', () => { bringBackFromArchive(ref); render(); });
+    r.querySelector('.rs-archive').addEventListener('click', () => { const dd = getDismissed(); if (dd[ref]) { dd[ref].research = false; dd[ref].date = todayISO(); saveDismissed(dd); } render(); });
+  });
+  updateNavCounts();
+}
+
 // One place for the whole history: everyone who was SENT a letter (the
 // sent log) and everyone ARCHIVED as not chasing — homeowners/planning
 // first, then businesses — each expandable to show exactly what went out.
@@ -2480,7 +2529,7 @@ function renderArchive(main){
   const isBizRef = (ref, source) => source === 'business' || ref.startsWith('ARCH-');
   const entries = [];
   Object.entries(log).forEach(([ref, e]) => entries.push({ kind: 'sent', ref, e, biz: isBizRef(ref, e.source) }));
-  Object.entries(archived).forEach(([ref, e]) => entries.push({ kind: 'archived', ref, e, biz: e.lead ? leadFolder(e.lead) === 'business' : isBizRef(ref, e.source) }));
+  Object.entries(archived).filter(([, e]) => !e.research).forEach(([ref, e]) => entries.push({ kind: 'archived', ref, e, biz: e.lead ? leadFolder(e.lead) === 'business' : isBizRef(ref, e.source) }));
   const filter = state.archiveFilter || 'all';
   const shown = entries.filter(x => filter === 'all' || x.kind === filter)
     .sort((a, b) => (b.e.date || '').localeCompare(a.e.date || '') || (a.e.name || '').localeCompare(b.e.name || ''));
