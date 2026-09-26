@@ -35,6 +35,14 @@
   details.est-work summary{cursor:pointer;color:var(--muted)}
   details.est-work ul{margin:6px 0 0 18px;color:var(--muted)}
   .mk-editor textarea{min-height:260px;font-size:0.8rem}
+  .est-panel{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:8px 12px;margin:6px 0 4px}
+  .est-panel .lbl{display:block;font-size:0.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+  .est-panel .est-badge{margin:2px 0 4px}
+  .est-panel .est-val{font-size:0.88rem}
+  .est-sd{background:rgba(56,153,207,.12);border-color:rgba(56,153,207,.4)}
+  .est-what{font-size:0.85rem;color:var(--text);line-height:1.4}
+  .est-note{font-size:0.78rem;color:var(--muted);margin-top:3px}
+  .est-none{font-size:0.8rem;color:var(--muted);margin:6px 0 4px}
   `;
   const el = document.createElement('style'); el.textContent = css; document.head.appendChild(el);
 })();
@@ -63,7 +71,7 @@ function moneyRange(r){ return r ? `${money(r[0])} to ${money(r[1])}` : '?'; }
 const midOf = r => r ? (r[0] + r[1]) / 2 : 0;
 const GRADE_TEXT = { A: 'Grade A: measured and priced, about ±15%', B: 'Grade B: good estimate, about ±30%', C: 'Grade C: rough guide, about ±50%', D: 'Grade D: not priced' };
 
-// The value line under "Applying for" on each register row, with workings in a drop-down.
+// Compact value line (Market tab lists), with workings in a drop-down.
 function estimateBadgeHtml(ref){
   const e = MARKET.estimates.get(ref);
   if (!e) return '';
@@ -81,6 +89,41 @@ function estimateBadgeHtml(ref){
       <li><b>Sources:</b> ${(e.sources || []).map(esc).join('; ') || 'none listed'}</li>
       <li class="hint" style="list-style:none;margin-left:-18px">Estimated ${esc(e.pricedOn || '')}. A guide for canvassing and planning, not a quote.</li>
     </ul></details>`;
+}
+
+// The estimate panel on each register row: job value, groundworks share, grade, Silverdale angle and
+// a one-line "what it is", so it's clear at a glance who is worth writing to. Paperwork on an
+// earlier permission (parentRef) shows the original application's estimate instead of its own.
+function estimateRowHtml(ref, parentRef){
+  const own = MARKET.estimates.get(ref);
+  const par = parentRef ? MARKET.estimates.get(parentRef) : null;
+  if (own && own.total) return estPanelHtml(own, '');
+  if (par && par.total) return estPanelHtml(par, `Value of the original permission, ${parentRef}. Paperwork like this usually means the build is about to start.`);
+  if (parentRef) return `<div class="est-none">Estimate: this is paperwork on ${esc(parentRef)}. Its value shows here once that application is priced (originals with recent paperwork are priced first on the Monday run).</div>`;
+  if (own) return `<div class="est-none">Estimate: not priced. ${esc(own.why || own.what || 'No building work to price.')}</div>`;
+  return `<div class="est-none">Estimate: not priced yet. The Monday 7am run prices 40 a week, newest first.</div>`;
+}
+function estPanelHtml(e, note){
+  const fit = silverdaleFit(e);
+  return `<div class="est-panel">
+    <span class="lbl">Estimate</span>
+    <div class="est-badge">
+      <span class="est-val" title="Estimated whole-job value">Job ${moneyRange(e.total)}</span>
+      ${e.groundworks ? `<span class="est-val est-gw" title="Groundworks and drainage share (DGC)">Groundworks ${moneyRange(e.groundworks)}</span>` : ''}
+      <span class="grade ${esc(e.grade)}" title="${esc(GRADE_TEXT[e.grade] || '')}">${esc(e.grade)}</span>
+      ${fit ? `<span class="est-val est-sd" title="${esc(e.silverdale || '')}">Silverdale: ${esc(fit)}</span>` : ''}
+    </div>
+    ${e.what ? `<div class="est-what">${esc(e.what)}</div>` : ''}
+    ${note ? `<div class="est-note">${esc(note)}</div>` : ''}
+    ${estimateBadgeHtml(e.ref).replace(/^<div class="est-badge">[\s\S]*?<\/div>\s*/, '')}
+  </div>`;
+}
+// For sorting the register by value: the application's own estimate, or its original's.
+function estimateFor(ref, parentRef){
+  const own = MARKET.estimates.get(ref);
+  if (own && own.total) return own;
+  const par = parentRef ? MARKET.estimates.get(parentRef) : null;
+  return par && par.total ? par : null;
 }
 
 // ---- Market tab ----

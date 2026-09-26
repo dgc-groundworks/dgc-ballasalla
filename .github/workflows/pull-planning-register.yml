@@ -2,9 +2,12 @@ name: Pull IoM Planning Register
 
 on:
   # Automatic — keeps the data reasonably fresh without anyone touching
-  # anything. Mondays at 06:00 UTC (planning weekly lists publish weekly).
+  # anything. Mondays at 7am Isle of Man time, summer and winter: GitHub
+  # only knows UTC, so both times are scheduled and the "when" job below
+  # lets through whichever one is 7am on the Island that day.
   schedule:
     - cron: '0 6 * * 1'
+    - cron: '0 7 * * 1'
   # Manual — this is the "click it whenever" button: go to this repo's
   # Actions tab → "Pull IoM Planning Register" → Run workflow.
   workflow_dispatch:
@@ -23,7 +26,21 @@ permissions:
   contents: write
 
 jobs:
+  when:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.check.outputs.go }}
+    steps:
+      - id: check
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # +0100 in summer time, +0000 in winter.
+          if [ "$(TZ=Europe/London date +%z)" = "+0100" ]; then want='0 6 * * 1'; else want='0 7 * * 1'; fi
+          if [ "${{ github.event.schedule }}" = "$want" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; else echo "go=false" >> "$GITHUB_OUTPUT"; fi
+
   pull:
+    needs: when
+    if: ${{ needs.when.outputs.go == 'true' }}
     runs-on: ubuntu-latest
     # Once the SUPABASE_SERVICE_KEY secret is added, the data is kept in the
     # private Supabase file store instead of being committed to this public repo.
@@ -49,9 +66,19 @@ jobs:
       - name: Pull register
         if: ${{ github.event.inputs.pricing_only != 'true' }}
         run: |
+          if [ -f silverdale-canvassing/register-data/latest.json ]; then
+            cp silverdale-canvassing/register-data/latest.json silverdale-canvassing/register-data/latest.previous.json
+          fi
           python3 silverdale-canvassing/scripts/pull_register.py \
             --months "${{ github.event.inputs.months || '3' }}" \
             --out silverdale-canvassing/register-data/latest.json
+
+      # The pull only covers the last few months; this keeps every earlier
+      # application on the list until Ash has decided what to do with it.
+      - name: Keep earlier applications on the list
+        if: ${{ github.event.inputs.pricing_only != 'true' }}
+        working-directory: silverdale-canvassing/scripts
+        run: python3 merge_register.py ../register-data/latest.previous.json ../register-data/latest.json
 
       - name: Update decision-time history, forecasts and accuracy
         if: ${{ github.event.inputs.pricing_only != 'true' }}

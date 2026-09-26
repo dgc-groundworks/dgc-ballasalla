@@ -15,6 +15,11 @@ store, never into this public repo.
 
 --max caps how many applications are priced in one run (newest first), so
 cost can be checked before it runs weekly at full size.
+
+Paperwork on an earlier permission (a condition discharge or minor change that
+names the original application) is not priced on its own: the app shows the
+original's estimate on it instead. Those originals are priced first, because a
+condition being discharged usually means the build is about to start.
 """
 import argparse
 import base64
@@ -31,6 +36,7 @@ EST_PATH = os.path.join(DATA, "estimates.jsonl")
 SUMMARY_PATH = os.path.join(DATA, "market-summary.json")
 PROMPT_PATH = os.path.join(DATA, "estimator", "prompt.md")
 RATES_PATH = os.path.join(DATA, "estimator", "rate_book.md")
+LATEST_PATH = os.path.join(DATA, "latest.json")
 MODEL = os.environ.get("ESTIMATOR_MODEL", "claude-opus-5-5")
 BATCH = 15
 BUILD_WORK = {"New homes (1)", "New homes (2-9)", "New homes (10+)", "Extension / alterations",
@@ -101,6 +107,18 @@ def save_estimates(est):
 
 
 REF_RE = re.compile(r"(?<!\d)\d{2}/\d{5}/[A-Z]{1,4}\b")
+PAPERWORK = {"Conditions / information", "Minor change", "Variation of conditions"}
+CLOSE_DAYS = 180   # paperwork this recent marks its original application as "build close"
+
+
+def parent_ref(r, history):
+    """The original application a piece of paperwork belongs to, when it names one we hold."""
+    if effective_work(r) not in PAPERWORK:
+        return None
+    for m in REF_RE.findall(r.get("description") or ""):
+        if m != r["ref"] and m in history:
+            return m
+    return None
 POSTCODE_RE = re.compile(r"\bIM\d{1,2}\s?\d[A-Z]{2}\b", re.I)
 SKIP_WORDS = {"the", "and", "land", "at", "of", "to", "site", "adjacent", "adj", "rear", "plot", "plots"}
 
@@ -235,10 +253,20 @@ def estimate(max_apps, vision):
     est = load_estimates()
     # A changed prompt or rate book means earlier estimates are re-priced (newest first, within --max).
     version = hashlib.sha1(system.encode("utf-8")).hexdigest()[:10]
-    todo = [r for r in history.values() if r.get("description")
+    # Only what the canvassing list shows (it keeps every application it has ever pulled), plus the
+    # originals behind recent paperwork. Order: new in the last fortnight, then originals whose build
+    # looks close, then everything else newest first.
+    on_list = {a["ref"] for a in (json.loads(read(LATEST_PATH)).get("applications", []) if os.path.exists(LATEST_PATH) else [])}
+    cutoff, fortnight = date.today() - timedelta(days=CLOSE_DAYS), date.today() - timedelta(days=14)
+    close = {parent_ref(r, history) for r in history.values()
+             if (parse_date(r.get("received")) or date.min) >= cutoff} - {None}
+    todo = [r for r in history.values() if r.get("description") and not parent_ref(r, history)
+            and (not on_list or r["ref"] in on_list or r["ref"] in close)
             and (r["ref"] not in est or est[r["ref"]].get("rateBook") != version)]
-    todo.sort(key=lambda r: parse_date(r.get("received")) or date.min, reverse=True)
+    received = lambda r: parse_date(r.get("received")) or date.min
+    todo.sort(key=lambda r: (received(r) >= fortnight, r["ref"] in close, received(r)), reverse=True)
     todo = todo[:max_apps]
+    print(f"{sum(r['ref'] in close for r in todo)} of these are originals with recent condition paperwork", file=sys.stderr)
     print(f"pricing {len(todo)} applications with {MODEL}", file=sys.stderr)
     usage, done = {}, 0
     with_image = [r for r in todo if vision and effective_work(r) in BUILD_WORK]

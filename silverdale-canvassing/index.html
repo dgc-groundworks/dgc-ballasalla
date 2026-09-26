@@ -10,7 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
-<script src="market.js?v=3"></script>
+<script src="market.js?v=4"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -114,6 +114,8 @@ table.tstats th{position:static}
 table.tstats td,table.tstats th{padding:5px 8px}
 .tstats-body{overflow-x:auto}
 .letter-preview{zoom:.62;margin-top:12px;overflow:hidden}
+.pl-editor textarea.pl-text{min-height:320px;line-height:1.5}
+.pl-editor .pl-sal{width:100%;max-width:420px;margin:0 0 8px}
 @media (max-width:760px){.lead-row{flex-wrap:wrap}.lr-side{flex-wrap:wrap;width:100%}.main{padding:16px}}
 .print-doc{background:#fff;color:#000;box-shadow:0 4px 32px rgba(0,0,0,.4);margin:0 auto 28px;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;font-variant-numeric:lining-nums proportional-nums;font-feature-settings:"lnum" 1,"pnum" 1}
 /* Page-to-page gap is for on-screen viewing only -- html2canvas
@@ -216,6 +218,7 @@ body.locked .gate{display:flex}
   <button class="navbtn" data-tab="fApproved">Approved<span class="nav-count" data-count="approved"></span></button>
   <button class="navbtn" data-tab="fPending">Pending<span class="nav-count" data-count="pending"></span></button>
   <button class="navbtn" data-tab="fBusiness">Businesses<span class="nav-count" data-count="business"></span></button>
+  <button class="navbtn" data-tab="fPersonal">Personalised<span class="nav-count" data-count="personal"></span></button>
   <button class="navbtn" data-tab="letters">Print — Letters<span class="nav-count" data-count="print"></span></button>
   <button class="navbtn" data-tab="envelopes">Print — Envelopes</button>
   <button class="navbtn" data-tab="archive">Archive &mdash; Sent &amp; Not chasing</button>
@@ -490,7 +493,7 @@ async function loadLetterImages(){
 
 // The folder a lead sits in decides which letter it gets. Leads saved
 // before folders existed have no `folder`, so fall back to what they are.
-const FOLDERS = { approved: 'Approved', pending: 'Pending', business: 'Businesses' };
+const FOLDERS = { approved: 'Approved', pending: 'Pending', business: 'Businesses', personal: 'Personalised' };
 function leadFolder(l){ return l.folder || (l.source === 'business' ? 'business' : l.planningStatus === 'pending' ? 'pending' : 'approved'); }
 function todayISO(){ return new Date().toLocaleDateString('en-CA'); }
 function prettyDate(iso){ return iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''; }
@@ -517,7 +520,7 @@ function archiveLead(i){
 }
 function updateNavCounts(){
   const active = leads.filter(l => !l.alreadyProcessed);
-  const counts = { approved: 0, pending: 0, business: 0 };
+  const counts = { approved: 0, pending: 0, business: 0, personal: 0 };
   active.forEach(l => counts[leadFolder(l)]++);
   counts.print = active.filter(l => l.include).length;
   counts.archive = Object.keys(getDismissed()).length;
@@ -949,6 +952,7 @@ function render(){
   if (state.tab === 'fApproved') return renderFolder(main, 'approved');
   if (state.tab === 'fPending') return renderFolder(main, 'pending');
   if (state.tab === 'fBusiness') return renderFolder(main, 'business');
+  if (state.tab === 'fPersonal') return renderFolder(main, 'personal');
   if (state.tab === 'archive') return renderArchive(main);
   if (state.tab === 'market') return renderMarket(main);
   if (state.tab === 'letters') return renderPrint(main, 'letter');
@@ -1241,10 +1245,20 @@ function relatedHtml(a){
   return `<div class="reg-related-slot" data-ref="${esc(a.ref)}"></div>`;
 }
 
+// Paperwork on an earlier permission (conditions, minor changes) names the original application;
+// its estimate is the one that matters, so rows and letters use that.
+function parentRefOf(a){
+  const t = timings && timings.byRef.get(a.ref);
+  const work = t && t.work;
+  if (!work || !PAPERWORK.includes(work) || work === 'Certificate of lawfulness') return null;
+  const m = (a.description || '').match(REL_REF_RE);
+  return m ? m.find(r => r !== a.ref) || null : null;
+}
+
 function plainEnglishHtml(a){
   const t = timings && timings.byRef.get(a.ref);
   const work = t && t.work, type = a.applicationType || (t && t.type);
-  const badge = typeof estimateBadgeHtml === 'function' ? estimateBadgeHtml(a.ref) : '';
+  const badge = typeof estimateRowHtml === 'function' ? estimateRowHtml(a.ref, parentRefOf(a)) : '';
   const drawings = a.keyVal ? `<div class="reg-links">${drawingsLinkHtml(a.keyVal)}${siteExtentHtml(a.siteExtent)}</div>` : '';
 
   // The same explanation and stats apply to every application of a given
@@ -1552,7 +1566,15 @@ function renderRegisterPullLoaded(box, data){
       }
       return true;
     })
-    .sort((x, y) => CATEGORY_ORDER[decisionCategory(x)] - CATEGORY_ORDER[decisionCategory(y)] || (x.ref < y.ref ? 1 : -1));
+    .sort((x, y) => {
+      const sort = document.getElementById('regSort').value;
+      if (sort !== 'new' && typeof estimateFor === 'function') {
+        const v = a => { const e = estimateFor(a.ref, parentRefOf(a)); return e ? midOf(sort === 'gw' ? e.groundworks : e.total) : -1; };
+        const d = v(y) - v(x);
+        if (d) return d;
+      }
+      return CATEGORY_ORDER[decisionCategory(x)] - CATEGORY_ORDER[decisionCategory(y)] || (x.ref < y.ref ? 1 : -1);
+    });
   }
 
   // Same ARCH-<slug> convention as the CSV business import, so one
@@ -1572,6 +1594,7 @@ function renderRegisterPullLoaded(box, data){
     const lead = classify({ ref: a.ref, applicant, site: a.address || '', agentText: `${a.agentName || ''} ${a.agentCompanyName || ''}`, extraReviewNote });
     lead.planningStatus = decisionCategory(a);
     lead.folder = folder;
+    lead.parentRef = parentRefOf(a) || '';
     lead.include = false;
     lead.addedAt = todayISO();
     lead.description = a.description || '';
@@ -1640,6 +1663,7 @@ function renderRegisterPullLoaded(box, data){
             ${sendBtn('business', 'Send as Business')}
             ${sendBtn('pending', 'Send as Pending')}
             ${sendBtn('approved', 'Send as Approved')}
+            ${sendBtn('personal', 'Send as Personalised')}
             <button type="button" class="btn-secondary reg-dismiss-btn" data-ref="${esc(a.ref)}" title="Looked at it, not chasing it — goes to the Archive tab, where you can bring it back">Archive</button>
           </div>`;
     }
@@ -1681,9 +1705,9 @@ function renderRegisterPullLoaded(box, data){
 
   box.innerHTML = `
     <h3 class="lead-section-hdr">Pull from the planning register</h3>
-    <p class="hint">Last pulled ${esc(pulledDate)} &middot; ${apps.length} applications on file (up to ${data.monthsRequested || '?'} months back).
+    <p class="hint">Last pulled ${esc(pulledDate)} &middot; ${apps.length} applications on file. Every Monday at 7am the last ${data.monthsRequested || '?'} months are refreshed and new ones added; older ones stay on the list until you deal with them.
       <a href="${REGISTER_ACTIONS_URL}" target="_blank" rel="noopener">Pull fresh data now &rarr;</a></p>
-    <p class="hint">On each one: <b>Send as Business / Pending / Approved</b> puts it in that folder (and decides which letter it gets), <b>Archive</b> means not chasing it. Nothing is printed until you press "Send to print" inside the folder.</p>
+    <p class="hint">On each one: <b>Send as Business / Pending / Approved</b> puts it in that folder (and decides which letter it gets), <b>Send as Personalised</b> puts it in the Personalised folder, where you write a letter for that one job, and <b>Archive</b> means not chasing it. Nothing is printed until you press "Send to print" inside the folder.</p>
     <div class="row-actions" style="flex-wrap:wrap;gap:10px">
       <label>From <input type="date" id="regFrom"></label>
       <label>To <input type="date" id="regTo"></label>
@@ -1694,6 +1718,13 @@ function renderRegisterPullLoaded(box, data){
           <option value="approved">Approved only</option>
           <option value="refused">Refused only</option>
           <option value="other">Other decided (withdrawn etc.)</option>
+        </select>
+      </label>
+      <label>Sort
+        <select id="regSort">
+          <option value="new">Newest first</option>
+          <option value="gw">Biggest groundworks value</option>
+          <option value="job">Biggest job value</option>
         </select>
       </label>
       <input type="text" id="regSearch" placeholder="Search name, address, description&hellip;" style="min-width:220px">
@@ -1708,7 +1739,7 @@ function renderRegisterPullLoaded(box, data){
     <div id="registerList" class="lead-list"></div>`;
 
   renderList();
-  ['regStatus', 'regFrom', 'regTo', 'regSearch'].forEach(id => {
+  ['regStatus', 'regSort', 'regFrom', 'regTo', 'regSearch'].forEach(id => {
     document.getElementById(id).addEventListener('input', renderList);
   });
   document.getElementById('registerList').addEventListener('click', e => {
@@ -1751,7 +1782,8 @@ function renderRegisterPullLoaded(box, data){
 const COPY_NOTE = {
   approved: 'Everyone here gets the "Congratulations on your recent planning approval" letter.',
   pending: 'Everyone here gets the "we noticed you have recently applied for planning permission" letter.',
-  business: 'Everyone here gets the architects &amp; engineers introduction letter.'
+  business: 'Everyone here gets the architects &amp; engineers introduction letter.',
+  personal: 'Each one here gets its own letter. Press "Write the letter" to open the editor: it starts from a draft that mentions their job, and you change whatever you like. Only letters you have saved can go to print.'
 };
 
 function renderFolder(main, folder){
@@ -1767,7 +1799,10 @@ function renderFolder(main, folder){
     return;
   }
   const onPrint = active.filter(x => x.l.include).length;
-  const sendable = active.filter(x => !x.l.include && !x.l.excludedReason && !x.l.needsReview);
+  const personal = folder === 'personal';
+  // Personalised letters only go to print once written and saved.
+  const sendable = active.filter(x => !x.l.include && !x.l.excludedReason && !x.l.needsReview && (!personal || x.l.personalDone));
+  const unwritten = personal ? active.filter(x => !x.l.personalDone).length : 0;
   const flaggedWaiting = active.filter(x => !x.l.include && !x.l.excludedReason && x.l.needsReview).length;
 
   const groups = new Map();
@@ -1784,6 +1819,8 @@ function renderFolder(main, folder){
       : l.needsReview ? { cls: 'tag-review', label: 'Check', title: l.reviewNote }
       : null;
     const editing = state.editRef === l.ref;
+    const writing = personal && state.letterRef === l.ref;
+    const needsWriting = personal && !l.personalDone;
     const moveOpts = Object.entries(FOLDERS).map(([k, v]) => `<option value="${k}" ${k === folder ? 'selected' : ''}>${v}</option>`).join('');
     return `
       <div class="lead-row ${flag ? 'flagged' : ''}" data-i="${i}">
@@ -1793,6 +1830,7 @@ function renderFolder(main, folder){
           ${l.appliedDate ? `<div class="lr-meta">${timingHtml(l.ref, l.appliedDate, l.decidedDate)}</div>` : ''}
           ${l.keyVal ? `<div class="hint" style="margin:2px 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(l.keyVal)}${siteExtentHtml(l.siteExtent)}</div>` : ''}
           ${flag && flag.title ? `<div class="hint" style="margin:0 0 4px;color:var(--accent)">${esc(flag.title)}</div>` : ''}
+          ${personal && typeof estimateRowHtml === 'function' ? estimateRowHtml(l.ref, l.parentRef || null) : ''}
           <input type="text" class="sal-input" value="${esc(l.salutation)}" title="Salutation — click to change">
           <div class="f-addr">${l.recipientLines.map(esc).join(' &middot; ')}</div>
           ${editing ? `
@@ -1801,13 +1839,26 @@ function renderFolder(main, folder){
             <textarea class="f-edit-lines">${esc(l.recipientLines.join('\n'))}</textarea>
             <div class="row-actions" style="margin:8px 0 0"><button class="btn f-edit-save">Save</button><button class="btn-secondary f-edit-cancel">Cancel</button></div>
           </div>` : ''}
+          ${writing ? `
+          <div class="f-edit-panel pl-editor">
+            <div class="hint" style="margin:0 0 4px">Starts "${esc(l.salutation)}" (change it above). Write the letter below with a blank line between paragraphs; "Kind regards" and the signature are added underneath. The estimate above is for you, so leave prices out of the letter.</div>
+            <textarea class="pl-text">${esc(parasToText(letterParas(l)))}</textarea>
+            <div class="row-actions" style="margin:8px 0 0">
+              <button class="btn pl-save">Save letter</button>
+              <button class="btn-secondary pl-reset" title="Throws away your changes and goes back to the draft for this job">Start again from the draft</button>
+              <button class="btn-secondary pl-close">Close</button>
+            </div>
+            <div class="letter-preview">${letterHtml(l)}</div>
+          </div>` : ''}
         </div>
         <div class="lr-side" style="flex-direction:column;align-items:flex-end;gap:8px">
           <div style="display:flex;gap:8px;align-items:center">
             ${flag ? `<span class="tag ${flag.cls}" title="${esc(flag.title)}">${flag.label}</span>` : ''}
-            <button class="send-toggle ${l.include ? 'on' : 'off'}" ${l.excludedReason ? 'disabled' : ''}>${l.include ? '&#10003; On print list' : 'Send to print'}</button>
+            ${personal ? `<span class="tag ${l.personalDone ? 'tag-approved' : 'tag-review'}">${l.personalDone ? 'Letter written' : 'Not written yet'}</span>` : ''}
+            <button class="send-toggle ${l.include ? 'on' : 'off'}" ${l.excludedReason || needsWriting ? 'disabled' : ''} ${needsWriting ? 'title="Write and save the letter first"' : ''}>${l.include ? '&#10003; On print list' : 'Send to print'}</button>
           </div>
           <div class="f-actions">
+            ${personal ? `<button class="btn f-letter-btn">&#9998; ${writing ? 'Close the letter' : l.personalDone ? 'Edit the letter' : 'Write the letter'}</button>` : ''}
             <button class="btn-secondary f-edit-btn">&#9998; Edit name / address</button>
             <label class="hint" style="margin:0">Move to <select class="f-move">${moveOpts}</select></label>
             <button class="btn-secondary f-archive-btn" title="Not chasing — goes to the Archive tab, where you can bring it back">Archive</button>
@@ -1828,6 +1879,7 @@ function renderFolder(main, folder){
       <span><b>${active.length}</b> waiting in ${label}</span>
       <span style="color:var(--accent)"><b>${onPrint}</b> on the print list</span>
       ${flaggedWaiting ? `<span><b>${flaggedWaiting}</b> marked Check — send those one at a time once you've looked</span>` : ''}
+      ${unwritten ? `<span><b>${unwritten}</b> letters still to write</span>` : ''}
       ${sentCount ? `<span><b>${sentCount}</b> already sent (see Archive)</span>` : ''}
     </div>
     <p class="hint">${COPY_NOTE[folder]}</p>
@@ -1858,6 +1910,26 @@ function renderFolder(main, folder){
     const cancel = rowEl.querySelector('.f-edit-cancel');
     if (cancel) cancel.addEventListener('click', () => { state.editRef = null; render(); });
     rowEl.querySelector('.f-move').addEventListener('change', e => { l.folder = e.target.value; done(); });
+    const letterBtn = rowEl.querySelector('.f-letter-btn');
+    if (letterBtn) letterBtn.addEventListener('click', () => { state.letterRef = state.letterRef === l.ref ? null : l.ref; render(); });
+    const text = rowEl.querySelector('.pl-text');
+    if (text) {
+      const preview = rowEl.querySelector('.pl-editor .letter-preview');
+      text.addEventListener('input', () => { preview.innerHTML = letterHtml({ ...l, personalParas: textToParas(text.value) }); });
+      rowEl.querySelector('.pl-save').addEventListener('click', () => {
+        const paras = textToParas(text.value);
+        if (!paras.length) { alert('The letter is empty.'); return; }
+        l.personalParas = paras; l.personalDone = true; l.edited = true;
+        state.letterRef = null;
+        done();
+      });
+      rowEl.querySelector('.pl-reset').addEventListener('click', () => {
+        if (!confirm('Throw away your changes to this letter and start again from the draft?')) return;
+        delete l.personalParas; l.personalDone = false;
+        done();
+      });
+      rowEl.querySelector('.pl-close').addEventListener('click', () => { state.letterRef = null; render(); });
+    }
     rowEl.querySelector('.f-archive-btn').addEventListener('click', () => { archiveLead(i); render(); });
     rowEl.querySelector('.f-remove-btn').addEventListener('click', () => {
       if (!confirm(`Delete "${l.applicant}" from ${label}? (Use Archive instead if you want a record that you looked at it.)`)) return;
@@ -1882,7 +1954,7 @@ function renderArchive(main){
     .sort((a, b) => (b.e.date || '').localeCompare(a.e.date || '') || (a.e.name || '').localeCompare(b.e.name || ''));
   const open = state.archiveOpen || (state.archiveOpen = new Set());
   const letterOpen = state.letterOpen || (state.letterOpen = new Set());
-  const COPY_LABEL = { approved: '"Congratulations on your planning approval" letter', pending: '"Applied for planning" letter', business: 'Architects &amp; engineers introduction letter' };
+  const COPY_LABEL = { approved: '"Congratulations on your planning approval" letter', pending: '"Applied for planning" letter', business: 'Architects &amp; engineers introduction letter', personal: 'Personalised letter' };
 
   function letterSnapshot(x){
     const e = x.e;
@@ -2060,10 +2132,10 @@ function renderPrint(main, kind){
   // can never silently get printed/sent again.
   const batch = leads.filter(l => l.include && !l.alreadyProcessed);
   if (!batch.length) {
-    main.innerHTML = `<p class="empty-state">Nothing on the print list yet — open Approved, Pending or Businesses and press "Send to print" (one at a time, or "Send all to print").</p>`;
+    main.innerHTML = `<p class="empty-state">Nothing on the print list yet — open Approved, Pending, Businesses or Personalised and press "Send to print" (one at a time, or "Send all to print").</p>`;
     return;
   }
-  const byFolder = { approved: 0, pending: 0, business: 0 };
+  const byFolder = { approved: 0, pending: 0, business: 0, personal: 0 };
   batch.forEach(l => byFolder[leadFolder(l)]++);
   const mix = Object.entries(byFolder).filter(([, n]) => n).map(([k, n]) => `${n} ${FOLDERS[k]}`).join(' &middot; ');
 
@@ -2222,7 +2294,33 @@ function docWrapHtml(l, idx, kind){
     </div>
   </div>`;
 }
-function letterParas(l){ return ({ approved: letterBody, pending: pendingLetterBody, business: businessLetterBody }[leadFolder(l)])(); }
+function letterParas(l){
+  const folder = leadFolder(l);
+  if (folder === 'personal') return l.personalParas || personalDraft(l);
+  return ({ approved: letterBody, pending: pendingLetterBody, business: businessLetterBody }[folder])();
+}
+// Which standard letter a personalised one starts from.
+function baseCopy(l){ return l.source === 'business' ? 'business' : l.planningStatus === 'pending' ? 'pending' : 'approved'; }
+// "the erection of a detached dwelling" from the register description, or null when the wording
+// is paperwork that wouldn't read well in a letter.
+function jobPhrase(l){
+  let d = (l.description || '').replace(/\s+/g, ' ').trim().replace(/\.$/, '');
+  if (!d || /condition|information in relation|approval of details|non-material|minor change/i.test(d)) return null;
+  if (d.length > 140) d = d.slice(0, 140).replace(/\s+\S*$/, '');
+  d = d.charAt(0).toLowerCase() + d.slice(1);
+  return /^(erection|construction|demolition|installation|alterations?|conversion|change|creation|extension|replacement|formation|provision|refurbishment|redevelopment|use)\b/.test(d) ? 'the ' + d : d;
+}
+function personalDraft(l){
+  const base = baseCopy(l);
+  const paras = ({ approved: letterBody, pending: pendingLetterBody, business: businessLetterBody }[base])().slice();
+  const job = jobPhrase(l);
+  if (job && base === 'approved') paras[0] = paras[0].replace('on your recent planning approval.', `on your recent planning approval for ${esc(job)}.`);
+  if (job && base === 'pending') paras[0] = paras[0].replace('for your project.', `for ${esc(job)}.`);
+  return paras;
+}
+// Stored paragraphs are HTML (the standard letters use &amp; etc.); the editor works in plain text.
+function parasToText(paras){ const t = document.createElement('textarea'); return paras.map(p => { t.innerHTML = p; return t.value; }).join('\n\n'); }
+function textToParas(text){ return text.split(/\n\s*\n/).map(p => p.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean).map(esc); }
 function letterHtml(l){
   return `<div class="print-doc letter-page">
     <div class="letter-head">
