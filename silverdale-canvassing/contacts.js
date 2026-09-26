@@ -104,7 +104,14 @@ function contactedBarHtml(batch){
   const byPerson = new Map();
   list.forEach(c => { const k = c.n || c.a || c.ref; byPerson.set(k, (byPerson.get(k) || 0) + 1); });
   const day = iso => iso ? prettyDate(iso) : '';
-  const planning = e => e.decidedDate ? `Decided ${esc(e.decidedDate)}` : e.appliedDate ? `Applied ${esc(e.appliedDate)}` : '';
+  const fmt = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const planning = c => {
+    const e = c.e, t = typeof timings !== 'undefined' && timings ? timings.byRef.get(c.ref) : null;   // older letters didn't record dates
+    if (e.decidedDate) return `Decided ${esc(e.decidedDate)}`;
+    if (t && t.decided) return `Decided ${fmt(t.decided)}`;
+    if (e.appliedDate) return `Applied ${esc(e.appliedDate)}`;
+    return t && t.received ? `Applied ${fmt(t.received)}` : '';
+  };
   const value = c => {
     if (c.ref.startsWith('ARCH-') || typeof estimateFor !== 'function') return '';
     const est = estimateFor(c.ref, typeof parentRefOf === 'function' ? parentRefOf({ ref: c.ref, description: c.e.description || '' }) : null);
@@ -118,7 +125,7 @@ function contactedBarHtml(batch){
       ${list.map(c => {
         const times = byPerson.get(c.n || c.a || c.ref) || 1;
         return `<tr><td><b>${esc(c.name)}</b><br><span class="hint" style="margin:0">${esc(c.ref.startsWith('ARCH-') ? 'Business' : c.ref)} &middot; ${esc(FOLDERS[c.e.copy] || '')} letter</span></td>
-          <td>${planning(c.e)}</td><td>${value(c)}</td>
+          <td>${planning(c)}</td><td>${value(c)}</td>
           <td class="${times > 1 ? 'rep' : ''}">${times > 1 ? `Yes, ${times} letters` : 'No, just this one'}</td>
           <td>${day(c.e.date)}</td><td>${day(c.e.sentToPrintAt) || '<span class="hint" style="margin:0">not recorded</span>'}</td></tr>`;
       }).join('')}
