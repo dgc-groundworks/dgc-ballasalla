@@ -1346,6 +1346,18 @@ function computeForecastAccuracy(){
   return { live, back };
 }
 
+// Where the pulled 5-year history really starts: the first month with a proper number of
+// decisions. Old originals looked up one by one for paperwork rows (some from 2005) sit in the
+// same history and must not stretch "everything pulled" or skew the averages.
+function historyStart(){
+  if (!timings) return null;
+  if (timings.start !== undefined) return timings.start;
+  const perMonth = new Map();
+  timings.rows.forEach(r => { if (r.decided) { const k = r.decided.getFullYear() * 12 + r.decided.getMonth(); perMonth.set(k, (perMonth.get(k) || 0) + 1); } });
+  const k = [...perMonth].filter(([, n]) => n >= 20).map(([m]) => m).sort((a, b) => a - b)[0];
+  return timings.start = k == null ? null : new Date(Math.floor(k / 12), k % 12, 1);
+}
+
 function renderTimingPanel(el){
   if (!timings || !timings.rows.length) {
     el.innerHTML = '<span class="hint" style="margin:0">Planning timings will appear here once the register history has been pulled.</span>';
@@ -1353,7 +1365,7 @@ function renderTimingPanel(el){
   }
   const range = state.timingRange || '365';
   const withAdmin = !!state.timingAdmin;
-  const since = range === 'all' ? null : new Date(Date.now() - Number(range) * DAY_MS);
+  const since = range === 'all' ? historyStart() : new Date(Date.now() - Number(range) * DAY_MS);
   const rows = timings.rows.filter(r => r.days != null && (!since || r.decided >= since) && (withAdmin || !ADMIN_WORK.includes(r.work)));
   const all = summarise(rows.map(r => r.days));
   const first = rows.reduce((m, r) => !m || r.decided < m ? r.decided : m, null);
@@ -1376,7 +1388,7 @@ function renderTimingPanel(el){
   const acc = state.timingOpen ? forecastAccuracy() : null;
   const whoHtml = state.timingOpen ? whoAppliesHtml() : '';
   const accLine = s => s ? `<b>${s.within14}%</b> within 2 weeks of the forecast &middot; typical miss ${s.medianMiss} days &middot; ${s.n} applications` : '';
-  const oldest = timings.rows.reduce((m, r) => r.decided && (!m || r.decided < m) ? r.decided : m, null);
+  const oldest = historyStart();
   el.innerHTML = `
     <div class="tp-head">
       <button type="button" class="tp-btn" id="tToggle">&#9201; Planning Decision Time ${state.timingOpen ? '&#9650;' : '&#9660;'}</button>
@@ -1388,7 +1400,7 @@ function renderTimingPanel(el){
     <div class="tstats-body">
       <label class="hint" style="margin:8px 0 0;display:block"><input type="checkbox" id="tAdmin" ${withAdmin ? 'checked' : ''}> Include condition discharges, minor changes &amp; lawfulness certificates (quick admin decisions, left out by default)</label>
       <div class="tp-explain">
-        <b>What period this covers:</b> ${all ? all.n.toLocaleString('en-GB') : 0} decisions from the public planning register${first ? `, decided ${fmtDay(first)} to now` : ''}. "Everything pulled" is all the history we hold, which goes back 5 years (${oldest ? esc(fmtDay(oldest)) : ''}). The register itself goes back further (applications from 2008 are on it), so older years can be added if wanted; each 5 years takes a few hours to pull.<br>
+        <b>What period this covers:</b> ${all ? all.n.toLocaleString('en-GB') : 0} decisions from the public planning register${first ? `, decided ${fmtDay(first)} to now` : ''}. "Everything pulled" is all the history we hold, which goes back 5 years, to ${oldest ? esc(oldest.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })) : 'the start'}. The register itself goes back further (applications from 2008 are on it), so older years can be added if wanted; each 5 years takes a few hours to pull.<br>
         <b>How it's measured:</b> from the day the application was received to the day the decision was issued.<br><br>
         <b>The averages, simply.</b> Imagine lining up every decision from quickest to slowest.<br>
         &bull; <b>Median = the typical one.</b> The one standing in the middle of the line: half were quicker, half were slower. <i>This is the one to use.</i><br>
@@ -1462,7 +1474,7 @@ function whoAppliesHtml(){
   if (kw && !whoDetails) loadDetails().then(d => { whoDetails = d; const el = document.getElementById('timingPanel'); if (el) renderTimingPanel(el); });
   const desc = ref => whoDetails ? (((whoDetails.apps || {})[ref] || [])[0] || '').toLowerCase() : '';
   // Every application in the range counts, pending ones included.
-  const since = state.timingRange === 'all' ? null : new Date(Date.now() - Number(state.timingRange || '365') * DAY_MS);
+  const since = state.timingRange === 'all' ? historyStart() : new Date(Date.now() - Number(state.timingRange || '365') * DAY_MS);
   const inRange = timings.rows.filter(r => !since || (r.decided || r.received) >= since);
   const works = [...new Set(inRange.map(r => r.work).filter(Boolean))].sort();
   const pool = inRange.filter(r => (workSel === 'all' || r.work === workSel) && (!kw || (whoDetails && desc(r.ref).includes(kw))));
