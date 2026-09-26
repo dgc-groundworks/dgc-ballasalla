@@ -270,13 +270,14 @@ def write_timings(history):
         rows.append([r["ref"], code("works", effective_work(r)), code("types", r.get("applicationType")),
                      code("levels", decision_level(r.get("decisionLevel"))), code("outcomes", outcome(r.get("decision"))),
                      iso(r.get("received")), iso(r.get("validated")), iso(r.get("decisionDate")), r.get("aiComplexity") or 0,
-                     code("agents", agent_label(r)), code("applicants", r.get("applicantName")), r.get("applicantKey") or ""])
+                     code("agents", agent_label(r)), code("applicants", r.get("applicantName")), r.get("applicantKey") or "",
+                     1 if r.get("foundAs") else 0])
         details[r["ref"]] = [r.get("description") or "", r.get("address") or "", r.get("keyVal") or "",
                              r.get("agentName") or "", r.get("agentCompanyName") or "", r.get("agentAddress") or "",
                              r.get("applicantName") or "", r.get("decision") or "", r.get("siteExtent")]
     save(TIMINGS, {"generated": datetime.utcnow().isoformat() + "Z",
                    "fields": ["ref", "work", "type", "level", "outcome", "received", "validated", "decided",
-                              "complexity", "agent", "applicant", "applicantKey"],
+                              "complexity", "agent", "applicant", "applicantKey", "foundAsOriginal"],
                    **enc, "rows": rows})
     save(DETAILS, {"fields": ["description", "address", "keyVal", "agentName", "agentCompanyName", "agentAddress",
                               "applicantName", "decision", "siteExtent"], "apps": details})
