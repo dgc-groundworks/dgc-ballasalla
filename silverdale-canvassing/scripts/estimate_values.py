@@ -42,7 +42,7 @@ B = floor or site area from drawings or description, priced with Isle of Man adj
 C = size inferred from the description using typical sizes (about +/-50%).
 D = not priced: not building work, or not enough information (value fields null)."""
 
-RANGE = {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2}
+RANGE = {"type": "array", "items": {"type": "integer"}}   # [low, high]; the API only allows minItems 0 or 1, so pairs are tidied in code
 NULLABLE_RANGE = {"anyOf": [RANGE, {"type": "null"}]}
 SCHEMA = {
     "type": "object",
@@ -159,6 +159,12 @@ def related_for(r, history, idx, limit=8):
     return out
 
 
+def tidy_range(v):
+    """Turn whatever came back into [low, high], or None."""
+    nums = [int(x) for x in v if isinstance(x, (int, float))] if isinstance(v, list) else []
+    return [min(nums), max(nums)] if nums else None
+
+
 def app_payload(r, related=None):
     return {k: v for k, v in {
         "ref": r["ref"], "description": r.get("description"), "applicationType": r.get("applicationType"),
@@ -256,6 +262,8 @@ def estimate(max_apps, vision):
             r = by_ref.get(res["ref"])
             if not r:
                 continue
+            for key in ("total", "groundworks", "england", "floorM2"):
+                res[key] = tidy_range(res.get(key))
             res.update({"received": r.get("received"), "status": r.get("outcome") or "pending",
                         "parish": r.get("parish"), "keyVal": r.get("keyVal"), "pricedOn": date.today().isoformat(),
                         "rateBook": version})

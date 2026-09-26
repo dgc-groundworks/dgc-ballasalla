@@ -13,6 +13,11 @@ on:
         description: 'How many recent months to pull (1-6)'
         required: false
         default: '3'
+      pricing_only:
+        description: 'Only price applications (skip the slow register pull)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -42,16 +47,19 @@ jobs:
         run: python3 silverdale-canvassing/scripts/sync_storage.py download
 
       - name: Pull register
+        if: ${{ github.event.inputs.pricing_only != 'true' }}
         run: |
           python3 silverdale-canvassing/scripts/pull_register.py \
             --months "${{ github.event.inputs.months || '3' }}" \
             --out silverdale-canvassing/register-data/latest.json
 
       - name: Update decision-time history, forecasts and accuracy
+        if: ${{ github.event.inputs.pricing_only != 'true' }}
         run: python3 silverdale-canvassing/scripts/planning_history.py --update silverdale-canvassing/register-data/latest.json
 
       # Only does anything once an ANTHROPIC_API_KEY repository secret exists.
       - name: Claude reads new applications (type, complexity, homes)
+        if: ${{ github.event.inputs.pricing_only != 'true' }}
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python3 silverdale-canvassing/scripts/ai_classify.py --max 150
