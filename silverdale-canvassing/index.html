@@ -11,6 +11,7 @@
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
 <script src="market.js?v=8"></script>
+<script src="contacts.js?v=1"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -1667,6 +1668,9 @@ function renderRegisterPullLoaded(box, data){
           ${a.agentAddress ? `<br><span style="opacity:.75">${esc(a.agentAddress)}</span>` : ''}
         </div>` : '';
 
+    const before = !sent && typeof priorContacts === 'function'
+      ? priorContacts({ ref: a.ref, applicant: person, recipientLines: [person, ...(a.address || '').split(',')], agentText: `${a.agentName || ''} ${a.agentCompanyName || ''}` }).filter(c => c.why !== 'also on the print list')
+      : [];
     let actions;
     if (sent) {
       const p = predictions[a.ref];
@@ -1704,6 +1708,7 @@ function renderRegisterPullLoaded(box, data){
         </div>
         <div class="lr-side">
           <span class="tag ${CATEGORY_TAG[cat][0]}">${CATEGORY_TAG[cat][1] || a.decision || 'Decided'}</span>
+          ${before.length ? `<span class="tag tag-excl" title="${esc(before.map(c => `${c.name}: ${c.why}, ${prettyDate(c.date)}`).join('; '))}">Written to before &middot; ${esc(prettyDate(before[0].date))}</span>` : ''}
           ${actions}
         </div>
       </div>`;
@@ -1777,7 +1782,12 @@ function renderRegisterPullLoaded(box, data){
       if (expandedRefs.has(a.ref)) expandedRefs.delete(a.ref); else expandedRefs.add(a.ref);
     } else if (btn.classList.contains('reg-send-btn')) {
       const folder = btn.dataset.folder;
-      if (addRegisterAppToBatch(a, folder)) { saveLeadsToStorage(); say(`${person} → ${FOLDERS[folder]} folder.`); }
+      if (addRegisterAppToBatch(a, folder)) {
+        saveLeadsToStorage();
+        const added = leads.find(l => l.ref === a.ref);
+        const p = added && typeof priorContacts === 'function' ? priorContacts(added) : [];
+        say(`${person} → ${FOLDERS[folder]} folder.${p.length ? ` Careful: ${p[0].name} was already written to (${p[0].why}${p[0].date ? ', ' + prettyDate(p[0].date) : ''}).` : ''}`);
+      }
     } else if (btn.classList.contains('reg-add-agent-btn')) {
       if (addAgentToBatch(a)) { saveLeadsToStorage(); say(`${a.agentName || a.agentCompanyName} (agent) → Businesses folder.`); }
     } else if (btn.classList.contains('reg-dismiss-btn')) {
@@ -1828,6 +1838,9 @@ function renderFolder(main, folder){
   // Personalised letters only go to print once written and saved.
   const sendable = active.filter(x => !x.l.include && !x.l.excludedReason && !x.l.needsReview && (!personal || x.l.personalDone));
   const unwritten = personal ? active.filter(x => !x.l.personalDone).length : 0;
+  const repeat = x => typeof priorContacts === 'function' && priorContacts(x.l).length > 0;
+  const repeatsWaiting = sendable.filter(repeat);
+  const sendableClean = sendable.filter(x => !repeat(x));
   const flaggedWaiting = active.filter(x => !x.l.include && !x.l.excludedReason && x.l.needsReview).length;
 
   const groups = new Map();
@@ -1853,6 +1866,7 @@ function renderFolder(main, folder){
           <div class="lr-applicant">${esc(l.applicant)}</div>
           <div class="lr-meta">${esc(l.ref)}${l.appliedDate ? ` &middot; <b style="color:var(--text)">Applied ${esc(l.appliedDate)}</b>` : ''}${l.decidedDate ? ` &middot; Decided ${esc(l.decidedDate)}` : ''}${l.description ? ' &middot; ' + esc(l.description) : ''}</div>
           ${l.appliedDate ? `<div class="lr-meta">${timingHtml(l.ref, l.appliedDate, l.decidedDate)}</div>` : ''}
+          ${typeof contactFlagHtml === 'function' ? contactFlagHtml(l) : ''}
           ${l.keyVal ? `<div class="hint" style="margin:2px 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${drawingsLinkHtml(l.keyVal)}${siteExtentHtml(l.siteExtent)}</div>` : ''}
           ${flag && flag.title ? `<div class="hint" style="margin:0 0 4px;color:var(--accent)">${esc(flag.title)}</div>` : ''}
           ${personal && typeof estimateRowHtml === 'function' ? estimateRowHtml(l.ref, l.parentRef || null, originalLineHtml(l.parentRef || null)) : ''}
@@ -1895,25 +1909,32 @@ function renderFolder(main, folder){
 
   main.innerHTML = `
     <div class="row-actions">
-      <button class="btn" id="fSendAllBtn" ${sendable.length ? '' : 'disabled'}>Send all ${sendable.length} to print</button>
+      <button class="btn" id="fSendAllBtn" ${sendableClean.length ? '' : 'disabled'}>Send all ${sendableClean.length} to print</button>
       ${onPrint ? `<button class="btn-secondary" id="fUnsendAllBtn">Take all ${onPrint} off the print list</button>` : ''}
       <button class="btn-secondary" id="fGoPrintBtn">Go to Print &rarr;</button>
-      <span id="fMsg" class="hint" style="margin:0"></span>
+      <span id="fMsg" class="hint" style="margin:0">${state.folderMsg ? esc(state.folderMsg) : ''}</span>
     </div>
+    ${typeof contactedBarHtml === 'function' ? contactedBarHtml(active.map(x => x.l)) : ''}
     <div class="stat-bar">
       <span><b>${active.length}</b> waiting in ${label}</span>
       <span style="color:var(--accent)"><b>${onPrint}</b> on the print list</span>
       ${flaggedWaiting ? `<span><b>${flaggedWaiting}</b> marked Check — send those one at a time once you've looked</span>` : ''}
       ${unwritten ? `<span><b>${unwritten}</b> letters still to write</span>` : ''}
+      ${repeatsWaiting.length ? `<span style="color:#ef4444"><b>${repeatsWaiting.length}</b> already written to: left out of "Send all", send them one at a time if you really mean to</span>` : ''}
       ${sentCount ? `<span><b>${sentCount}</b> already sent (see Archive)</span>` : ''}
     </div>
     <p class="hint">${COPY_NOTE[folder]}</p>
     ${[...groups].map(([k, xs]) => `<h3 class="lead-section-hdr">${groupTitle(k)} &middot; ${xs.length}</h3><div class="lead-list">${xs.map(x => row(x.l, x.i)).join('')}</div>`).join('')}
   `;
 
+  state.folderMsg = '';
   const done = () => { saveLeadsToStorage(); render(); };
   const sendAll = document.getElementById('fSendAllBtn');
-  sendAll.addEventListener('click', () => { sendable.forEach(x => { x.l.include = true; }); done(); });
+  sendAll.addEventListener('click', () => {
+    sendableClean.forEach(x => { x.l.include = true; x.l.sentToPrintAt = todayISO(); });
+    if (repeatsWaiting.length) state.folderMsg = `${repeatsWaiting.length} already written to were left off the print list.`;
+    done();
+  });
   const unsendAll = document.getElementById('fUnsendAllBtn');
   if (unsendAll) unsendAll.addEventListener('click', () => { active.forEach(x => { x.l.include = false; }); done(); });
   document.getElementById('fGoPrintBtn').addEventListener('click', () => { state.tab = 'letters'; render(); });
@@ -1922,7 +1943,12 @@ function renderFolder(main, folder){
     const i = +rowEl.dataset.i;
     const l = leads[i];
     const toggle = rowEl.querySelector('.send-toggle');
-    if (!toggle.disabled) toggle.addEventListener('click', () => { l.include = !l.include; done(); });
+    if (!toggle.disabled) toggle.addEventListener('click', () => {
+      if (!l.include && typeof confirmRepeats === 'function' && !confirmRepeats([l], 'Put this letter on the print list')) return;
+      l.include = !l.include;
+      if (l.include) l.sentToPrintAt = todayISO();
+      done();
+    });
     rowEl.querySelector('.sal-input').addEventListener('change', e => { l.salutation = e.target.value; l.edited = true; saveLeadsToStorage(); });
     rowEl.querySelector('.f-edit-btn').addEventListener('click', () => { state.editRef = l.ref; render(); });
     const save = rowEl.querySelector('.f-edit-save');
@@ -2182,9 +2208,11 @@ function renderPrint(main, kind){
     </div>
     <div class="stat-bar"><span>${mix}</span><span>Each ${kind === 'letter' ? 'letter uses' : 'envelope matches'} the copy for its folder — letters and envelopes are in the same order.</span>
     </div>
+    ${typeof contactedBarHtml === 'function' ? contactedBarHtml(batch) : ''}
     <div id="pdfArea">${batch.map((l, i) => docWrapHtml(l, i, kind)).join('')}</div>
   `;
-  document.getElementById('printBtn').addEventListener('click', () => window.print());
+  const okToSend = action => typeof confirmRepeats !== 'function' || confirmRepeats(batch, action);
+  document.getElementById('printBtn').addEventListener('click', () => { if (okToSend('Print these')) window.print(); });
   document.getElementById('pdfArea').addEventListener('click', (e) => {
     const wrap = e.target.closest('.doc-wrap');
     if (!wrap) return;
@@ -2272,7 +2300,7 @@ function renderPrint(main, kind){
         date: today, name: l.applicant, source: leadFolder(l) === 'business' ? 'business' : 'planning',
         copy: leadFolder(l), recipientLines: l.recipientLines, salutation: l.salutation, letterDate, bodyParas: letterParas(l),
         description: l.description || '', appliedDate: l.appliedDate || '', decidedDate: l.decidedDate || '',
-        keyVal: l.keyVal || '', siteExtent: l.siteExtent || null,
+        keyVal: l.keyVal || '', siteExtent: l.siteExtent || null, sentToPrintAt: l.sentToPrintAt || '',
         ...(pdfFile ? (kind === 'letter' ? { pdfFile, pdfPage: i + 1 } : { envelopePdfFile: pdfFile, envelopePdfPage: i + 1 }) : {})
       };
       l.alreadyProcessed = true;
@@ -2281,8 +2309,9 @@ function renderPrint(main, kind){
     saveLog(log);
     saveLeadsToStorage();
   }
-  document.getElementById('savePdfBtn').addEventListener('click', () => buildAndSavePdf(document.getElementById('savePdfBtn')));
+  document.getElementById('savePdfBtn').addEventListener('click', () => { if (okToSend('Make the PDF')) buildAndSavePdf(document.getElementById('savePdfBtn')); });
   document.getElementById('saveArchiveBtn').addEventListener('click', async () => {
+    if (!okToSend('Save and mark them as sent')) return;
     const btn = document.getElementById('saveArchiveBtn');
     const filename = await buildAndSavePdf(btn);
     if (!filename) return;
@@ -2290,6 +2319,7 @@ function renderPrint(main, kind){
     render();
   });
   document.getElementById('markSentBtn').addEventListener('click', () => {
+    if (!okToSend('Mark them as sent')) return;
     archiveBatch(false);
     document.getElementById('markSentBtn').textContent = '✓ Logged';
     document.getElementById('markSentBtn').disabled = true;
@@ -2307,6 +2337,7 @@ function docWrapHtml(l, idx, kind){
       <button class="doc-edit-btn" type="button">&#9998; Edit this one</button>
       <button class="doc-edit-btn doc-remove-btn" type="button">&#10005; Take off print list</button>
     </div>
+    ${kind === 'letter' && typeof contactFlagHtml === 'function' ? `<div class="no-print">${contactFlagHtml(l)}</div>` : ''}
     ${docHtml}
     <div class="doc-edit-panel no-print" hidden>
       <label>Recipient name &amp; address (one line each)</label>
