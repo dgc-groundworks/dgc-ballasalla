@@ -156,6 +156,18 @@ table.tstats td,table.tstats th{padding:5px 8px}
 .pl-editor textarea.pl-text{min-height:320px;line-height:1.5}
 .pl-editor .pl-sal{width:100%;max-width:420px;margin:0 0 8px}
 @media (max-width:760px){.lead-row{flex-wrap:wrap}.lr-side{flex-wrap:wrap;width:100%}.main{padding:16px}}
+/* Phones: the top bar wraps instead of pushing the page wider than the screen (27 Sep 2026) */
+@media (max-width:760px){
+  .topbar{flex-wrap:wrap;padding:8px 12px;gap:6px;position:static}
+  .topbar .sub{margin-left:0;width:100%;order:2}
+  .topbar button,.topbar .cloud-chip{font-size:0.72rem;padding:4px 8px}
+  .nav{top:0;padding:0 8px}
+  .reg-actions{grid-template-columns:repeat(2,auto)!important}
+  .row-bar .rb-what{margin-left:0}
+  .row-body{margin-left:0}
+  .prof-panel{padding:14px}
+  table.est-mat,table.contacted,table.tstats{display:block;overflow-x:auto}
+}
 .print-doc{background:#fff;color:#000;box-shadow:0 4px 32px rgba(0,0,0,.4);margin:0 auto 28px;font-family:'Cormorant Garamond',Garamond,'Times New Roman',serif;font-variant-numeric:lining-nums proportional-nums;font-feature-settings:"lnum" 1,"pnum" 1}
 /* Page-to-page gap is for on-screen viewing only -- html2canvas
    captures the full margin box, so it must collapse to 0 during a
