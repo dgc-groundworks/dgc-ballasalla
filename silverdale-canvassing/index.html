@@ -113,6 +113,21 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .who-inv{font-size:0.85rem;margin:6px 0 4px;padding:6px 10px;border-left:3px solid rgba(56,153,207,.7);background:var(--surf2);border-radius:0 6px 6px 0;color:var(--text);line-height:1.5}
 .who-inv b{color:#7cc4ea;font-weight:700}
 .orig-banner{margin-top:8px;padding-top:8px;border-top:1px solid var(--bord);font-weight:400}
+/* Compact rows: one bar each, click to open the full detail (Ash, 27 Sep 2026) */
+.row-bar{cursor:pointer;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.row-bar .rb-caret{color:var(--muted);font-size:0.8rem;width:12px}
+.row-bar .rb-meta{font-size:0.78rem;color:var(--muted)}
+.row-bar .rb-what{flex-basis:100%;font-size:0.85rem;color:var(--text);margin-left:22px}
+.row-bar .rb-val{font-size:0.78rem;font-weight:700;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.1);border-radius:5px;padding:1px 7px}
+.row-body{display:none;margin:8px 0 0 22px}
+.lead-row.open .row-body{display:block}
+.lead-row.open .rb-caret{transform:rotate(90deg)}
+.grp{border:1px solid var(--bord);border-radius:10px;margin:8px 0;background:var(--surf)}
+.grp-bar{cursor:pointer;padding:10px 14px;font-size:0.9rem;color:var(--text);display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
+.grp-bar .gb-count{font-size:0.78rem;font-weight:800;color:#111;background:#7cc4ea;border-radius:999px;padding:1px 8px}
+.grp-body{display:none;padding:0 8px 8px}
+.grp.open .grp-body{display:block}
+.grp.open .grp-bar .rb-caret{transform:rotate(90deg)}
 .orig-banner .est-orig{font-size:0.86rem;margin:0}
 .proj-hdr{margin:18px 0 6px;padding:8px 12px;border-radius:8px;background:rgba(56,153,207,.1);border:1px solid rgba(56,153,207,.35);font-size:0.85rem;color:var(--text)}
 .proj-hdr b{color:#7cc4ea}
@@ -519,6 +534,21 @@ const FOLDERS = { approved: 'Approved', pending: 'Pending', business: 'Businesse
 // Anything dealt with (sent to a folder, archived, parked in Market research) stays on the planning
 // list with its Undo button until the page is next refreshed, then lives only in its tab (Ash, 27 Sep 2026).
 const REG_RECENT = new Set();
+const ROW_OPEN = new Set(), GRP_OPEN = new Set();
+document.addEventListener('click', e => {
+  if (e.target.closest('button, a, input, select, textarea, label, summary, .prof-overlay')) return;
+  const bar = e.target.closest('.row-bar, .grp-bar');
+  if (!bar) return;
+  const box = bar.closest(bar.classList.contains('grp-bar') ? '.grp' : '.lead-row');
+  const set = bar.classList.contains('grp-bar') ? GRP_OPEN : ROW_OPEN;
+  const key = box.dataset.key;
+  if (box.classList.toggle('open')) set.add(key); else set.delete(key);
+});
+// One collapsible bar for several entries belonging to the same person or firm.
+function groupBarHtml(key, title, count, extra, bodyHtml){
+  return `<div class="grp${GRP_OPEN.has(key) ? ' open' : ''}" data-key="${esc(key)}"><div class="grp-bar"><span class="rb-caret">&#9656;</span><b>${title}</b><span class="gb-count">${count}</span>${extra || ''}</div><div class="grp-body">${bodyHtml}</div></div>`;
+}
+const plainText = html => { const d = document.createElement('div'); d.innerHTML = html; return d.textContent.replace(/\s+/g, ' ').trim(); };
 function leadFolder(l){ return l.folder || (l.source === 'business' ? 'business' : l.planningStatus === 'pending' ? 'pending' : 'approved'); }
 function todayISO(){ return new Date().toLocaleDateString('en-CA'); }
 function prettyDate(iso){ return iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''; }
@@ -1997,15 +2027,22 @@ function renderRegisterPullLoaded(box, data){
       const where = arch ? (arch.research ? 'Market research' : 'Archive') : inLead ? FOLDERS[leadFolder(inLead)] : sent ? 'Archive' : '';
       if (where) actions += `<div class="hint" style="margin:6px 0 0;text-align:right;color:var(--accent)">Moves to the ${esc(where)} tab when you next refresh. Undo until then.</div>`;
     }
+    const gloss = (whatThisIsHtml(a).match(/<div class="reg-work-gloss">([\s\S]*?)<\/div>/) || [])[1];
+    const val = typeof estimateFor === 'function' ? estimateFor(a.ref, parentRefOf(a)) : null;
     return `
-      <div class="lead-row">
+      <div class="lead-row${ROW_OPEN.has(a.ref) ? ' open' : ''}" data-key="${esc(a.ref)}">
         <div class="lr-main">
-          <div class="reg-name">${nameBtn(a.ref, person)}</div>
+          <div class="row-bar"><span class="rb-caret">&#9656;</span><span class="reg-name">${nameBtn(a.ref, person)}</span>
+            <span class="rb-meta">${esc(a.ref)}${a.parish ? ` &middot; ${esc(a.parish)}` : ''} &middot; applied ${esc(a.received || '?')}</span>
+            ${val ? `<span class="rb-val">Job ${moneyRange(val.total)}${val.ref !== a.ref ? ' (original)' : ''}</span>` : ''}
+            <span class="rb-what">${gloss ? plainText(gloss) : esc((a.description || '').slice(0, 140))}</span></div>
+          <div class="row-body">
           <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}${a.parish ? ` &middot; ${esc(a.parish)}` : ''}</div>
           <div class="reg-work"><span class="lbl">Applying for</span>${whatThisIsHtml(a)}${parentRefOf(a) ? `<div class="orig-banner">${originalLineHtml(parentRefOf(a), a)}</div>` : ''}</div>
           ${whoInvolvedHtml(a)}
           <div class="lr-meta" style="margin:4px 0 2px"><b style="color:var(--text)">Applied ${esc(a.received || '?')}</b>${a.isDecided && a.decisionDate ? ` &middot; Decided ${esc(a.decisionDate)}` : ''} &middot; ${timingHtml(a.ref, a.received, a.isDecided ? a.decisionDate : null)}</div>
           ${plainEnglishHtml(a)}
+          </div>
         </div>
         <div class="lr-side">
           <span class="tag ${CATEGORY_TAG[cat][0]}">${CATEGORY_TAG[cat][1] || a.decision || 'Decided'}</span>
@@ -2040,8 +2077,32 @@ function renderRegisterPullLoaded(box, data){
       const est = typeof estimateFor === 'function' ? estimateFor(k, null) : null;
       const who = (root.applicantName || (relIdx && relIdx.rec.get(k) ? relIdx.rec.get(k).applicant : '')) || '';
       const banned = STANDING_EXCLUDE.find(n => who.toLowerCase().includes(n));
-      return `<div class="proj-hdr"><b>Project ${esc(k)}</b>${who ? ` &middot; ${esc(who)}` : ''}${banned ? ` <span class="tag tag-excl">Never contact</span>` : ''}${est ? ` &middot; job ${moneyRange(est.total)}` : ''} &middot; ${xs.length} applications on this list${root.description ? `<div class="hint" style="margin:2px 0 0">${esc(root.description.slice(0, 180))}</div>` : ''}</div>`
-        + xs.map(a => rowHtml(a, true)).join('');
+      return groupBarHtml('proj:' + k, `Project ${esc(k)}${who ? ` &middot; ${esc(who)}` : ''}`, `${xs.length} applications`,
+        `${banned ? '<span class="tag tag-excl">Never contact</span>' : ''}${est ? `<span class="rb-val">Job ${moneyRange(est.total)}</span>` : ''}${root.description ? `<span class="rb-what" style="margin-left:22px">${esc(root.description.slice(0, 160))}</span>` : ''}`,
+        xs.map(a => rowHtml(a, true)).join(''));
+    }).join('');
+  }
+
+  // Several applications from the same person or firm sit under one bar that says how many.
+  function personGroupedHtml(list){
+    const groups = new Map();
+    list.forEach(a => {
+      const name = a.applicantName || a.agentCompanyName || a.agentName || '';
+      const n = personNorm(name);
+      let k = n ? [...groups.keys()].find(g => samePerson(g, n)) || n : 'ref:' + a.ref;
+      if (!groups.has(k)) groups.set(k, { name, xs: [] });
+      groups.get(k).xs.push(a);
+    });
+    return [...groups].map(([k, g]) => {
+      if (g.xs.length < 2) return rowHtml(g.xs[0], true);
+      const vals = g.xs.map(a => typeof estimateFor === 'function' ? estimateFor(a.ref, parentRefOf(a)) : null).filter(Boolean);
+      const uniq = [...new Map(vals.map(v => [v.ref, v])).values()];
+      const total = uniq.length ? [uniq.reduce((n, v) => n + v.total[0], 0), uniq.reduce((n, v) => n + v.total[1], 0)] : null;
+      const written = g.xs.some(a => log[a.ref]) || (typeof priorContacts === 'function' && priorContacts({ ref: g.xs[0].ref, applicant: g.name, recipientLines: [g.name] }).some(c => c.why !== 'also on the print list'));
+      const banned = STANDING_EXCLUDE.find(x => g.name.toLowerCase().includes(x));
+      return groupBarHtml('person:' + k, esc(g.name), `${g.xs.length} applications`,
+        `${total ? `<span class="rb-val">Jobs ${moneyRange(total)}</span>` : ''}${written ? '<span class="tag tag-excl">Written to before</span>' : ''}${banned ? '<span class="tag tag-excl">Never contact</span>' : ''}<span class="rb-meta">${g.xs.map(a => esc(a.ref)).join(' &middot; ')}</span>`,
+        g.xs.map(a => rowHtml(a, true)).join(''));
     }).join('');
   }
 
@@ -2059,7 +2120,7 @@ function renderRegisterPullLoaded(box, data){
     document.getElementById('regCount').innerHTML = `${filtered.length} of ${apps.length} shown`
       + (parked ? ` &middot; ${parked}, ${showArchived ? '<button type="button" class="link-btn" id="regHideArchived">hide them</button>' : '<button type="button" class="link-btn" id="regShowArchived">show them</button>'}` : '');
     document.getElementById('registerList').innerHTML = filtered.length
-      ? (document.getElementById('regGroup').checked ? groupedHtml(filtered) : filtered.map(a => rowHtml(a, full)).join(''))
+      ? ({ project: groupedHtml, person: personGroupedHtml }[document.getElementById('regGroup').value] || (xs => xs.map(a => rowHtml(a, full)).join('')))(filtered)
       : '<p class="empty-state">Nothing matches those filters.</p>';
     const showBtn = document.getElementById('regShowArchived');
     if (showBtn) showBtn.addEventListener('click', () => { showArchived = true; renderList(); });
@@ -2113,7 +2174,13 @@ function renderRegisterPullLoaded(box, data){
           <option value="name">Name A to Z</option>
         </select>
       </label>
-      <label class="hint" style="margin:0"><input type="checkbox" id="regGroup" checked> Group by project</label>
+      <label>Group
+        <select id="regGroup">
+          <option value="person" selected>Same person together</option>
+          <option value="project">Same project together</option>
+          <option value="none">No grouping</option>
+        </select>
+      </label>
       <input type="text" id="regSearch" placeholder="Search name, address, description&hellip;" style="min-width:220px">
     </div>
     <div class="row-actions" style="flex-wrap:wrap;gap:10px;margin-bottom:6px">
@@ -2361,6 +2428,12 @@ function renderFolder(main, folder){
   const today = todayISO();
   const groupTitle = k => !k ? 'Added earlier' : k === today ? `Added today &middot; ${prettyDate(k)}` : `Added ${prettyDate(k)}`;
 
+  function byPerson(xs){
+    const g = new Map();
+    xs.forEach(x => { const n = personNorm(x.l.applicant); const k = n ? [...g.keys()].find(y => samePerson(y, n)) || n : 'ref:' + x.l.ref; if (!g.has(k)) g.set(k, []); g.get(k).push(x); });
+    return [...g].map(([k, ys]) => ys.length < 2 ? row(ys[0].l, ys[0].i)
+      : groupBarHtml(`fp:${folder}:${k}`, esc(ys[0].l.applicant), `${ys.length} entries`, `<span class="rb-meta">${ys.map(y => esc(y.l.ref)).join(' &middot; ')}</span>`, ys.map(y => row(y.l, y.i)).join(''))).join('');
+  }
   function row(l, i){
     const flag = l.excludedReason ? { cls: 'tag-excl', label: 'Never contact', title: l.excludedReason }
       : l.needsReview ? { cls: 'tag-review', label: 'Check', title: l.reviewNote }
@@ -2370,9 +2443,14 @@ function renderFolder(main, folder){
     const needsWriting = personal && !l.personalDone;
     const moveOpts = Object.entries(FOLDERS).map(([k, v]) => `<option value="${k}" ${k === folder ? 'selected' : ''}>${v}</option>`).join('');
     return `
-      <div class="lead-row ${flag ? 'flagged' : ''}" data-i="${i}">
+      <div class="lead-row ${flag ? 'flagged' : ''}${ROW_OPEN.has('f:' + l.ref) || editing || writing ? ' open' : ''}" data-i="${i}" data-key="f:${esc(l.ref)}">
         <div class="lr-main">
-          <div class="lr-applicant">${nameBtn(l.baseRef || l.ref, l.applicant)}${l.baseRef ? ' <span class="tag tag-review">Follow-up</span>' : ''}${isBiz ? `<span class="trade-tag">${esc(tradeOf(l))}</span>` : ''}</div>
+          <div class="row-bar"><span class="rb-caret">&#9656;</span><span class="lr-applicant">${nameBtn(l.baseRef || l.ref, l.applicant)}${l.baseRef ? ' <span class="tag tag-review">Follow-up</span>' : ''}${isBiz ? `<span class="trade-tag">${esc(tradeOf(l))}</span>` : ''}</span>
+            <span class="rb-meta">${esc(isBiz ? ((l.recipientLines || [])[1] || '') : l.ref)}${l.appliedDate ? ` &middot; applied ${esc(l.appliedDate)}` : ''}</span>
+            ${!isBiz && typeof estimateFor === 'function' && estimateFor(l.baseRef || l.ref, l.parentRef || null) ? `<span class="rb-val">Job ${moneyRange(estimateFor(l.baseRef || l.ref, l.parentRef || null).total)}</span>` : ''}
+            ${typeof priorContacts === 'function' && priorContacts(l).some(c => !(c.why === 'this application' && l.alreadyProcessed)) ? '<span class="tag tag-excl">Written to before</span>' : ''}
+            ${l.description ? `<span class="rb-what">${esc(l.description.slice(0, 150))}</span>` : ''}</div>
+          <div class="row-body">
           <div class="lr-meta">${esc(l.ref)}${l.appliedDate ? ` &middot; <b style="color:var(--text)">Applied ${esc(l.appliedDate)}</b>` : ''}${l.decidedDate ? ` &middot; Decided ${esc(l.decidedDate)}` : ''}${l.description ? ' &middot; ' + esc(l.description) : ''}</div>
           ${l.appliedDate ? `<div class="lr-meta">${timingHtml(l.ref, l.appliedDate, l.decidedDate)}</div>` : ''}
           ${typeof contactFlagHtml === 'function' ? contactFlagHtml(l) : ''}
@@ -2398,6 +2476,7 @@ function renderFolder(main, folder){
             </div>
             <div class="letter-preview">${letterHtml(l)}</div>
           </div>` : ''}
+          </div>
         </div>
         <div class="lr-side" style="flex-direction:column;align-items:flex-end;gap:8px">
           <div style="display:flex;gap:8px;align-items:center">
@@ -2434,7 +2513,7 @@ function renderFolder(main, folder){
       ${sentCount ? `<span><b>${sentCount}</b> already sent (see Archive)</span>` : ''}
     </div>
     <p class="hint">${COPY_NOTE[folder]}</p>
-    ${[...groups].map(([k, xs]) => `<h3 class="lead-section-hdr">${groupTitle(k)} &middot; ${xs.length}</h3><div class="lead-list">${xs.map(x => row(x.l, x.i)).join('')}</div>`).join('')}
+    ${[...groups].map(([k, xs]) => `<h3 class="lead-section-hdr">${groupTitle(k)} &middot; ${xs.length}</h3><div class="lead-list">${byPerson(xs)}</div>`).join('')}
   `;
 
   state.folderMsg = '';
@@ -2515,14 +2594,20 @@ function renderResearch(main){
   const rowFor = ([ref, e]) => {
     const a = { ref, description: e.description || '', address: e.address || '', received: e.appliedDate || '', decisionDate: e.decidedDate || '', isDecided: !!e.decidedDate, keyVal: e.keyVal || '' };
     const parent = parentRefOf(a);
-    return `<div class="lead-row" data-ref="${esc(ref)}"><div class="lr-main">
-        <div class="lr-applicant">${nameBtn(ref, e.name || ref)}</div>
+    const val = typeof estimateFor === 'function' ? estimateFor(ref, parent) : null;
+    return `<div class="lead-row${ROW_OPEN.has('rs:' + ref) ? ' open' : ''}" data-ref="${esc(ref)}" data-key="rs:${esc(ref)}"><div class="lr-main">
+        <div class="row-bar"><span class="rb-caret">&#9656;</span><span class="lr-applicant">${nameBtn(ref, e.name || ref)}</span>
+          <span class="rb-meta">${esc(ref)}${e.appliedDate ? ` &middot; applied ${esc(e.appliedDate)}` : ''}</span>
+          ${val ? `<span class="rb-val">Job ${moneyRange(val.total)}</span>` : ''}${e.note ? '<span class="tag tag-dupe">Notes</span>' : ''}
+          <span class="rb-what">${esc((e.description || '').slice(0, 150))}</span></div>
+        <div class="row-body">
         <div class="lr-meta">${esc(ref)} &middot; ${esc(e.address || '')}${e.appliedDate ? ` &middot; <b style="color:var(--text)">Applied ${esc(e.appliedDate)}</b>` : ''}${e.decidedDate ? ` &middot; Decided ${esc(e.decidedDate)}` : ''}</div>
         <div class="reg-work"><span class="lbl">Applying for</span>${whatThisIsHtml(a)}${parent ? `<div class="orig-banner">${originalLineHtml(parent, a)}</div>` : ''}</div>
         ${whoInvolvedHtml(a)}
         ${typeof estimateRowHtml === 'function' ? estimateRowHtml(ref, parent, '') : ''}
         ${e.keyVal ? `<div class="reg-links">${drawingsLinkHtml(e.keyVal)}</div>` : ''}
         <label class="hint" style="display:block;margin:8px 0 0">Your research notes<textarea class="rs-note" rows="2" placeholder="Who to call, what you found, next step&hellip;">${esc(e.note || '')}</textarea></label>
+        </div>
       </div>
       <div class="lr-side" style="flex-direction:column;align-items:flex-end;gap:6px">
         <span class="tag tag-dupe">Parked ${esc(prettyDate(e.date))}</span>
@@ -2632,8 +2717,16 @@ function renderArchive(main){
 
   const planning = shown.filter(x => !x.biz);
   const business = shown.filter(x => x.biz);
+  const byPerson = xs => {
+    const g = new Map();
+    xs.forEach(x => { const n = personNorm(x.e.name || ''); const k = n ? [...g.keys()].find(y => samePerson(y, n)) || n : 'ref:' + x.ref; if (!g.has(k)) g.set(k, []); g.get(k).push(x); });
+    return [...g].map(([k, ys]) => ys.length < 2 ? entryHtml(ys[0])
+      : groupBarHtml('ar:' + k, esc(ys[0].e.name || ys[0].ref), `${ys.length} entries`,
+          `<span class="rb-meta">${ys.map(y => `${esc(y.ref)} (${y.kind === 'sent' ? 'sent ' + esc(prettyDate(y.e.date)) : 'not chasing'})`).join(' &middot; ')}</span>`,
+          ys.map(entryHtml).join(''))).join('');
+  };
   const section = (title, xs) => `<h3 class="lead-section-hdr">${title} &middot; ${xs.length}</h3>`
-    + (xs.length ? `<div class="lead-list">${xs.map(entryHtml).join('')}</div>` : '<p class="empty-state">Nothing here.</p>');
+    + (xs.length ? `<div class="lead-list">${byPerson(xs)}</div>` : '<p class="empty-state">Nothing here.</p>');
   const count = k => entries.filter(x => x.kind === k).length;
 
   main.innerHTML = `
