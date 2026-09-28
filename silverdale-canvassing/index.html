@@ -11,7 +11,8 @@
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
 <script src="market.js?v=13"></script>
-<script src="contacts.js?v=6"></script>
+<script src="contacts.js?v=7"></script>
+<script src="enquiries.js?v=1"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -92,6 +93,12 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .send-toggle:disabled{opacity:.4;cursor:default}
 .tag{display:inline-block;font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:4px}
 .tag-excl{background:rgba(239,68,68,.15);color:var(--red)}
+.tag-enq{background:rgba(239,68,68,.18);color:var(--red);font-weight:700}
+.enq-flag{border-color:var(--red)}
+.enq-box{margin-top:8px;padding:8px 10px;border:1px solid var(--bord);border-radius:6px;font-size:0.86rem}
+.enq-msg{white-space:pre-wrap;margin-top:6px;padding:8px 10px;border-left:3px solid var(--accent);font-size:0.9rem}
+.enq-contact{font-size:0.86rem;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.enq-plan{margin-top:6px;padding-top:6px;border-top:1px dashed var(--bord)}
 .tag-dupe{background:rgba(100,116,139,.2);color:var(--muted)}
 .tag-review{background:rgba(245,158,11,.18);color:var(--accent)}
 .tag-approved{background:rgba(34,197,94,.15);color:var(--green)}
@@ -272,6 +279,7 @@ body.locked .gate{display:flex}
   <button class="navbtn" data-tab="fPersonal">Personalised<span class="nav-count" data-count="personal"></span></button>
   <button class="navbtn" data-tab="letters">Print — Letters<span class="nav-count" data-count="print"></span></button>
   <button class="navbtn" data-tab="envelopes">Print — Envelopes</button>
+  <button class="navbtn" data-tab="responses">Responses<span class="nav-count" data-count="responses"></span></button>
   <button class="navbtn" data-tab="research">Market research<span class="nav-count" data-count="research"></span></button>
   <button class="navbtn" data-tab="archive">Archive &mdash; Sent &amp; Not chasing</button>
   <button class="navbtn" data-tab="market">Market &mdash; Job values</button>
@@ -596,6 +604,7 @@ function updateNavCounts(){
   counts.archive = Object.values(getDismissed()).filter(e => !e.research).length;
   counts.research = Object.values(getDismissed()).filter(e => e.research).length;
   document.querySelectorAll('.nav-count').forEach(el => { el.textContent = counts[el.dataset.count] || ''; });
+  if (typeof updateEnquiryCount === 'function') updateEnquiryCount();
 }
 
 // Leads, the sent log and the archive are saved online (see the online
@@ -1027,6 +1036,7 @@ function render(){
   if (state.tab === 'fPersonal') return renderFolder(main, 'personal');
   if (state.tab === 'archive') return renderArchive(main);
   if (state.tab === 'research') return renderResearch(main);
+  if (state.tab === 'responses') return renderResponses(main);
   if (state.tab === 'market') return renderMarket(main);
   if (state.tab === 'letters') return renderPrint(main, 'letter');
   if (state.tab === 'envelopes') return renderPrint(main, 'envelope');
@@ -2050,8 +2060,10 @@ function renderRegisterPullLoaded(box, data){
           <div class="row-bar"><span class="rb-caret">&#9656;</span><span class="reg-name">${nameBtn(a.ref, person)}</span>
             <span class="rb-meta">${esc(a.ref)}${a.parish ? ` &middot; ${esc(a.parish)}` : ''} &middot; applied ${esc(a.received || '?')}</span>
             ${val ? `<span class="rb-val">Job ${moneyRange(val.total)}${val.ref !== a.ref ? ' (original)' : ''}</span>` : ''}
+            ${typeof enquiryTagHtml === 'function' ? enquiryTagHtml({ ref: a.ref, name: person, address: a.address }) : ''}
             <span class="rb-what">${gloss ? plainText(gloss) : esc((a.description || '').slice(0, 140))}</span></div>
           <div class="row-body">
+          ${typeof enquiryFlagHtml === 'function' ? enquiryFlagHtml({ ref: a.ref, name: person, address: a.address }) : ''}
           <div class="lr-meta">${esc(a.ref)} &middot; ${esc(a.address)}${a.parish ? ` &middot; ${esc(a.parish)}` : ''}</div>
           <div class="reg-work"><span class="lbl">Applying for</span>${whatThisIsHtml(a)}${parentRefOf(a) ? `<div class="orig-banner">${originalLineHtml(parentRefOf(a), a)}</div>` : ''}</div>
           ${whoInvolvedHtml(a)}
@@ -2221,6 +2233,7 @@ function renderRegisterPullLoaded(box, data){
       if (expandedRefs.has(a.ref)) expandedRefs.delete(a.ref); else expandedRefs.add(a.ref);
     } else if (btn.classList.contains('reg-send-btn')) {
       const folder = btn.dataset.folder;
+      if (typeof confirmEnquiries === 'function' && !confirmEnquiries([{ ref: a.ref, applicant: person, recipientLines: [person, a.address || ''] }], `Put ${person} in the ${FOLDERS[folder]} folder`)) return;
       if (addRegisterAppToBatch(a, folder)) {
         markDealt(a.ref);
         saveLeadsToStorage();

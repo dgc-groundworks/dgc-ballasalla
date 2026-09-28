@@ -126,13 +126,15 @@ function contactLine(c){
   return `${who} was sent ${what}${where} on ${esc(prettyDate(c.date))}${c.why === 'same address' ? ' (same address)' : ''}.`;
 }
 function contactFlagHtml(l){
+  const enq = typeof enquiryFlagHtml === 'function' ? enquiryFlagHtml({ ref: l.baseRef || l.ref, name: l.applicant, address: (l.recipientLines || []).slice(1).join(', ') + ' ' + (l.site || '') }) : '';
   const p = priorContacts(l).filter(c => !(c.why === 'this application' && l.alreadyProcessed));
-  if (!p.length) return '';
-  return `<div class="contact-flag"><b>&#9888; Already written to.</b> ${p.slice(0, 3).map(contactLine).join(' ')}${p.length > 3 ? ` And ${p.length - 3} more.` : ''}</div>`;
+  if (!p.length) return enq;
+  return enq + `<div class="contact-flag"><b>&#9888; Already written to.</b> ${p.slice(0, 3).map(contactLine).join(' ')}${p.length > 3 ? ` And ${p.length - 3} more.` : ''}</div>`;
 }
 
 // The one question before anything is sent twice. True = go ahead.
 function confirmRepeats(list, action){
+  if (typeof confirmEnquiries === 'function' && !confirmEnquiries(list, action)) return false;
   const hits = list.map(l => ({ l, p: priorContacts(l).filter(c => !(c.why === 'this application' && l.alreadyProcessed)) })).filter(x => x.p.length);
   if (!hits.length) return true;
   const lines = hits.slice(0, 8).map(x => `- ${x.l.applicant}: ${x.p[0].why === 'also on the print list' ? 'also on the print list' : `${x.p[0].why}, sent ${prettyDate(x.p[0].date)}`}`);
