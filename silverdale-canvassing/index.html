@@ -13,6 +13,7 @@
 <script src="market.js?v=13"></script>
 <script src="contacts.js?v=7"></script>
 <script src="enquiries.js?v=2"></script>
+<script defer src="search.js?v=1"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
 [data-theme="light"]{--bg:#f0f4f8;--surf:#ffffff;--surf2:#e4ecf4;--bord:#b8ccd8;--accent:#c26a00;--text:#1a2b3c;--muted:#5c7a94;--green:#16a34a;--red:#dc2626}
@@ -99,6 +100,20 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .enq-msg{white-space:pre-wrap;margin-top:6px;padding:8px 10px;border-left:3px solid var(--accent);font-size:0.9rem}
 .enq-contact{font-size:0.86rem;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
 .enq-plan{margin-top:6px;padding-top:6px;border-top:1px dashed var(--bord)}
+/* Search everything (top bar) */
+.gs-wrap{position:relative;flex:1;min-width:220px;max-width:460px}
+.gs-wrap input{width:100%;padding:6px 10px;border:1px solid var(--bord);border-radius:6px;background:var(--bg,transparent);color:var(--text);font:inherit;font-size:0.85rem}
+.gs-results{display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:65vh;overflow-y:auto;background:var(--surf);border:1px solid var(--bord);border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.35);z-index:50;min-width:320px}
+.gs-count{font-size:0.75rem;color:var(--muted);padding:6px 10px}
+.gs-item{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--bord);padding:7px 10px;color:var(--text);cursor:pointer;font:inherit}
+.gs-item:hover,.gs-item.active{background:rgba(245,158,11,.12)}
+.gs-name{font-weight:700;font-size:0.88rem;margin-right:8px}
+.gs-where{font-size:0.72rem;color:var(--accent);font-weight:700}
+.gs-sub{display:block;font-size:0.76rem;color:var(--muted);margin-top:2px}
+.gs-item mark{background:rgba(245,158,11,.35);color:inherit;border-radius:2px}
+@keyframes gsFlash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+.lead-row.gs-flash{animation:gsFlash 2.4s ease-out}
+@media (max-width:760px){.gs-wrap{order:3;max-width:none;width:100%;flex-basis:100%}.gs-results{min-width:0}}
 .tag-dupe{background:rgba(100,116,139,.2);color:var(--muted)}
 .tag-review{background:rgba(245,158,11,.18);color:var(--accent)}
 .tag-approved{background:rgba(34,197,94,.15);color:var(--green)}
