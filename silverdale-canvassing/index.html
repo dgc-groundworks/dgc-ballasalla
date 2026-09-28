@@ -3140,6 +3140,7 @@ async function boot(){
   else cloudStatus('warn', "Can't reach online storage (saved on this computer)");
   await Promise.all([loadLetterImages(), loadEstimatesCache()]);
   leads = loadLeadsFromStorage().map(classify);
+  if (location.hash === '#responses') state.tab = 'responses';   // link from the stats page
   render();
 }
 boot();
