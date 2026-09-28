@@ -80,6 +80,31 @@ function addrKey(lines){
   return pc && first ? first + '|' + pc : '';
 }
 
+// ---- One letter per household (Ash's prime directive, 28 Sep 2026) ----
+// The envelope address without the name line is the tell: the same house gets one letter, whoever it's addressed to.
+// Written to in the last 6 months = LOCKED (can't send). Older than that = flagged, send if you mean to.
+const LOCK_DAYS = 183;
+const normLine = s => String(s || '').toLowerCase().replace(/\bisle of man\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+function houseKeys(lines){
+  const addr = (lines || []).slice(1).map(x => String(x || '').trim()).filter(Boolean);
+  if (!addr.length) return [];
+  const txt = addr.join(', '), pc = postcodeOf(addr), keys = new Set();
+  const flat = (txt.match(/\b(?:flat|apartment|apt|unit)\s*([a-z0-9]+)/i) || [])[1];
+  const f = flat ? 'f' + flat.toLowerCase() + '|' : '';
+  const rest = txt.replace(/\b(?:flat|apartment|apt|unit)\s*[a-z0-9]+\s*,?/i, '');
+  const num = (rest.match(/(?:^|,\s*)(\d{1,4}[a-z]?)\b/i) || [])[1];
+  if (typeof addrKeysOf === 'function') addrKeysOf(rest).forEach(k => keys.add('st:' + f + k));      // "18|governors road"
+  if (pc && num) keys.add('pcn:' + f + pc + '|' + num.toLowerCase());                                  // postcode + house number
+  const first = normLine(addr[0]);
+  if (pc && first) keys.add('pcf:' + pc + '|' + first);                                                 // postcode + first address line
+  if (first && !/^\d/.test(first) && first.length > 3 && addr[1]) keys.add('hn:' + first + '|' + normLine(addr[1]));   // house name + road
+  return [...keys];
+}
+const sameHouse = (a, b) => a.length && b.length && a.some(k => b.includes(k));
+const daysAgo = iso => iso ? Math.floor((Date.now() - new Date(iso + 'T12:00:00')) / DAY_MS) : null;
+const lockedUntil = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + LOCK_DAYS); return d.toISOString().slice(0, 10); };
+const isLocked = c => c.date && c.why !== 'their agent' && daysAgo(c.date) < LOCK_DAYS;
+
 // The sent record as a list, rebuilt only when it changes.
 const CONTACTS = { raw: null, list: [] };
 function sentContacts(){
@@ -89,7 +114,8 @@ function sentContacts(){
     CONTACTS.list = Object.entries(log).map(([ref, e]) => {
       const lines = e.recipientLines || [];
       const name = e.name || lines[0] || '';
-      return { ref, e, name, lines, n: personNorm(name), a: addrKey(lines) };
+      const biz = ref.startsWith('ARCH-') || e.source === 'business';
+      return { ref, e, name, lines, n: personNorm(name), a: addrKey(lines), h: biz ? [] : houseKeys(lines) };
     });
     CONTACTS.raw = raw;
   }
@@ -101,10 +127,13 @@ function sentContacts(){
 function priorContacts(l){
   const n = personNorm(l.applicant || (l.recipientLines || [])[0]);
   const a = addrKey(l.recipientLines);
+  const isBiz = (l.ref || '').startsWith('ARCH-') || (typeof leadFolder === 'function' && l.recipientLines && leads.includes(l) && leadFolder(l) === 'business');
+  const h = isBiz ? [] : houseKeys(l.recipientLines);
   const agent = personNorm(l.agentText || '');
   const out = [];
   sentContacts().forEach(c => {
     const why = c.ref === l.ref ? 'this application'
+      : sameHouse(h, c.h) ? 'same house'
       : samePerson(n, c.n) ? 'same name'
       : a && a === c.a ? 'same address'
       : agent && c.n.length > 4 && (agent.includes(c.n) || samePerson(agent, c.n)) ? 'their agent'
@@ -113,7 +142,7 @@ function priorContacts(l){
   });
   leads.forEach(o => {
     if (o === l || o.ref === l.ref || !o.include || o.alreadyProcessed) return;
-    if (samePerson(n, personNorm(o.applicant)) || (a && addrKey(o.recipientLines) === a)) out.push({ ref: o.ref, name: o.applicant, date: null, copy: leadFolder(o), why: 'also on the print list' });
+    if (samePerson(n, personNorm(o.applicant)) || (a && addrKey(o.recipientLines) === a) || sameHouse(h, (o.ref || '').startsWith('ARCH-') || leadFolder(o) === 'business' ? [] : houseKeys(o.recipientLines))) out.push({ ref: o.ref, name: o.applicant, date: null, copy: leadFolder(o), why: 'also on the print list' });
   });
   return out.sort((x, y) => (y.date || '9').localeCompare(x.date || '9'));
 }
@@ -123,7 +152,8 @@ function contactLine(c){
   if (c.why === 'also on the print list') return `${who} is also on the print list right now.`;
   const what = FOLDERS[c.copy] ? `the ${esc(FOLDERS[c.copy])} letter` : 'a letter';
   const where = c.ref.startsWith('ARCH-') ? ' as a business' : c.why === 'this application' ? '' : ` about ${esc(c.ref)}`;
-  return `${who} was sent ${what}${where} on ${esc(prettyDate(c.date))}${c.why === 'same address' ? ' (same address)' : ''}.`;
+  const lock = isLocked(c) ? ` <b>&#128274; Locked until ${esc(prettyDate(lockedUntil(c.date)))}</b> (6-month rule).` : c.date ? ` Over 6 months ago, so you can send again if you mean to.` : '';
+  return `${who} was sent ${what}${where} on ${esc(prettyDate(c.date))}${c.why === 'same address' || c.why === 'same house' ? ' (same house)' : ''}.${lock}`;
 }
 function contactFlagHtml(l){
   const enq = typeof enquiryFlagHtml === 'function' ? enquiryFlagHtml({ ref: l.baseRef || l.ref, name: l.applicant, address: (l.recipientLines || []).slice(1).join(', ') + ' ' + (l.site || '') }) : '';
@@ -137,6 +167,15 @@ function confirmRepeats(list, action){
   if (typeof confirmEnquiries === 'function' && !confirmEnquiries(list, action)) return false;
   const hits = list.map(l => ({ l, p: priorContacts(l).filter(c => !(c.why === 'this application' && l.alreadyProcessed)) })).filter(x => x.p.length);
   if (!hits.length) return true;
+  // Prime directive: nobody gets a second letter within 6 months, and no house gets two letters in one batch.
+  const locked = hits.filter(x => x.p.some(c => isLocked(c) || c.why === 'also on the print list'));
+  if (locked.length) {
+    const why = x => { const c = x.p.find(c => isLocked(c)) || x.p[0];
+      return c.why === 'also on the print list' ? `${x.l.applicant}: the same house or person as ${c.name}, both in this batch. Keep one.`
+        : `${x.l.applicant}: ${c.why}, written to ${prettyDate(c.date)} (${c.name}). Locked until ${prettyDate(lockedUntil(c.date))}.`; };
+    alert(`Not sent. ${locked.length === 1 ? 'This letter breaks' : `${locked.length} of these letters break`} the one-letter-per-household rule:\n\n${locked.slice(0, 10).map(x => '- ' + why(x)).join('\n')}${locked.length > 10 ? `\n...and ${locked.length - 10} more` : ''}\n\nTake ${locked.length === 1 ? 'it' : 'them'} off the print list (or archive ${locked.length === 1 ? 'it' : 'them'}), then try again.`);
+    return false;
+  }
   const lines = hits.slice(0, 8).map(x => `- ${x.l.applicant}: ${x.p[0].why === 'also on the print list' ? 'also on the print list' : `${x.p[0].why}, sent ${prettyDate(x.p[0].date)}`}`);
   return confirm(`You've already written to ${hits.length === 1 ? 'this person' : `${hits.length} of these people`}:\n\n${lines.join('\n')}${hits.length > 8 ? `\n...and ${hits.length - 8} more` : ''}\n\n${action} anyway?`);
 }

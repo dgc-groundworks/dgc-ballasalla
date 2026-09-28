@@ -11,7 +11,7 @@
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
 <script src="market.js?v=13"></script>
-<script src="contacts.js?v=7"></script>
+<script src="contacts.js?v=8"></script>
 <script src="enquiries.js?v=2"></script>
 <script defer src="search.js?v=1"></script>
 <style>
@@ -2088,7 +2088,7 @@ function renderRegisterPullLoaded(box, data){
         </div>
         <div class="lr-side">
           <span class="tag ${CATEGORY_TAG[cat][0]}">${CATEGORY_TAG[cat][1] || a.decision || 'Decided'}</span>
-          ${before.length ? `<span class="tag tag-excl" title="${esc(before.map(c => `${c.name}: ${c.why}, ${prettyDate(c.date)}`).join('; '))}">Written to before &middot; ${esc(prettyDate(before[0].date))}</span>` : ''}
+          ${before.length ? `<span class="tag tag-excl" title="${esc(before.map(c => `${c.name}: ${c.why}, ${prettyDate(c.date)}`).join('; '))}">${typeof isLocked === 'function' && before.some(isLocked) ? '&#128274; Locked &middot; written to' : 'Written to before &middot;'} ${esc(prettyDate(before[0].date))}${before[0].why === 'same house' ? ' (same house)' : ''}</span>` : ''}
           ${actions}
         </div>
       </div>`;
