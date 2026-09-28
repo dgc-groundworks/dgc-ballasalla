@@ -152,7 +152,13 @@ function roughValueFor(e){
   if (!want.length) return null;
   const words = want.map(w => w[0]);
   const core = want.find(w => w[0] === 'conservatory') || want[0];
-  const pool = [...MARKET.estimates.values()].filter(x => x.total && ENQ.index.apps.get(x.ref) && core[1].test(ENQ.index.apps.get(x.ref).description));
+  // Leave out big schemes (two storeys, new dwellings, flats) unless the enquiry is for one.
+  const BIG = /two[- ]storey|first floor|second floor|dwelling|apartment|flats|units|demolition of (the )?(existing )?(house|dwelling)/i;
+  const big = words.includes('new house') || /two[- ]storey|first floor/i.test(e.message);
+  const pool = [...MARKET.estimates.values()].filter(x => {
+    const a = x.total && ENQ.index.apps.get(x.ref);
+    return a && core[1].test(a.description) && (big || !BIG.test(a.description));
+  });
   const mids = pool.map(x => midOf(x.total)).filter(v => v > 0).sort((a, b) => a - b);
   if (mids.length < 2) return null;
   const gw = pool.map(x => x.groundworks ? midOf(x.groundworks) : null).filter(v => v > 0).sort((a, b) => a - b);
