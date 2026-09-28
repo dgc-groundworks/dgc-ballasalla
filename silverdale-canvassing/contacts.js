@@ -155,8 +155,16 @@ function contactLine(c){
   const lock = isLocked(c) ? ` <b>&#128274; Locked until ${esc(prettyDate(lockedUntil(c.date)))}</b> (6-month rule).` : c.date ? ` Over 6 months ago, so you can send again if you mean to.` : '';
   return `${who} was sent ${what}${where} on ${esc(prettyDate(c.date))}${c.why === 'same address' || c.why === 'same house' ? ' (same house)' : ''}.${lock}`;
 }
+// Other letters waiting in the folders for the same house or person (not yet on the print list).
+function waitingTwins(l){
+  if (l.alreadyProcessed || !leads.includes(l)) return [];
+  const bz = x => (x.ref || '').startsWith('ARCH-') || leadFolder(x) === 'business';
+  const h = bz(l) ? [] : houseKeys(l.recipientLines), n = personNorm(l.applicant);
+  return leads.filter(o => o !== l && !o.alreadyProcessed && !o.include && (sameHouse(h, bz(o) ? [] : houseKeys(o.recipientLines)) || samePerson(n, personNorm(o.applicant))));
+}
 function contactFlagHtml(l){
-  const enq = typeof enquiryFlagHtml === 'function' ? enquiryFlagHtml({ ref: l.baseRef || l.ref, name: l.applicant, address: (l.recipientLines || []).slice(1).join(', ') + ' ' + (l.site || '') }) : '';
+  const enq = (typeof enquiryFlagHtml === 'function' ? enquiryFlagHtml({ ref: l.baseRef || l.ref, name: l.applicant, address: (l.recipientLines || []).slice(1).join(', ') + ' ' + (l.site || '') }) : '')
+    + (() => { const t = waitingTwins(l); return t.length ? `<div class="contact-flag"><b>&#9888; ${t.length + 1} letters waiting for this house.</b> Also: ${t.map(o => `${esc(o.ref)} in ${esc(FOLDERS[leadFolder(o)])}`).join(', ')}. Send one and archive the rest (the print step won't let two go).</div>` : ''; })();
   const p = priorContacts(l).filter(c => !(c.why === 'this application' && l.alreadyProcessed));
   if (!p.length) return enq;
   return enq + `<div class="contact-flag"><b>&#9888; Already written to.</b> ${p.slice(0, 3).map(contactLine).join(' ')}${p.length > 3 ? ` And ${p.length - 3} more.` : ''}</div>`;
