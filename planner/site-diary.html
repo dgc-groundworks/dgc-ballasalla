@@ -229,7 +229,7 @@ async function loadStaff() {
 // D1: load active planner jobs for the site dropdown
 async function loadPlannerJobs() {
   try {
-    const r = await fetch(REST + '/dgc_planner_jobs?archived=eq.false&select=id,name,start_date,base_weeks&order=name.asc', { headers: ah() });
+    const r = await fetch(REST + '/dgc_planner_jobs?archived=eq.false&select=id,name,start_date,base_weeks,status,on_timeline&order=name.asc', { headers: ah() });
     if (r.ok) plannerJobs = await r.json();
   } catch {}
 }
@@ -304,11 +304,19 @@ function renderList() {
   const site   = document.getElementById('siteFilter').value;
   const list   = document.getElementById('entryList');
 
-  // Populate site filter
-  const sites = [...new Set(entries.map(e => e.site).filter(Boolean))].sort();
+  // Populate site filter: every active job on the planner (not archived, not
+  // parked in Pricing), then any other site that has diary entries
+  const counts = {};
+  entries.forEach(e => { if (e.site) counts[e.site] = (counts[e.site] || 0) + 1; });
+  const active = [...new Set(plannerJobs.filter(j => j.on_timeline !== false && j.status !== 'tendering').map(j => j.name))]
+    .sort((a, b) => a.localeCompare(b));
+  const older = Object.keys(counts).filter(s => !active.includes(s)).sort((a, b) => a.localeCompare(b));
   const filterSel = document.getElementById('siteFilter');
   const cur = filterSel.value;
-  filterSel.innerHTML = '<option value="">All sites</option>' + sites.map(s => `<option value="${esc(s)}" ${cur===s?'selected':''}>${esc(s)}</option>`).join('');
+  const opt = s => `<option value="${esc(s)}" ${cur===s?'selected':''}>${esc(s)}${counts[s] ? ` (${counts[s]})` : ''}</option>`;
+  filterSel.innerHTML = '<option value="">All sites</option>'
+    + (active.length ? `<optgroup label="Active jobs">${active.map(opt).join('')}</optgroup>` : '')
+    + (older.length ? `<optgroup label="Other sites with entries">${older.map(opt).join('')}</optgroup>` : '');
 
   const filtered = entries.filter(e => {
     const matchSite = !site || e.site === site;
