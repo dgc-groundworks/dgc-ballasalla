@@ -733,7 +733,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.72';
+const VERSION = 'v2.73';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1268,6 +1268,7 @@ async function moveJobToCol(id, col, beforeId) {
   inCol.forEach((x, i) => { const p = (i + 1) * 1000; if (x.board_pos !== p) { x.board_pos = p; if (x !== j) changed.push(x); } });
   const dirty = changed.filter(x => { const s = _jobsSnap.get(x.id); return !s || jobChanged(s, x); });
   if (!dirty.length) return;
+  dirty.sort((a, b) => (a === j) - (b === j)); // moved job last, so Undo names it
   await saveJobsBatch(dirty);
   showUndoToast(fromCol === col ? `${j.name} moved in ${col.title}` : `${j.name} moved to ${col.title}`);
 }
