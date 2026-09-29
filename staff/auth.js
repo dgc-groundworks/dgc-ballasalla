@@ -67,21 +67,40 @@ function consumeMagicLinkFromUrl() {
   return true;
 }
 
+// Several pages share one login (the planner and the Staff, Site Diary and
+// Dayworks pages inside it). Only one refreshes at a time (navigator.locks),
+// and a page that finds someone else has already refreshed uses that, so two
+// pages refreshing at once can't sign everyone out.
 async function refreshSession(session) {
-  const r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
-    method: 'POST', headers: authHeaders(), body: JSON.stringify({ refresh_token: session.refresh_token }),
-  });
-  const data = await r.json();
-  if (!r.ok) { clearSession(); return null; }
-  const updated = {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_at: Date.now() + (data.expires_in - 60) * 1000,
-    email: data.user && data.user.email || session.email,
-    forget_at: session.forget_at || null,
+  const run = async () => {
+    const cur = getStoredSession();
+    if (!cur) return null;
+    if (cur.refresh_token !== session.refresh_token && Date.now() < cur.expires_at) return cur;
+    let r, data;
+    try {
+      r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({ refresh_token: cur.refresh_token }),
+      });
+      data = await r.json().catch(() => ({}));
+    } catch (e) { return null; } // offline: keep the login for later
+    if (!r.ok) {
+      const now = getStoredSession();
+      if (now && now.refresh_token !== cur.refresh_token) return now; // refreshed elsewhere meanwhile
+      if (r.status >= 400 && r.status < 500) clearSession();           // really refused
+      return null;
+    }
+    const updated = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: Date.now() + (data.expires_in - 60) * 1000,
+      email: data.user && data.user.email || cur.email,
+      forget_at: cur.forget_at || null,
+    };
+    storeSession(updated);
+    return updated;
   };
-  storeSession(updated);
-  return updated;
+  if (navigator.locks && navigator.locks.request) return navigator.locks.request('dgc-auth-refresh', run);
+  return run();
 }
 
 // Returns a valid access token, refreshing silently if needed, or null if
@@ -90,10 +109,17 @@ async function refreshSession(session) {
 async function ensureLoggedIn() {
   consumeMagicLinkFromUrl();
   let session = getStoredSession();
-  if (!session) return null;
-  if (session.forget_at && Date.now() > session.forget_at) { clearSession(); return null; }
+  if (!session) { _askPlannerToSignIn(); return null; }
+  if (session.forget_at && Date.now() > session.forget_at) { clearSession(); _askPlannerToSignIn(); return null; }
   if (Date.now() >= session.expires_at) session = await refreshSession(session);
+  if (!session) _askPlannerToSignIn();
   return session;
+}
+
+// Inside the planner: let the planner show its own sign-in screen instead of
+// this page asking for a second login.
+function _askPlannerToSignIn() {
+  try { if (window.top !== window.self) window.top.postMessage({ type: 'dgc-need-login' }, location.origin); } catch (e) {}
 }
 
 function logout() {
