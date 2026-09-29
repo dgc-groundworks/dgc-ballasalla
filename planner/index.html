@@ -687,7 +687,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.64';
+const VERSION = 'v2.65';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1268,6 +1268,7 @@ function renderTimeline(jobs) {
       const cx = Math.max(bx, LBL_W);
       const cw = Math.min(bx + bw, LBL_W + WEEKS * W_PX) - cx;
       const segs = crewSegments(j);
+      let dateY = by + 10; // end-date label baseline; moves inside a thin last section
       if (segs.length > 1) {
         // Crew changes: one section per headcount, thinner where fewer people, badge on each
         const maxP = Math.max(...segs.map(g => g.people), 1);
@@ -1280,6 +1281,7 @@ function renderTimeline(jobs) {
           if (x1 <= x0) return;
           const hh = Math.max(Math.round(bh * (0.45 + 0.55 * (g.people / maxP))), 12);
           const yy = by + (bh - hh) / 2;
+          if (gi === segs.length - 1) dateY = yy + Math.min(9, hh - 3);
           s += `<rect x="${x0}" y="${yy}" width="${x1 - x0}" height="${hh}" rx="4" fill="${col}" opacity=".85" pointer-events="none"/>`;
           if (gi > 0 && sx > LBL_W && sx < visEnd) s += `<line x1="${sx}" y1="${by+2}" x2="${sx}" y2="${by+bh-2}" stroke="white" stroke-width="1.5" opacity=".8" pointer-events="none"/>`;
           if (x1 - x0 > 22) {
@@ -1308,7 +1310,8 @@ function renderTimeline(jobs) {
       // End date label — inside bar, right-aligned at the actual last working day
       if (bw > 55) {
         const endActX = Math.min(LBL_W + (endOff / 7) * W_PX - 3, LBL_W + WEEKS * W_PX - 4);
-        s += `<text x="${endActX}" y="${by + 10}" font-size="7.5" text-anchor="end" fill="rgba(255,255,255,0.78)" font-weight="700" pointer-events="none">${fmtDate(endDate)}</text>`;
+        const thin = segs.length > 1 && dateY > by + 10;
+        s += `<text x="${thin ? endActX - 24 : endActX}" y="${dateY}" font-size="7.5" text-anchor="end" fill="white" stroke="${col}" stroke-width="2.5" paint-order="stroke" font-weight="700" pointer-events="none">${fmtDate(endDate)}</text>`;
       }
       // Resize grip — three vertical lines at right edge (visual cue to drag here)
       if (bw > 30) {
