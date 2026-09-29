@@ -22,6 +22,7 @@
   --tl-bg:#1b2a3b; --tl-col-even:rgba(0,0,0,.18); --tl-col-odd:rgba(0,0,0,.06);
   --tl-lbl-bg:#1b2a3b; --tl-sep:rgba(0,0,0,.35); --tl-foot:rgba(0,0,0,.35);
   --tl-day:#5a7a9a; --tl-date:#8ab0cc; --tl-row-lbl:#cde0f5;
+  --tl-band:rgba(0,0,0,.28); --tl-band-txt:#cde0f5; --tl-band-sub:#8ab0cc; --tl-band-line:rgba(0,0,0,.4);
   --c-run:#22c55e; --c-award:#3b82f6; --c-conf:#10b981;
   --c-likely:#f97316; --c-tend:#f59e0b; --c-ph:#94a3b8;
 }
@@ -33,6 +34,7 @@
   --tl-bg:#dde8f3; --tl-col-even:rgba(0,0,0,.04); --tl-col-odd:rgba(255,255,255,.5);
   --tl-lbl-bg:#f0f4f8; --tl-sep:rgba(0,0,0,.1); --tl-foot:rgba(0,0,0,.08);
   --tl-day:#4a6a88; --tl-date:#1a2b3c; --tl-row-lbl:#1a2b3c;
+  --tl-band:#e2e8ee; --tl-band-txt:#1a2b3c; --tl-band-sub:#5a6b7c; --tl-band-line:rgba(0,0,0,.14);
   --c-run:#16a34a; --c-award:#2563eb; --c-conf:#059669;
   --c-likely:#ea580c; --c-tend:#d97706; --c-ph:#64748b;
 }
@@ -705,7 +707,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.70';
+const VERSION = 'v2.71';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1323,7 +1325,11 @@ function renderTimeline(jobs) {
   const tlFoot    = cs.getPropertyValue('--tl-foot').trim()    || 'rgba(0,0,0,.35)';
   const tlRowLbl  = cs.getPropertyValue('--tl-row-lbl').trim() || '#cde0f5';
   const accentCol = cs.getPropertyValue('--accent').trim()     || '#f59e0b';
-  const TL_BAND = '#1e2d3b'; // header + gang footer band (same in light and dark themes)
+  // Header + staff footer band: slightly grey, set per theme in CSS
+  const TL_BAND = cs.getPropertyValue('--tl-band').trim() || '#e2e8ee';
+  const TL_TXT  = cs.getPropertyValue('--tl-band-txt').trim() || '#1a2b3c';
+  const TL_SUB  = cs.getPropertyValue('--tl-band-sub').trim() || '#5a6b7c';
+  const TL_LINE = cs.getPropertyValue('--tl-band-line').trim() || 'rgba(0,0,0,.14)';
 
   let s = `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
 
@@ -1336,17 +1342,17 @@ function renderTimeline(jobs) {
   }
   // Date header: a solid dark band so it reads as a header, not another job row
   s += `<rect x="0" y="0" width="${svgW}" height="${HEAD_H}" fill="${TL_BAND}"/>`;
-  s += `<line x1="0" y1="${HEAD_H}" x2="${svgW}" y2="${HEAD_H}" stroke="rgba(0,0,0,.45)" stroke-width="2"/>`;
+  s += `<line x1="0" y1="${HEAD_H}" x2="${svgW}" y2="${HEAD_H}" stroke="${TL_LINE}" stroke-width="1.5"/>`;
   for (let w = 0; w < WEEKS; w++) {
     const wDate = addDays(origin, w * 7);
     const x = LBL_W + w * W_PX;
-    if (w) s += `<line x1="${x}" y1="6" x2="${x}" y2="${HEAD_H-6}" stroke="rgba(255,255,255,.12)" stroke-width="1"/>`;
+    if (w) s += `<line x1="${x}" y1="6" x2="${x}" y2="${HEAD_H-6}" stroke="${TL_LINE}" stroke-width="1"/>`;
     const d = new Date(wDate+'T12:00:00');
     const dayName = d.toLocaleDateString('en-GB',{weekday:'short'});
     const dateLbl = d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
     const cx = x + W_PX / 2;
-    s += `<text x="${cx}" y="17" font-size="9" text-anchor="middle" fill="rgba(255,255,255,.6)" font-weight="600">${dayName}</text>`;
-    s += `<text x="${cx}" y="34" font-size="11" text-anchor="middle" fill="#ffffff" font-weight="700">${dateLbl}</text>`;
+    s += `<text x="${cx}" y="17" font-size="9" text-anchor="middle" fill="${TL_SUB}" font-weight="600">${dayName}</text>`;
+    s += `<text x="${cx}" y="34" font-size="11" text-anchor="middle" fill="${TL_TXT}" font-weight="700">${dateLbl}</text>`;
   }
 
   // Today line
@@ -1358,7 +1364,7 @@ function renderTimeline(jobs) {
   // Label column bg
   s += `<rect x="0" y="0" width="${LBL_W}" height="${svgH}" fill="${tlLblBg}"/>`;
   s += `<rect x="0" y="0" width="${LBL_W}" height="${HEAD_H}" fill="${TL_BAND}"/>`;
-  s += `<text x="${LBL_W-8}" y="${HEAD_H/2+4}" font-size="11" text-anchor="end" fill="rgba(255,255,255,.75)" font-weight="700">Week</text>`;
+  s += `<text x="${LBL_W-8}" y="${HEAD_H/2+4}" font-size="11" text-anchor="end" fill="${TL_SUB}" font-weight="700">Week</text>`;
   s += `<line x1="${LBL_W}" y1="0" x2="${LBL_W}" y2="${svgH}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>`;
 
   // Job rows
@@ -1455,11 +1461,11 @@ function renderTimeline(jobs) {
   // Bank holiday days (isWorkingDay = false) are skipped and never cause a split.
   const footY = HEAD_H + Math.max(jobs.length,1) * ROW_H;
   s += `<rect x="0" y="${footY}" width="${svgW}" height="${FOOT_H}" fill="${TL_BAND}"/>`;
-  s += `<line x1="0" y1="${footY}" x2="${svgW}" y2="${footY}" stroke="rgba(0,0,0,.45)" stroke-width="3"/>`;
-  s += `<line x1="${LBL_W}" y1="${footY}" x2="${LBL_W}" y2="${footY+FOOT_H}" stroke="rgba(255,255,255,.15)" stroke-width="1"/>`;
-  s += `<text x="${LBL_W-8}" y="${footY+FOOT_H/2}" font-size="11" text-anchor="end" fill="#ffffff" font-weight="700">Staff</text>`;
-  s += `<text x="${LBL_W-8}" y="${footY+FOOT_H/2+13}" font-size="9" text-anchor="end" fill="rgba(255,255,255,.6)" font-weight="600">on site</text>`;
-  for (let w = 1; w < WEEKS; w++) s += `<line x1="${LBL_W + w * W_PX}" y1="${footY+6}" x2="${LBL_W + w * W_PX}" y2="${footY+FOOT_H-6}" stroke="rgba(255,255,255,.08)" stroke-width="1"/>`;
+  s += `<line x1="0" y1="${footY}" x2="${svgW}" y2="${footY}" stroke="${TL_LINE}" stroke-width="1.5"/>`;
+  s += `<line x1="${LBL_W}" y1="${footY}" x2="${LBL_W}" y2="${footY+FOOT_H}" stroke="${TL_LINE}" stroke-width="1"/>`;
+  s += `<text x="${LBL_W-8}" y="${footY+FOOT_H/2}" font-size="11" text-anchor="end" fill="${TL_TXT}" font-weight="700">Staff</text>`;
+  s += `<text x="${LBL_W-8}" y="${footY+FOOT_H/2+13}" font-size="9" text-anchor="end" fill="${TL_SUB}" font-weight="600">on site</text>`;
+  for (let w = 1; w < WEEKS; w++) s += `<line x1="${LBL_W + w * W_PX}" y1="${footY+6}" x2="${LBL_W + w * W_PX}" y2="${footY+FOOT_H-6}" stroke="${TL_LINE}" stroke-width="1"/>`;
 
   const weekData = [];
   for (let w = 0; w < WEEKS; w++) {
