@@ -3,7 +3,7 @@
 // shows an "Update ready" banner; tapping it activates the new SW and reloads.
 // No cache clearing needed by the user, and the app works offline.
 
-const PLANNER_CACHE = 'dgc-planner-v45';
+const PLANNER_CACHE = 'dgc-planner-v46';
 const PRECACHE = [
   './',
   'index.html',
