@@ -687,7 +687,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.63';
+const VERSION = 'v2.64';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1114,7 +1114,7 @@ function _dropDate(clientX) {
   const x = clientX - svg.getBoundingClientRect().left - _tlGeom.LBL_W;
   if (x < 0) return mondayOf(toDateStr(new Date()));
   const day = Math.floor((x / _tlGeom.W_PX) * 7);
-  return snapToWorkingDay(addDays(_tlGeom.origin, day));
+  return addDays(_tlGeom.origin, day); // weekends allowed
 }
 (function bindPoolDrop() {
   const wrap = document.getElementById('tl-wrap');
@@ -1168,7 +1168,7 @@ function crewSegments(j) {
   const start = j.start_date || toDateStr(new Date()), end = jobEndDate(j);
   const segs = [];
   for (let d = start, n = 0; d <= end && n < 800; d = addDays(d, 1), n++) {
-    if (!isWorkingDay(d)) continue;
+    if (!isWorkingDay(d) && d !== start) continue; // a weekend start day still counts
     const p = map.has(d) ? map.get(d) : base;
     const g = segs[segs.length - 1];
     if (g && g.people === p) g.to = d; else segs.push({ from: d, to: d, people: p });
@@ -2488,7 +2488,8 @@ function _applyDragMove(clientX, clientY) {
   const deltaDays = Math.round((deltaX / _W_PX) * 7);
   if (Math.abs(deltaDays) >= 1) _wasDrag = true;
   const previewDate = addDays(_drag.dragAnchor, deltaDays);
-  showDragTooltip(clientX, clientY, '→ ' + fmtDate(previewDate));
+  const _dow = new Date(previewDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short' });
+  showDragTooltip(clientX, clientY, '→ ' + _dow + ' ' + fmtDate(previewDate) + (isWorkingDay(previewDate) ? '' : ' (weekend / BH)'));
   if (deltaDays === _drag.lastDeltaDays) return;
   _drag.lastDeltaDays = deltaDays;
   const j = _jobs.find(x => x.id == _drag.job.id);
@@ -2544,8 +2545,8 @@ window.addEventListener('mouseup', async e => {
     if (!j) return;
     if (Math.abs(deltaDays) >= 1) {
       _wasDrag = true;
-      // Snap to nearest working day (Mon-Fri, skip BH) — no Monday forcing
-      j.start_date = snapToWorkingDay(addDays(dragAnchor, deltaDays));
+      // Any day allowed, including weekends and bank holidays (out-of-hours work)
+      j.start_date = addDays(dragAnchor, deltaDays);
       await upsertJob(j);
       { const cl = checkDeploymentClashes(); if (cl.length) showClashToast(cl); }
     } else {
@@ -3097,8 +3098,8 @@ window.addEventListener('touchend', async e => {
     if (!j) return;
     if (Math.abs(deltaDays) >= 1) {
       _wasDrag = true;
-      // Snap to nearest working day (Mon-Fri, skip BH) — no Monday forcing
-      j.start_date = snapToWorkingDay(addDays(dragAnchor, deltaDays));
+      // Any day allowed, including weekends and bank holidays (out-of-hours work)
+      j.start_date = addDays(dragAnchor, deltaDays);
       await upsertJob(j);
       { const cl = checkDeploymentClashes(); if (cl.length) showClashToast(cl); }
     } else {
