@@ -80,7 +80,7 @@
     back.innerHTML = `
       <div class="sgc-box" role="dialog" aria-modal="true" aria-labelledby="sgc-title">
         <h2 id="sgc-title">Suggest a change</h2>
-        <p class="sgc-quote">"What would you like to see change on this app?" Spotted a bug, or something that should work differently? Tell us and it goes straight to Ash.</p>
+        <p class="sgc-quote">"What would you like to see change on this app?" Spotted a bug, or something that should work differently? Tell us here.</p>
         <label for="sgc-from">From</label>
         <input id="sgc-from" readonly>
         <label for="sgc-subject">Subject</label>
@@ -104,6 +104,8 @@
       $('sgc-from').value = (s && s.email) || 'Not signed in';
       msg('');
       $('sgc-send').disabled = false;
+      $('sgc-send').style.display = '';
+      $('sgc-cancel').textContent = 'Cancel';
       back.classList.add('open');
       setTimeout(() => $('sgc-subject').focus(), 30);
     });
@@ -128,9 +130,11 @@
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
-        msg('Sent. Thanks, Ash will see it straight away.', 'ok');
+        msg('Sent', 'ok');
         $('sgc-subject').value = ''; $('sgc-body').value = '';
-        setTimeout(close, 1400);
+        $('sgc-send').style.display = 'none';
+        $('sgc-cancel').textContent = 'Close';
+        $('sgc-cancel').focus();
       } catch (e) {
         $('sgc-send').disabled = false;
         msg("Couldn't send just now (" + e.message + '). Your text is still here, so try again in a minute.', 'err');
