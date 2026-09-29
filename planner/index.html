@@ -121,6 +121,32 @@ a{color:var(--accent);text-decoration:none}
 .jbox-list{display:flex;flex-direction:column;gap:5px}
 .jbox.jbox-pool{border-style:dashed;border-top-style:solid}
 .jbox.jbox-over{outline:2px dashed var(--bc,var(--accent));outline-offset:2px;background:color-mix(in srgb, var(--bc,#94a3b8) 10%, var(--surf))}
+.jbox-hd{cursor:grab;align-items:center}
+.jbox-hd .jbox-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text}
+.jbox-menu-btn{background:none;border:none;color:var(--muted);font-size:16px;line-height:1;padding:0 4px;cursor:pointer;border-radius:4px;font-family:inherit}
+.jbox-menu-btn:hover{color:var(--text);background:var(--surf2)}
+.jbox-menu-btn:focus-visible,.jbox-add-btn:focus-visible,.jbox-menu button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.jbox-rename{flex:1;min-width:0;width:100%;box-sizing:border-box;font:inherit;font-size:12.5px;font-weight:800;background:var(--surf2);color:var(--text);border:1px solid var(--accent);border-radius:5px;padding:4px 7px}
+.jbox.jbox-add{border-style:dashed;border-top-width:1px;background:transparent;display:flex;flex-direction:column;gap:7px}
+.jbox-add-btn{background:none;border:none;color:var(--muted);font-weight:700;font-size:12.5px;cursor:pointer;text-align:left;padding:4px 0;font-family:inherit}
+.jbox-add-btn:hover{color:var(--accent)}
+.jbox-add-row{display:flex;gap:6px}
+.jbox-add-row button{border-radius:6px;padding:6px 11px;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
+.jbox-add-save{background:var(--accent);border:none;color:#111}
+.jbox-add-cancel{background:none;border:1px solid var(--bord);color:var(--muted)}
+.jbox.jbox-col-over{box-shadow:-4px 0 0 var(--accent)}
+.jbox.jbox-col-dragging{opacity:.45}
+.pool-marker{height:3px;border-radius:2px;background:var(--bc,var(--accent));margin:-1px 0}
+.jbox-menu{position:fixed;z-index:9500;background:var(--surf);border:1px solid var(--bord);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:5px;width:210px;display:flex;flex-direction:column}
+.jbox-menu button[role=menuitem]{background:none;border:none;text-align:left;padding:7px 9px;border-radius:5px;color:var(--text);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.jbox-menu button[role=menuitem]:hover:not(:disabled){background:var(--surf2)}
+.jbox-menu button:disabled{color:var(--muted);opacity:.5;cursor:default}
+.jbox-menu .jm-danger{color:#ef4444}
+.jm-label{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;padding:6px 9px 0}
+.jbox-swatches{display:flex;gap:6px;padding:6px 9px;flex-wrap:wrap}
+.jbox-swatch{width:20px;height:20px;border-radius:50%;border:2px solid var(--surf);box-shadow:0 0 0 1px var(--bord);padding:0;cursor:pointer}
+.jbox-swatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--text)}
+.jm-note{font-size:11px;line-height:1.4;color:var(--muted);padding:6px 9px 4px;border-top:1px solid var(--bord);margin-top:4px}
 .job-list-toggle{margin:16px 12px 0}
 .job-list-toggle summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);padding:6px 0}
 .job-list-toggle summary:hover{color:var(--accent)}
@@ -707,7 +733,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.71';
+const VERSION = 'v2.72';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1018,7 +1044,7 @@ function recordUndo(op) {
   _saveUndo();
 }
 function jobChanged(a, b) {
-  return ['name','base_weeks','people_needed','people_on_site','start_date','status','note','on_timeline','archived']
+  return ['name','base_weeks','people_needed','people_on_site','start_date','status','note','on_timeline','archived','board_col','board_pos']
     .some(k => String(a[k] ?? '') !== String(b[k] ?? ''))
     || JSON.stringify(a.day_overrides || []) !== JSON.stringify(b.day_overrides || []);
 }
@@ -1066,14 +1092,61 @@ document.addEventListener('keydown', e => {
   e.preventDefault(); undoLast();
 });
 
-// ── Still tendering list (jobs parked off the timeline) ────
-const JOB_BOXES = [
-  { title:'Running',          statuses:['running'],          drop:'running' },
-  { title:'Awarded',          statuses:['awarded','confirmed'], drop:'awarded' },
-  { title:'Probably Awarded', statuses:['tendering_likely'], drop:'tendering_likely' },
-  { title:'Other',            statuses:['placeholder'],      drop:'placeholder', catchAll:true },
-  { title:'Pricing',          statuses:['tendering'],        drop:'tendering', sub:'Drag a job up onto the timeline to plan it' },
+// ── Job board: Trello-style columns under the timeline ─────
+// Columns live in dgc_planner_board, shared with everyone. The five status
+// columns are linked to a job status (dropping a job there changes its status
+// and they can't be deleted); columns people add have status null and just
+// group jobs. Each job keeps its own column (board_col) and place (board_pos).
+const DEFAULT_BOARD = [
+  { id:'running',          title:'Running',          status:'running',          pos:1 },
+  { id:'awarded',          title:'Awarded',          status:'awarded',          pos:2 },
+  { id:'tendering_likely', title:'Probably Awarded', status:'tendering_likely', pos:3 },
+  { id:'placeholder',      title:'Other',            status:'placeholder',      pos:4 },
+  { id:'tendering',        title:'Pricing',          status:'tendering',        pos:5 },
 ];
+const BOARD_COLOURS = ['#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#eab308','#ef4444','#64748b'];
+const BOARD_LOCAL_K = 'dgc-planner-board';
+let _board = DEFAULT_BOARD.map(c => ({ ...c }));
+let _boardCols = true;     // dgc_planner_jobs has board_col / board_pos
+let _boardEditing = false; // a column name box is open: don't redraw under it
+function colStatuses(c) { return c.status === 'awarded' ? ['awarded','confirmed'] : (c.status ? [c.status] : []); }
+function colColour(c) { return c.color || STATUS_COL[c.status] || '#94a3b8'; }
+function byBoardPos(a, b) {
+  const pa = a.board_pos ?? Infinity, pb = b.board_pos ?? Infinity;
+  return (pa - pb) || (a.start_date || '').localeCompare(b.start_date || '');
+}
+function jobColumn(j) {
+  if (j.board_col) { const c = _board.find(x => x.id === j.board_col && !x.status); if (c) return c; }
+  return _board.find(c => colStatuses(c).includes(j.status))
+    || _board.find(c => c.status === 'placeholder') || _board[0];
+}
+async function loadBoard() {
+  let rows = null;
+  if (_local) { try { rows = JSON.parse(localStorage.getItem(BOARD_LOCAL_K) || 'null'); } catch (e) {} }
+  else if (_sb) {
+    const { data, error } = await _sb.from('dgc_planner_board').select('*').order('pos');
+    if (error) console.error(error); else rows = data;
+  }
+  _board = (rows && rows.length ? rows : DEFAULT_BOARD.map(c => ({ ...c }))).slice().sort((a, b) => a.pos - b.pos);
+}
+async function saveBoardCols(cols) {
+  const now = new Date().toISOString();
+  cols.forEach(c => c.updated_at = now);
+  if (_local) { localStorage.setItem(BOARD_LOCAL_K, JSON.stringify(_board)); return true; }
+  const { error } = await _sb.from('dgc_planner_board').upsert(cols);
+  if (error) { console.error(error); showUndoToast("Couldn't save the column. Reload and check you're signed in."); return false; }
+  return true;
+}
+async function saveJobsBatch(list) {
+  for (const job of list) {
+    const before = _jobsSnap.get(job.id);
+    if (!_boardCols) { delete job.board_col; delete job.board_pos; }
+    await _rawUpsert(job);
+    if (!_undoing && before && jobChanged(before, job)) recordUndo({ k:'job', id: job.id, before, name: job.name });
+  }
+  await refresh();
+}
+
 function renderPool(jobs) {
   const el = document.getElementById('tl-pool');
   if (!el) return;
@@ -1084,58 +1157,260 @@ function renderPool(jobs) {
     const when = off
       ? `Not on timeline · ${(j.base_weeks || 0) ? j.base_weeks + 'w' : '1 day'}`
       : `${fmtDate(j.start_date || toDateStr(new Date()))} to ${fmtDate(jobEndDate(j))}`;
-    return `<div class="pool-card" draggable="true" data-id="${esc(j.id)}" style="--pc:${col}" title="Drag to another box to change its status, or up onto the timeline. Click to edit.">
+    return `<div class="pool-card" draggable="true" data-id="${esc(j.id)}" style="--pc:${col}" title="Drag to another column or up onto the timeline. Click to edit.">
       <div class="pool-row"><span class="pool-name">${esc(j.name)}</span>${off ? `<button class="pool-add" data-id="${esc(j.id)}">Add to timeline</button>` : ''}</div>
       <span class="pool-meta">${when} · ${ppl}</span>
     </div>`;
   };
-  const known = JOB_BOXES.flatMap(b => b.statuses);
-  el.innerHTML = JOB_BOXES.map((b, bi) => {
-    const list = jobs.filter(j => b.statuses.includes(j.status) || (b.catchAll && !known.includes(j.status)))
-      .sort((a, c) => (a.start_date || '').localeCompare(c.start_date || ''));
-    const col = STATUS_COL[b.drop] || '#94a3b8';
-    return `<section class="jbox${b.drop === 'tendering' ? ' jbox-pool' : ''}" data-box="${bi}" style="--bc:${col}">
-      <div class="jbox-hd"><h3>${b.title}</h3><span class="jbox-count">${list.length}</span></div>
-      ${b.sub ? `<div class="jbox-sub">${b.sub}</div>` : ''}
+  el.innerHTML = _board.map(c => {
+    const list = jobs.filter(j => jobColumn(j) === c).sort(byBoardPos);
+    return `<section class="jbox${c.status === 'tendering' ? ' jbox-pool' : ''}" data-col="${esc(c.id)}" style="--bc:${colColour(c)}">
+      <div class="jbox-hd" draggable="true" title="Drag to move this column. Double-click the name to rename it.">
+        <h3 class="jbox-title">${esc(c.title)}</h3>
+        <span class="jbox-count">${list.length}</span>
+        <button type="button" class="jbox-menu-btn" data-col="${esc(c.id)}" aria-label="Options for the ${esc(c.title)} column" aria-haspopup="menu">&#8943;</button>
+      </div>
+      ${c.status === 'tendering' ? '<div class="jbox-sub">Drag a job up onto the timeline to plan it</div>' : ''}
       <div class="jbox-list">${list.map(card).join('') || '<div class="pool-empty">Drop a job here</div>'}</div>
     </section>`;
-  }).join('');
+  }).join('') + `<section class="jbox jbox-add"><button type="button" class="jbox-add-btn" id="jbox-add-btn">+ Add a column</button></section>`;
+
   el.querySelectorAll('.pool-card').forEach(c => {
-    c.addEventListener('dragstart', e => { e.dataTransfer.setData('text/dgc-pool', c.dataset.id); e.dataTransfer.effectAllowed = 'move'; c.classList.add('pool-dragging'); });
-    c.addEventListener('dragend', () => { c.classList.remove('pool-dragging'); el.querySelectorAll('.jbox').forEach(b => b.classList.remove('jbox-over')); });
+    c.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.setData('text/dgc-pool', c.dataset.id); e.dataTransfer.effectAllowed = 'move'; c.classList.add('pool-dragging'); });
+    c.addEventListener('dragend', () => { c.classList.remove('pool-dragging'); _clearBoardMarks(el); });
     c.addEventListener('click', () => { const j = _jobs.find(x => x.id == c.dataset.id); if (j) openEdit(j); });
   });
   el.querySelectorAll('.pool-add').forEach(b => b.addEventListener('click', ev => {
     ev.stopPropagation();
     poolToTimeline(b.dataset.id, snapToWorkingDay(mondayOf(toDateStr(new Date()))));
   }));
-  const isCard = e => Array.from(e.dataTransfer.types || []).includes('text/dgc-pool');
-  el.querySelectorAll('.jbox').forEach(box => {
-    box.addEventListener('dragover', e => { if (!isCard(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; box.classList.add('jbox-over'); });
-    box.addEventListener('dragleave', e => { if (!box.contains(e.relatedTarget)) box.classList.remove('jbox-over'); });
+  const has = (e, t) => Array.from(e.dataTransfer.types || []).includes(t);
+  el.querySelectorAll('.jbox[data-col]').forEach(box => {
+    const hd = box.querySelector('.jbox-hd');
+    hd.addEventListener('dragstart', e => {
+      if (e.target.closest('.jbox-menu-btn')) { e.preventDefault(); return; }
+      e.dataTransfer.setData('text/dgc-col', box.dataset.col); e.dataTransfer.effectAllowed = 'move';
+      box.classList.add('jbox-col-dragging');
+    });
+    hd.addEventListener('dragend', () => { box.classList.remove('jbox-col-dragging'); _clearBoardMarks(el); });
+    hd.querySelector('.jbox-title').addEventListener('dblclick', () => renameColumn(box.dataset.col));
+    hd.querySelector('.jbox-menu-btn').addEventListener('click', e => { e.stopPropagation(); openColumnMenu(box.dataset.col, e.currentTarget); });
+    box.addEventListener('dragover', e => {
+      if (has(e, 'text/dgc-pool')) {
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        box.classList.add('jbox-over');
+        _placeMarker(box, e.clientY);
+      } else if (has(e, 'text/dgc-col')) {
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        el.querySelectorAll('.jbox-col-over').forEach(b => b !== box && b.classList.remove('jbox-col-over'));
+        box.classList.add('jbox-col-over');
+      }
+    });
+    box.addEventListener('dragleave', e => {
+      if (box.contains(e.relatedTarget)) return;
+      box.classList.remove('jbox-over', 'jbox-col-over');
+      box.querySelectorAll('.pool-marker').forEach(m => m.remove());
+    });
     box.addEventListener('drop', e => {
-      if (!isCard(e)) return;
-      e.preventDefault(); box.classList.remove('jbox-over');
-      moveJobToBox(e.dataTransfer.getData('text/dgc-pool'), JOB_BOXES[+box.dataset.box]);
+      const col = _board.find(c => c.id === box.dataset.col);
+      if (has(e, 'text/dgc-pool')) {
+        e.preventDefault();
+        const m = box.querySelector('.pool-marker');
+        const next = m && m.nextElementSibling && m.nextElementSibling.classList.contains('pool-card') ? m.nextElementSibling.dataset.id : null;
+        _clearBoardMarks(el);
+        moveJobToCol(e.dataTransfer.getData('text/dgc-pool'), col, next);
+      } else if (has(e, 'text/dgc-col')) {
+        e.preventDefault(); _clearBoardMarks(el);
+        moveColumnBefore(e.dataTransfer.getData('text/dgc-col'), col.id);
+      }
     });
   });
+  document.getElementById('jbox-add-btn').addEventListener('click', addColumn);
 }
-// Dropping a card on a box sets its status. Pricing parks it off the timeline;
-// moving out of Pricing puts it on the timeline (this week if its date has passed).
-async function moveJobToBox(id, box) {
+function _clearBoardMarks(el) {
+  el.querySelectorAll('.jbox').forEach(b => b.classList.remove('jbox-over', 'jbox-col-over'));
+  el.querySelectorAll('.pool-marker').forEach(m => m.remove());
+}
+// Line showing where a dragged card will land in the column
+function _placeMarker(box, y) {
+  const list = box.querySelector('.jbox-list');
+  let m = list.querySelector('.pool-marker');
+  if (!m) { m = document.createElement('div'); m.className = 'pool-marker'; }
+  const cards = [...list.querySelectorAll('.pool-card:not(.pool-dragging)')];
+  const before = cards.find(c => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
+  if (before) { if (m.nextElementSibling !== before) list.insertBefore(m, before); }
+  else if (list.lastElementChild !== m) list.appendChild(m);
+}
+
+// Dropping a card on a status column sets its status (Pricing parks it off the
+// timeline; leaving Pricing puts it on, this week if its date has passed).
+// Dropping on a column you made just files it there. Order is kept.
+async function moveJobToCol(id, col, beforeId) {
   const j = _jobs.find(x => x.id == id);
-  if (!j || !box) return;
-  if (box.statuses.includes(j.status) && !(box.drop === 'tendering' && j.on_timeline !== false)) return;
-  if (!box.statuses.includes(j.status)) j.status = box.drop;
-  if (box.drop === 'tendering') j.on_timeline = false;
-  else if (j.on_timeline === false) {
-    j.on_timeline = true;
-    const today = toDateStr(new Date());
-    if (!j.start_date || j.start_date < today) j.start_date = snapToWorkingDay(mondayOf(today));
-  }
-  await upsertJob(j);
-  showUndoToast(`${j.name} moved to ${box.title}`);
+  if (!j || !col) return;
+  if (!col.status && !_boardCols) { showUndoToast('Your own columns need the planner update. Reload the page.'); return; }
+  const fromCol = jobColumn(j);
+  if (col.status) {
+    j.board_col = null;
+    if (!colStatuses(col).includes(j.status)) j.status = col.status;
+    if (col.status === 'tendering') j.on_timeline = false;
+    else if (j.on_timeline === false) {
+      j.on_timeline = true;
+      const today = toDateStr(new Date());
+      if (!j.start_date || j.start_date < today) j.start_date = snapToWorkingDay(mondayOf(today));
+    }
+  } else j.board_col = col.id;
+  const inCol = _jobs.filter(x => !x.archived && x.id != j.id && jobColumn(x) === col).sort(byBoardPos);
+  let idx = beforeId ? inCol.findIndex(x => x.id == beforeId) : -1;
+  if (idx < 0) idx = inCol.length;
+  inCol.splice(idx, 0, j);
+  const changed = [j];
+  inCol.forEach((x, i) => { const p = (i + 1) * 1000; if (x.board_pos !== p) { x.board_pos = p; if (x !== j) changed.push(x); } });
+  const dirty = changed.filter(x => { const s = _jobsSnap.get(x.id); return !s || jobChanged(s, x); });
+  if (!dirty.length) return;
+  await saveJobsBatch(dirty);
+  showUndoToast(fromCol === col ? `${j.name} moved in ${col.title}` : `${j.name} moved to ${col.title}`);
 }
+
+async function addColumn() {
+  const btn = document.getElementById('jbox-add-btn');
+  if (!btn) return;
+  const wrap = btn.parentElement;
+  _boardEditing = true;
+  wrap.innerHTML = `<input class="jbox-rename" id="jbox-new-name" maxlength="40" placeholder="Column name, e.g. Waiting on drawings" aria-label="New column name">
+    <div class="jbox-add-row"><button type="button" class="jbox-add-save">Add column</button><button type="button" class="jbox-add-cancel">Cancel</button></div>`;
+  const inp = wrap.querySelector('input');
+  inp.focus();
+  let done = false;
+  const finish = async save => {
+    if (done) return; done = true; _boardEditing = false;
+    const title = inp.value.trim();
+    if (save && title) {
+      const c = { id: 'c' + Date.now().toString(36), title, status: null,
+                  color: BOARD_COLOURS[_board.filter(x => !x.status).length % BOARD_COLOURS.length],
+                  pos: Math.max(0, ..._board.map(x => x.pos || 0)) + 1 };
+      _board.push(c);
+      if (await saveBoardCols([c])) showUndoToast(`Column "${title}" added`);
+    }
+    renderPool(_jobs.filter(j => !j.archived));
+  };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') finish(false); });
+  wrap.querySelector('.jbox-add-save').addEventListener('mousedown', e => { e.preventDefault(); finish(true); });
+  wrap.querySelector('.jbox-add-cancel').addEventListener('mousedown', e => { e.preventDefault(); finish(false); });
+  inp.addEventListener('blur', () => finish(!!inp.value.trim()));
+}
+function renameColumn(colId) {
+  const c = _board.find(x => x.id === colId);
+  const h = document.querySelector(`.jbox[data-col="${CSS.escape(colId)}"] .jbox-title`);
+  if (!c || !h) return;
+  _boardEditing = true;
+  const inp = document.createElement('input');
+  inp.className = 'jbox-rename'; inp.maxLength = 40; inp.value = c.title;
+  inp.setAttribute('aria-label', 'Column name');
+  h.replaceWith(inp); inp.focus(); inp.select();
+  const hd = inp.closest('.jbox-hd'); if (hd) hd.draggable = false;
+  let done = false;
+  const finish = async save => {
+    if (done) return; done = true; _boardEditing = false;
+    const t = inp.value.trim();
+    if (save && t && t !== c.title) { const old = c.title; c.title = t; if (await saveBoardCols([c])) showUndoToast(`"${old}" renamed to "${t}"`); }
+    renderPool(_jobs.filter(j => !j.archived));
+  };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') finish(false); });
+  inp.addEventListener('blur', () => finish(true));
+}
+async function moveColumnBefore(dragId, targetId) {
+  if (dragId === targetId) return;
+  const from = _board.findIndex(c => c.id === dragId);
+  if (from < 0) return;
+  const [c] = _board.splice(from, 1);
+  const to = _board.findIndex(x => x.id === targetId);
+  _board.splice(to < 0 ? _board.length : to, 0, c);
+  await _renumberColumns();
+}
+async function shiftColumn(colId, dir) {
+  const i = _board.findIndex(c => c.id === colId), k = i + dir;
+  if (i < 0 || k < 0 || k >= _board.length) return;
+  [_board[i], _board[k]] = [_board[k], _board[i]];
+  await _renumberColumns();
+}
+async function _renumberColumns() {
+  const changed = [];
+  _board.forEach((c, i) => { if (c.pos !== i + 1) { c.pos = i + 1; changed.push(c); } });
+  renderPool(_jobs.filter(j => !j.archived));
+  if (changed.length) await saveBoardCols(changed);
+}
+async function setColumnColour(colId, colour) {
+  const c = _board.find(x => x.id === colId);
+  if (!c) return;
+  c.color = colour;
+  renderPool(_jobs.filter(j => !j.archived));
+  await saveBoardCols([c]);
+}
+async function deleteColumn(colId) {
+  const c = _board.find(x => x.id === colId);
+  if (!c || c.status) return;
+  const inIt = _jobs.filter(j => !j.archived && jobColumn(j) === c);
+  const msg = inIt.length
+    ? `Delete the "${c.title}" column?\n\nIts ${inIt.length} job${inIt.length === 1 ? '' : 's'} won't be deleted: they go back to their status column (Running, Awarded and so on).`
+    : `Delete the empty "${c.title}" column?`;
+  if (!confirm(msg)) return;
+  _board = _board.filter(x => x !== c);
+  if (_local) localStorage.setItem(BOARD_LOCAL_K, JSON.stringify(_board));
+  else {
+    const { error } = await _sb.from('dgc_planner_board').delete().eq('id', c.id);
+    if (error) { console.error(error); showUndoToast("Couldn't delete the column. Reload and try again."); await refresh(); return; }
+  }
+  const orphans = _jobs.filter(j => j.board_col === c.id);
+  orphans.forEach(j => { j.board_col = null; j.board_pos = null; });
+  if (orphans.length) await saveJobsBatch(orphans); else renderPool(_jobs.filter(j => !j.archived));
+  showUndoToast(`Column "${c.title}" deleted`);
+}
+function closeColumnMenu() {
+  const m = document.getElementById('jbox-menu');
+  if (m) { const b = m._btn; m.remove(); if (b && document.body.contains(b)) b.focus(); }
+}
+function openColumnMenu(colId, btn) {
+  const already = document.getElementById('jbox-menu');
+  if (already && already._col === colId) { closeColumnMenu(); return; }
+  closeColumnMenu();
+  const c = _board.find(x => x.id === colId);
+  if (!c) return;
+  const i = _board.indexOf(c);
+  const m = document.createElement('div');
+  m.id = 'jbox-menu'; m.className = 'jbox-menu'; m.setAttribute('role', 'menu'); m._col = colId; m._btn = btn;
+  const cur = colColour(c);
+  m.innerHTML = `
+    <button role="menuitem" data-a="rename">Rename</button>
+    <button role="menuitem" data-a="left" ${i === 0 ? 'disabled' : ''}>Move left</button>
+    <button role="menuitem" data-a="right" ${i === _board.length - 1 ? 'disabled' : ''}>Move right</button>
+    <div class="jm-label">Colour</div>
+    <div class="jbox-swatches">${[...new Set([STATUS_COL[c.status], ...BOARD_COLOURS].filter(Boolean))].map(x =>
+      `<button class="jbox-swatch" data-a="colour" data-c="${x}" style="background:${x}" aria-label="Colour ${x}" aria-pressed="${x === cur}"></button>`).join('')}</div>
+    ${c.status
+      ? `<div class="jm-note">Linked to the "${esc(STATUS_LBL[c.status] || c.status)}" job status, so it can't be deleted. Rename or move it freely.</div>`
+      : `<button role="menuitem" class="jm-danger" data-a="delete">Delete column</button>`}`;
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();
+  m.style.top = Math.min(r.bottom + 4, window.innerHeight - m.offsetHeight - 8) + 'px';
+  m.style.left = Math.max(8, Math.min(r.right - m.offsetWidth, window.innerWidth - m.offsetWidth - 8)) + 'px';
+  m.addEventListener('click', e => {
+    const b = e.target.closest('button[data-a]');
+    if (!b || b.disabled) return;
+    e.stopPropagation();
+    const a = b.dataset.a;
+    closeColumnMenu();
+    if (a === 'rename') renameColumn(colId);
+    else if (a === 'left') shiftColumn(colId, -1);
+    else if (a === 'right') shiftColumn(colId, 1);
+    else if (a === 'colour') setColumnColour(colId, b.dataset.c);
+    else if (a === 'delete') deleteColumn(colId);
+  });
+  const first = m.querySelector('button:not(:disabled)'); if (first) first.focus();
+}
+document.addEventListener('click', e => { if (!e.target.closest('#jbox-menu')) closeColumnMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('jbox-menu')) closeColumnMenu(); });
+window.addEventListener('scroll', () => { if (document.getElementById('jbox-menu')) closeColumnMenu(); }, true);
 async function poolToTimeline(id, startDate) {
   const j = _jobs.find(x => x.id == id);
   if (!j) return;
@@ -1192,7 +1467,9 @@ async function refresh() {
   await _autoStartDueJobs();
   await _migrateLocalOverrides();
   _jobsSnap = new Map(_jobs.map(j => [j.id, JSON.parse(JSON.stringify(j))]));
-  renderPool(_jobs.filter(j => !j.archived));
+  _boardCols = _local || !_jobs.length || _jobs.some(j => Object.prototype.hasOwnProperty.call(j, 'board_col'));
+  await loadBoard();
+  if (!_boardEditing) renderPool(_jobs.filter(j => !j.archived));
   renderTimeline(tlJobs());
   renderTable(applyTlRowOrder(_jobs.filter(j => !j.archived)), 'jobs-body', false);
   renderTable(_jobs.filter(j => j.archived), 'archive-body', true);
@@ -1205,6 +1482,7 @@ function initRealtime() {
   if (!_sb) return;
   _sb.channel('plan-jobs')
     .on('postgres_changes', { event:'*', schema:'public', table:'dgc_planner_jobs' }, () => refresh())
+    .on('postgres_changes', { event:'*', schema:'public', table:'dgc_planner_board' }, () => refresh())
     .subscribe();
   // Backstop: re-read when the tab comes back into view and every 2 minutes, so boxes
   // stay right if a live update is missed and so dates passing move jobs to Running.
