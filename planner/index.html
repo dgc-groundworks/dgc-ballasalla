@@ -83,6 +83,27 @@ a{color:var(--accent);text-decoration:none}
 .logo-txt{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.2px}
 .logo-txt span{color:var(--accent)}
 .hdr-r{display:flex;align-items:center;gap:10px}
+.undo-btn{background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em}
+.undo-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.undo-btn:disabled{opacity:.35;cursor:default}
+.undo-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.undo-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--surf2);color:var(--text);border:1px solid var(--bord);border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.35);opacity:0;transition:opacity .2s;pointer-events:none}
+.undo-toast.show{opacity:1}
+.tl-pool{margin:14px 12px 0;border:1px dashed var(--bord);border-radius:10px;padding:10px 12px}
+.tl-pool-hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.tl-pool-hd h3{margin:0;font-size:13px;font-weight:800;color:var(--text);letter-spacing:.02em}
+.tl-pool-hd span{font-size:11px;color:var(--muted)}
+.tl-pool-list{display:flex;flex-direction:column;gap:6px}
+.pool-card{display:flex;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--bord);border-left:4px solid var(--pc,#94a3b8);border-radius:6px;padding:7px 10px;cursor:grab;font-size:12px}
+.pool-card:active{cursor:grabbing}
+.pool-card.pool-dragging{opacity:.4}
+.pool-name{font-weight:700;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pool-meta{color:var(--muted);font-size:11px;white-space:nowrap}
+.pool-add{background:none;border:1px solid var(--bord);border-radius:5px;color:var(--accent);font-size:11px;font-weight:700;padding:3px 9px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.pool-add:hover{border-color:var(--accent)}
+.pool-empty{font-size:12px;color:var(--muted);padding:4px 0}
+#tl-wrap.tl-drop-over{outline:2px dashed var(--accent);outline-offset:-2px;background:rgba(245,158,11,.06)}
+
 .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
 .sync-dot.live{background:var(--c-run)}
 .sync-dot.local{background:var(--accent)}
@@ -432,6 +453,7 @@ a{color:var(--accent);text-decoration:none}
       <img src="../dgc-logo-white.png" class="logo-svg" alt="DGC" style="height:32px;width:auto">
     </div>
     <div class="hdr-r">
+      <button id="undo-btn" class="undo-btn" onclick="undoLast()" disabled title="Nothing to undo yet">&#8630; Undo</button>
       <button class="theme-toggle-btn" onclick="toggleTheme()" title="Switch light/dark mode" style="background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em">Light Mode</button>
       <span class="ver" id="ver-badge"></span>
       <span class="sync-dot" id="sync-dot" title="Sync status"></span>
@@ -455,6 +477,7 @@ a{color:var(--accent);text-decoration:none}
       <button id="arch-tab-btn" onclick="showTab('archive',this)" style="background:none;border:1px solid var(--bord);color:var(--muted);padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:auto">Archive</button>
     </div>
     <div id="tl-wrap"><div id="tl-svg"></div></div>
+    <div id="tl-pool" class="tl-pool"></div>
     <div style="overflow-x:auto;border-top:1px solid var(--bord);margin-top:20px">
       <table class="job-tbl">
         <thead><tr>
@@ -621,6 +644,7 @@ a{color:var(--accent);text-decoration:none}
       <button class="btn-sv" onclick="saveModal()">Save</button>
       <button class="btn-cx" onclick="closeModal()">Cancel</button>
       <button class="btn-split" id="btn-split" onclick="openSplitSection()" style="display:none" title="Split this job into two date segments">Split</button>
+      <button class="btn-arch" id="btn-pool-action" onclick="togglePoolJob()" title="Take this job off the timeline and park it in the Still tendering list, or put it back">Send to tendering list</button>
       <button class="btn-arch" id="btn-archive-action" onclick="archiveJob()">Archive</button>
     </div>
   </div>
@@ -629,7 +653,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.57';
+const VERSION = 'v2.59';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -686,12 +710,14 @@ function getBaseDays(jobId) {
   try { return parseInt(JSON.parse(localStorage.getItem('dgc-job-days')||'{}')[jobId]||0)||0; } catch(e) { return 0; }
 }
 function saveBaseDays(jobId, days) {
+  if (!_undoing && jobId && getBaseDays(jobId) !== (parseInt(days)||0)) recordUndo({ k:'days', id: jobId, before: getBaseDays(jobId) });
   try { const s=JSON.parse(localStorage.getItem('dgc-job-days')||'{}'); s[jobId]=days; localStorage.setItem('dgc-job-days',JSON.stringify(s)); } catch(e) {}
 }
 function getJobOverrides(jobId) {
   try { return JSON.parse(localStorage.getItem('dgc-job-overrides')||'{}')[jobId]||[]; } catch(e) { return []; }
 }
 function saveJobOverrides(jobId, ovs) {
+  if (!_undoing && jobId) recordUndo({ k:'ovs', id: jobId, before: JSON.parse(JSON.stringify(getJobOverrides(jobId))) });
   try { const s=JSON.parse(localStorage.getItem('dgc-job-overrides')||'{}'); s[jobId]=ovs; localStorage.setItem('dgc-job-overrides',JSON.stringify(s)); } catch(e) {}
 }
 
@@ -845,6 +871,7 @@ async function loadJobs() {
   return sbLoad();
 }
 async function upsertJob(job) {
+  const _before = job.id ? _jobsSnap.get(job.id) : null;
   let savedId;
   if (_local) {
     const jobs = loadLocal();
@@ -855,10 +882,15 @@ async function upsertJob(job) {
   } else {
     savedId = await sbUpsert(job);
   }
+  if (!_undoing && savedId) {
+    if (!_before) recordUndo({ k:'job', id: savedId, before: null, name: job.name });
+    else if (jobChanged(_before, job)) recordUndo({ k:'job', id: savedId, before: _before, name: job.name });
+  }
   await refresh();
   return savedId;
 }
 async function removeJob(id) {
+  if (!_undoing && _jobsSnap.get(id)) recordUndo({ k:'del', row: _jobsSnap.get(id), name: _jobsSnap.get(id).name });
   if (_local) {
     const jobs = loadLocal().filter(j => j.id !== id);
     saveLocal(jobs);
@@ -868,10 +900,158 @@ async function removeJob(id) {
   await refresh();
 }
 
+// ── Undo history ───────────────────────────────────────────
+// Every job change (add, edit, drag, resize, archive, delete, tendering list) is
+// recorded. Changes within 1.2s of each other are one step (a drag, a split).
+const UNDO_MAX = 30, UNDO_GROUP_MS = 1200;
+let _undoStack = [];
+let _undoing = false;
+let _jobsSnap = new Map();
+let _tlGeom = null;
+try { _undoStack = JSON.parse(sessionStorage.getItem('dgc-undo') || '[]'); } catch(e) { _undoStack = []; }
+document.addEventListener('DOMContentLoaded', () => _saveUndo());
+function _saveUndo() {
+  try { sessionStorage.setItem('dgc-undo', JSON.stringify(_undoStack)); } catch(e) {}
+  const b = document.getElementById('undo-btn');
+  if (!b) return;
+  const top = _undoStack[_undoStack.length - 1];
+  b.disabled = !top;
+  b.innerHTML = top ? `&#8630; Undo (${_undoStack.length})` : '&#8630; Undo';
+  b.title = top ? `Undo: ${top.label}` : 'Nothing to undo yet';
+}
+function recordUndo(op) {
+  const now = Date.now();
+  let g = _undoStack[_undoStack.length - 1];
+  if (!g || now - g.ts > UNDO_GROUP_MS) {
+    g = { ts: now, ops: [], label: '' };
+    _undoStack.push(g);
+    if (_undoStack.length > UNDO_MAX) _undoStack.shift();
+  }
+  g.ts = now;
+  const key = op.k === 'del' ? 'del:' + op.row.id : op.k + ':' + op.id;
+  if (!g.ops.some(o => (o.k === 'del' ? 'del:' + o.row.id : o.k + ':' + o.id) === key)) g.ops.push(op);
+  if (op.name) {
+    const verb = op.k === 'del' ? 'delete' : (op.k === 'job' && !op.before ? 'add' : 'change to');
+    g.label = `${verb} "${op.name}"`;
+  } else if (!g.label) g.label = 'last change';
+  _saveUndo();
+}
+function jobChanged(a, b) {
+  return ['name','base_weeks','people_needed','people_on_site','start_date','status','note','on_timeline','archived']
+    .some(k => String(a[k] ?? '') !== String(b[k] ?? ''));
+}
+async function _rawUpsert(row) {
+  if (_local) {
+    const jobs = loadLocal();
+    const i = jobs.findIndex(j => j.id === row.id);
+    if (i >= 0) jobs[i] = row; else jobs.push(row);
+    saveLocal(jobs);
+  } else await sbUpsert(Object.assign({}, row));
+}
+async function _rawDelete(id) {
+  if (_local) saveLocal(loadLocal().filter(j => j.id !== id));
+  else await sbDelete(id);
+}
+async function undoLast() {
+  const g = _undoStack.pop();
+  _saveUndo();
+  if (!g) return;
+  _undoing = true;
+  try {
+    for (const op of g.ops.slice().reverse()) {
+      if (op.k === 'job') { if (op.before) await _rawUpsert(op.before); else await _rawDelete(op.id); }
+      else if (op.k === 'del') await _rawUpsert(op.row);
+      else if (op.k === 'days') saveBaseDays(op.id, op.before);
+      else if (op.k === 'ovs') saveJobOverrides(op.id, op.before);
+    }
+  } catch (e) { console.error('Undo failed', e); }
+  _undoing = false;
+  await refresh();
+  showUndoToast(`Undone: ${g.label}`);
+}
+function showUndoToast(msg) {
+  let t = document.getElementById('undo-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'undo-toast'; t.className = 'undo-toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+document.addEventListener('keydown', e => {
+  if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+  const tl = document.getElementById('tab-timeline');
+  if (!tl || !tl.classList.contains('active')) return;
+  e.preventDefault(); undoLast();
+});
+
+// ── Still tendering list (jobs parked off the timeline) ────
+function renderPool(jobs) {
+  const el = document.getElementById('tl-pool');
+  if (!el) return;
+  const rows = jobs.map(j => {
+    const col = STATUS_COL[j.status] || '#94a3b8';
+    const wks = (j.base_weeks || 0) ? `${j.base_weeks}w` : '1 day';
+    const ppl = (j.people_needed || 0) ? `${j.people_needed} guys` : 'crew tbc';
+    return `<div class="pool-card" draggable="true" data-id="${esc(j.id)}" style="--pc:${col}" title="Drag up onto the timeline, or double-click to edit">
+      <span class="pool-name">${esc(j.name)}</span>
+      <span class="pool-meta">${wks} · ${ppl} · ${esc(STATUS_LBL[j.status] || j.status)}</span>
+      <button class="pool-add" data-id="${esc(j.id)}">Add to timeline</button>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="tl-pool-hd"><h3>Still tendering</h3><span>Drag a job up onto the timeline to plan it, or tap "Add to timeline" to put it on this week.</span></div>
+    <div class="tl-pool-list">${rows || '<div class="pool-empty">Nothing waiting. Jobs set to Tendering land here.</div>'}</div>`;
+  el.querySelectorAll('.pool-card').forEach(c => {
+    c.addEventListener('dragstart', e => { e.dataTransfer.setData('text/dgc-pool', c.dataset.id); e.dataTransfer.effectAllowed = 'move'; c.classList.add('pool-dragging'); });
+    c.addEventListener('dragend', () => c.classList.remove('pool-dragging'));
+    c.addEventListener('dblclick', () => { const j = _jobs.find(x => x.id == c.dataset.id); if (j) openEdit(j); });
+  });
+  el.querySelectorAll('.pool-add').forEach(b => b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    poolToTimeline(b.dataset.id, snapToWorkingDay(mondayOf(toDateStr(new Date()))));
+  }));
+}
+async function poolToTimeline(id, startDate) {
+  const j = _jobs.find(x => x.id == id);
+  if (!j) return;
+  j.on_timeline = true;
+  if (startDate) j.start_date = startDate;
+  await upsertJob(j);
+}
+async function togglePoolJob() {
+  const id = document.getElementById('m-id').value;
+  const j = id && _jobs.find(x => x.id == id);
+  if (!j) return;
+  j.on_timeline = j.on_timeline === false;
+  closeModal();
+  await upsertJob(j);
+}
+function _dropDate(clientX) {
+  const svg = document.querySelector('#tl-svg svg');
+  if (!svg || !_tlGeom) return mondayOf(toDateStr(new Date()));
+  const x = clientX - svg.getBoundingClientRect().left - _tlGeom.LBL_W;
+  if (x < 0) return mondayOf(toDateStr(new Date()));
+  const day = Math.floor((x / _tlGeom.W_PX) * 7);
+  return snapToWorkingDay(addDays(_tlGeom.origin, day));
+}
+(function bindPoolDrop() {
+  const wrap = document.getElementById('tl-wrap');
+  if (!wrap) return;
+  const isPool = e => Array.from(e.dataTransfer.types || []).includes('text/dgc-pool');
+  wrap.addEventListener('dragover', e => { if (!isPool(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; wrap.classList.add('tl-drop-over'); });
+  wrap.addEventListener('dragleave', e => { if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('tl-drop-over'); });
+  wrap.addEventListener('drop', e => {
+    if (!isPool(e)) return;
+    e.preventDefault(); wrap.classList.remove('tl-drop-over');
+    poolToTimeline(e.dataTransfer.getData('text/dgc-pool'), _dropDate(e.clientX));
+  });
+})();
+
 // ── Refresh ────────────────────────────────────────────────
 let _jobs = [];
 async function refresh() {
   _jobs = await loadJobs();
+  _jobsSnap = new Map(_jobs.map(j => [j.id, JSON.parse(JSON.stringify(j))]));
+  renderPool(_jobs.filter(j => !j.archived && j.on_timeline === false));
   const tlJobs = applyTlRowOrder(_jobs.filter(j => !j.archived && j.on_timeline !== false));
   renderTimeline(tlJobs);
   renderTable(applyTlRowOrder(_jobs.filter(j => !j.archived)), 'jobs-body', false);
@@ -911,6 +1091,7 @@ function renderTimeline(jobs) {
   const currentMonday = mondayOf(today);
   const origin = addDays(currentMonday, -WEEKS_BEFORE * 7); // start 1 week before today
   _origin = origin; // expose for drag handlers
+  _tlGeom = { LBL_W, W_PX, WEEKS, origin };
 
   const svgW = containerW;
   const svgH = HEAD_H + Math.max(jobs.length,1) * ROW_H + FOOT_H;
@@ -1210,6 +1391,7 @@ function openAdd() {
   document.getElementById('m-status').value = 'tendering';
   document.getElementById('m-note').value = '';
   document.getElementById('btn-archive-action').style.display = 'none';
+  document.getElementById('btn-pool-action').style.display = 'none';
   const _splitBtn = document.getElementById('btn-split');
   if (_splitBtn) _splitBtn.style.display = 'none';
   document.getElementById('split-section').style.display = 'none';
@@ -1238,6 +1420,9 @@ function openEdit(j) {
   archBtn.style.display = '';
   archBtn.textContent = j.archived ? 'Restore' : 'Archive';
   archBtn.className = j.archived ? 'btn-unarch' : 'btn-arch';
+  const poolBtn = document.getElementById('btn-pool-action');
+  poolBtn.style.display = j.archived ? 'none' : '';
+  poolBtn.textContent = j.on_timeline === false ? 'Put on timeline' : 'Send to tendering list';
   const splitBtn = document.getElementById('btn-split');
   if (splitBtn) splitBtn.style.display = j.archived ? 'none' : '';
   document.getElementById('split-section').style.display = 'none';
@@ -1297,6 +1482,8 @@ async function saveModal() {
     on_timeline: true,
     archived: _editArchived
   };
+  { const ex = id ? _jobs.find(x => x.id == id) : null;
+    job.on_timeline = ex ? ex.on_timeline !== false : job.status !== 'tendering'; }
   if (id) { job.id = id; saveBaseDays(id, bd); }
   else if (_local) { job.id = 'local-' + Date.now(); saveBaseDays(job.id, bd); }
   closeModal();
@@ -2087,7 +2274,21 @@ async function confirmSplit() {
 
 // ── Init — called by login gate after authentication ──────
 async function initPlanner() {
-  _sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
+  // Every request carries the logged-in user's token (auth.js session,
+  // refreshed when expired), not just the public anon key. Staff, wages,
+  // hours, advances and leave are locked to signed-in admins by RLS
+  // (29 Sep 2026), so without this the Staff/Resources tabs come back empty.
+  _sb = window.supabase.createClient(SB_URL, SB_KEY, {
+    auth: { persistSession: false },
+    global: {
+      fetch: async (input, init = {}) => {
+        const sess = await ensureLoggedIn();
+        const headers = new Headers(init.headers || {});
+        if (sess) headers.set('Authorization', 'Bearer ' + sess.access_token);
+        return fetch(input, { ...init, headers });
+      },
+    },
+  });
   await bootApp();
   // Hash routing — e.g. planner/#resources opens that tab directly
   const hash = location.hash.replace('#', '');
