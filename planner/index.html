@@ -705,7 +705,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.68';
+const VERSION = 'v2.70';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1172,8 +1172,22 @@ function _dropDate(clientX) {
 
 // ── Refresh ────────────────────────────────────────────────
 let _jobs = [];
+// Awarded/Confirmed jobs whose start date has arrived move to Running by themselves.
+// Only jobs on the timeline; Probably Awarded and Pricing are never promoted automatically.
+async function _autoStartDueJobs() {
+  const today = toDateStr(new Date());
+  const due = _jobs.filter(j => !j.archived && j.on_timeline !== false &&
+    (j.status === 'awarded' || j.status === 'confirmed') && j.start_date && j.start_date <= today);
+  if (!due.length) return;
+  for (const j of due) {
+    j.status = 'running';
+    if (_local) { const all = loadLocal(); const i = all.findIndex(x => x.id === j.id); if (i >= 0) { all[i] = j; saveLocal(all); } }
+    else await sbUpsert(j);
+  }
+}
 async function refresh() {
   _jobs = await loadJobs();
+  await _autoStartDueJobs();
   await _migrateLocalOverrides();
   _jobsSnap = new Map(_jobs.map(j => [j.id, JSON.parse(JSON.stringify(j))]));
   renderPool(_jobs.filter(j => !j.archived));
@@ -1190,6 +1204,10 @@ function initRealtime() {
   _sb.channel('plan-jobs')
     .on('postgres_changes', { event:'*', schema:'public', table:'dgc_planner_jobs' }, () => refresh())
     .subscribe();
+  // Backstop: re-read when the tab comes back into view and every 2 minutes, so boxes
+  // stay right if a live update is missed and so dates passing move jobs to Running.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+  setInterval(() => { if (document.visibilityState === 'visible' && !_drag && !_resize) refresh(); }, 120000);
 }
 
 // ── Timeline (SVG Gantt) ───────────────────────────────────
@@ -1305,6 +1323,7 @@ function renderTimeline(jobs) {
   const tlFoot    = cs.getPropertyValue('--tl-foot').trim()    || 'rgba(0,0,0,.35)';
   const tlRowLbl  = cs.getPropertyValue('--tl-row-lbl').trim() || '#cde0f5';
   const accentCol = cs.getPropertyValue('--accent').trim()     || '#f59e0b';
+  const TL_BAND = '#1e2d3b'; // header + gang footer band (same in light and dark themes)
 
   let s = `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
 
@@ -1314,12 +1333,20 @@ function renderTimeline(jobs) {
     const x = LBL_W + w * W_PX;
     const isEven = w % 2 === 0;
     s += `<rect x="${x}" y="0" width="${W_PX}" height="${svgH}" fill="${isEven?tlColEven:tlColOdd}" />`;
+  }
+  // Date header: a solid dark band so it reads as a header, not another job row
+  s += `<rect x="0" y="0" width="${svgW}" height="${HEAD_H}" fill="${TL_BAND}"/>`;
+  s += `<line x1="0" y1="${HEAD_H}" x2="${svgW}" y2="${HEAD_H}" stroke="rgba(0,0,0,.45)" stroke-width="2"/>`;
+  for (let w = 0; w < WEEKS; w++) {
+    const wDate = addDays(origin, w * 7);
+    const x = LBL_W + w * W_PX;
+    if (w) s += `<line x1="${x}" y1="6" x2="${x}" y2="${HEAD_H-6}" stroke="rgba(255,255,255,.12)" stroke-width="1"/>`;
     const d = new Date(wDate+'T12:00:00');
     const dayName = d.toLocaleDateString('en-GB',{weekday:'short'});
     const dateLbl = d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
     const cx = x + W_PX / 2;
-    s += `<text x="${cx}" y="17" font-size="9" text-anchor="middle" fill="${tlDay}" font-weight="600">${dayName}</text>`;
-    s += `<text x="${cx}" y="34" font-size="11" text-anchor="middle" fill="${tlDate}" font-weight="700">${dateLbl}</text>`;
+    s += `<text x="${cx}" y="17" font-size="9" text-anchor="middle" fill="rgba(255,255,255,.6)" font-weight="600">${dayName}</text>`;
+    s += `<text x="${cx}" y="34" font-size="11" text-anchor="middle" fill="#ffffff" font-weight="700">${dateLbl}</text>`;
   }
 
   // Today line
@@ -1330,6 +1357,8 @@ function renderTimeline(jobs) {
 
   // Label column bg
   s += `<rect x="0" y="0" width="${LBL_W}" height="${svgH}" fill="${tlLblBg}"/>`;
+  s += `<rect x="0" y="0" width="${LBL_W}" height="${HEAD_H}" fill="${TL_BAND}"/>`;
+  s += `<text x="${LBL_W-8}" y="${HEAD_H/2+4}" font-size="11" text-anchor="end" fill="rgba(255,255,255,.75)" font-weight="700">Week</text>`;
   s += `<line x1="${LBL_W}" y1="0" x2="${LBL_W}" y2="${svgH}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>`;
 
   // Job rows
@@ -1425,9 +1454,12 @@ function renderTimeline(jobs) {
   // Breaks into 5 daily bars when any day differs (mid-week overlaps, starts/ends, or explicit overrides).
   // Bank holiday days (isWorkingDay = false) are skipped and never cause a split.
   const footY = HEAD_H + Math.max(jobs.length,1) * ROW_H;
-  s += `<rect x="0" y="${footY}" width="${svgW}" height="${FOOT_H}" fill="${tlFoot}"/>`;
-  s += `<line x1="0" y1="${footY}" x2="${svgW}" y2="${footY}" stroke="${tlSep}" stroke-width="2"/>`;
-  s += `<text x="${LBL_W-8}" y="${footY+FOOT_H/2+4}" font-size="11" text-anchor="end" fill="#64748b" font-weight="700">Gang</text>`;
+  s += `<rect x="0" y="${footY}" width="${svgW}" height="${FOOT_H}" fill="${TL_BAND}"/>`;
+  s += `<line x1="0" y1="${footY}" x2="${svgW}" y2="${footY}" stroke="rgba(0,0,0,.45)" stroke-width="3"/>`;
+  s += `<line x1="${LBL_W}" y1="${footY}" x2="${LBL_W}" y2="${footY+FOOT_H}" stroke="rgba(255,255,255,.15)" stroke-width="1"/>`;
+  s += `<text x="${LBL_W-8}" y="${footY+FOOT_H/2}" font-size="11" text-anchor="end" fill="#ffffff" font-weight="700">Staff</text>`;
+  s += `<text x="${LBL_W-8}" y="${footY+FOOT_H/2+13}" font-size="9" text-anchor="end" fill="rgba(255,255,255,.6)" font-weight="600">on site</text>`;
+  for (let w = 1; w < WEEKS; w++) s += `<line x1="${LBL_W + w * W_PX}" y1="${footY+6}" x2="${LBL_W + w * W_PX}" y2="${footY+FOOT_H-6}" stroke="rgba(255,255,255,.08)" stroke-width="1"/>`;
 
   const weekData = [];
   for (let w = 0; w < WEEKS; w++) {
