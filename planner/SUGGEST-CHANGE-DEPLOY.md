@@ -1,5 +1,7 @@
 # Suggest a change: deploy reference
 
+**Status, 29 Sep 2026 (20:38):** Edge Function `suggest-change` has been **deployed** (Verify JWT on). The CORS handshake and the not-signed-in check were tested. **Waiting on Ash** to add the `TRELLO_KEY` and `TRELLO_TOKEN` secrets. Until then, a signed-in send returns "Trello not configured".
+
 A "Suggest a change" button sits in the planner header (and in the top corner of every staff, site diary and dayworks page when opened on its own). It opens a pop-up with **From** (the signed-in user), **Subject** and **Message**. Pressing **Send** creates a Trello card in the **AHP board, INBOX list** (`6a4705b2bd876f10e03a771f`):
 - **Title:** `App change: <subject>`
 - **Description:** the message, then who sent it, the page, the app version and the time
