@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>DGC Job Planner — Join</title>
+<style>
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:linear-gradient(135deg,#0d1117 0%,#1a1d27 60%,#1e2538 100%);
+         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#e2e8f0; padding:16px; box-sizing:border-box; }
+  .card { width:100%; max-width:360px; background:rgba(26,29,39,0.95); border:1px solid rgba(245,158,11,0.2);
+          border-radius:20px; padding:32px 28px; box-shadow:0 24px 60px rgba(0,0,0,0.6); box-sizing:border-box; }
+  h1 { font-size:1.2rem; margin:0 0 6px; }
+  p { color:#94a3b8; font-size:0.9rem; line-height:1.45; margin:0 0 16px; }
+  input { width:100%; box-sizing:border-box; padding:13px 14px; margin-bottom:10px; background:rgba(0,0,0,0.3);
+          border:1px solid rgba(245,158,11,0.25); border-radius:10px; color:#e2e8f0; font-size:15px; font-family:inherit; }
+  button { width:100%; padding:14px; background:linear-gradient(135deg,#f59e0b,#d97706); border:none; border-radius:10px;
+           color:#1a1d27; font-weight:800; font-size:15px; cursor:pointer; font-family:inherit; }
+  button:disabled { opacity:0.6; cursor:default; }
+  .err { color:#f87171; font-size:0.88rem; min-height:1.2em; margin:10px 0 0; }
+  .hide { display:none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="stepAccept">
+    <h1>Join the DGC Job Planner</h1>
+    <p id="acceptText">Press Accept to set up your login.</p>
+    <button id="acceptBtn">Accept</button>
+    <p class="err" id="acceptErr"></p>
+  </div>
+  <div id="stepPassword" class="hide">
+    <h1>Pick a password</h1>
+    <p id="pwText">You'll use this with your email to sign in to the Job Planner.</p>
+    <input type="password" id="pw1" placeholder="Password (8+ characters)" autocomplete="new-password">
+    <input type="password" id="pw2" placeholder="Same password again" autocomplete="new-password">
+    <button id="pwBtn">Save and open the Job Planner</button>
+    <p class="err" id="pwErr"></p>
+  </div>
+  <div id="stepBad" class="hide">
+    <h1>This link isn't complete</h1>
+    <p>Ask Ash for a new join link.</p>
+  </div>
+</div>
+<script src="../staff/config.js?v=2"></script>
+<script src="../staff/auth.js?v=2"></script>
+<script>
+// The token lives in the #fragment, which is never sent to any server and
+// is only used when the person presses Accept (link scanners don't press
+// buttons, so they can't use it up first).
+const params = new URLSearchParams(location.hash.slice(1));
+const tokenHash = params.get('th');
+const linkType = params.get('t') === 'magiclink' ? 'magiclink' : 'invite';
+const email = params.get('e') || '';
+let joined = null;
+
+if (!tokenHash) {
+  document.getElementById('stepAccept').classList.add('hide');
+  document.getElementById('stepBad').classList.remove('hide');
+} else if (email) {
+  document.getElementById('acceptText').textContent = 'Press Accept to set up your login for ' + email + '.';
+}
+
+document.getElementById('acceptBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('acceptBtn');
+  const err = document.getElementById('acceptErr');
+  btn.disabled = true; btn.textContent = 'Checking…'; err.textContent = '';
+  try {
+    const r = await fetch(SUPABASE_URL + '/auth/v1/verify', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ type: linkType, token_hash: tokenHash }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.access_token) {
+      throw new Error('This link has expired or has already been used. Ask Ash for a new one, it only takes him a few seconds.');
+    }
+    joined = data;
+    storeSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: Date.now() + ((data.expires_in || 3600) - 60) * 1000,
+      email: data.user && data.user.email,
+    });
+    history.replaceState(null, '', location.pathname);
+    document.getElementById('stepAccept').classList.add('hide');
+    document.getElementById('stepPassword').classList.remove('hide');
+    if (data.user && data.user.email) {
+      document.getElementById('pwText').textContent = 'You\'ll sign in with ' + data.user.email + ' and this password.';
+    }
+  } catch (e) {
+    err.textContent = e.message;
+    btn.disabled = false; btn.textContent = 'Accept';
+  }
+});
+
+document.getElementById('pwBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('pwBtn');
+  const err = document.getElementById('pwErr');
+  const p1 = document.getElementById('pw1').value, p2 = document.getElementById('pw2').value;
+  err.textContent = '';
+  if (p1.length < 8) { err.textContent = 'At least 8 characters, please.'; return; }
+  if (p1 !== p2) { err.textContent = 'The two passwords don\'t match.'; return; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const session = getStoredSession();
+    const r = await fetch(SUPABASE_URL + '/auth/v1/user', {
+      method: 'PUT', headers: authedHeaders(session), body: JSON.stringify({ password: p1 }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.msg || d.error_description || d.message || 'Could not save the password.');
+    }
+    location.replace('./');
+  } catch (e) {
+    err.textContent = e.message;
+    btn.disabled = false; btn.textContent = 'Save and open the Job Planner';
+  }
+});
+</script>
+</body>
+</html>

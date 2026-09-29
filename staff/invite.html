@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DGC Job Planner — Invite</title>
+<link rel="stylesheet" href="style.css?v=2">
+<script src="../planner/theme.js"></script>
+</head>
+<body>
+<main id="app" style="max-width:640px">
+  <h2 style="margin:0 0 4px">Invite someone to the Job Planner</h2>
+  <p class="hours-hint" style="margin-bottom:16px">Makes a join link for you to send yourself (text, WhatsApp or email). Once they're in, they can see the whole Job Planner.</p>
+  <form id="inviteForm" style="display:flex;flex-direction:column;gap:10px">
+    <input type="text" id="invName" placeholder="Name (e.g. John McLoughlin)" autocomplete="off">
+    <input type="email" id="invEmail" placeholder="Email (e.g. john.mcloughlin@dgc.im)" required autocomplete="off">
+    <button type="submit" class="primary-btn" id="invBtn">Make join link</button>
+    <p id="invStatus" class="form-status"></p>
+  </form>
+  <div id="invResult" style="display:none;margin-top:18px">
+    <p class="hours-hint" style="margin-bottom:6px">Message to send (copy it all):</p>
+    <textarea id="invMsg" rows="7" readonly style="width:100%;box-sizing:border-box;font-family:inherit;font-size:0.9rem"></textarea>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="primary-btn" id="copyBtn" type="button">Copy message</button>
+      <button class="secondary-btn" id="copyLinkBtn" type="button">Copy link only</button>
+    </div>
+    <p class="hours-hint" style="margin-top:10px">Make the link when you're about to send it. It lasts about a day and works once. If it's too late, just make a new one here: the old one stops mattering.</p>
+  </div>
+</main>
+<script src="config.js?v=2"></script>
+<script src="auth.js?v=2"></script>
+<script>
+let session = null;
+let joinUrl = '';
+
+(async () => {
+  session = await ensureLoggedIn();
+  if (!session) { window.location.replace('index.html'); return; }
+})();
+
+document.getElementById('inviteForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('invBtn');
+  const status = document.getElementById('invStatus');
+  const name = document.getElementById('invName').value.trim();
+  const email = document.getElementById('invEmail').value.trim();
+  btn.disabled = true; status.className = 'form-status'; status.textContent = 'Making link…';
+  try {
+    session = await ensureLoggedIn();
+    if (!session) throw new Error('You are signed out. Reload the Job Planner and sign in.');
+    const r = await fetch(SUPABASE_URL + '/functions/v1/invite-staff', {
+      method: 'POST', headers: authedHeaders(session), body: JSON.stringify({ name, email }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || data.msg || ('Error ' + r.status));
+    joinUrl = data.join_url;
+    const first = (name.split(/\s+/)[0]) || 'there';
+    document.getElementById('invMsg').value =
+      `Hi ${first}, here's your login for the DGC Job Planner.\n\n` +
+      `1. Open this link and press "Accept":\n${joinUrl}\n\n` +
+      `2. Pick a password. Your login is ${data.email}\n\n` +
+      `After that, sign in any time at https://dgc-groundworks.github.io/dgc-ballasalla/planner/`;
+    document.getElementById('invResult').style.display = 'block';
+    status.className = 'form-status success';
+    status.textContent = data.type === 'invite'
+      ? `Link ready for ${data.email} (new account).`
+      : `${data.email} already has an account, so this is a sign-in link. They can set a new password with it.`;
+  } catch (err) {
+    status.className = 'form-status error';
+    status.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function copy(text, btn) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) { const t = document.getElementById('invMsg'); t.select(); document.execCommand('copy'); }
+  const old = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => btn.textContent = old, 1500);
+}
+document.getElementById('copyBtn').addEventListener('click', e => copy(document.getElementById('invMsg').value, e.target));
+document.getElementById('copyLinkBtn').addEventListener('click', e => copy(joinUrl, e.target));
+</script>
+</body>
+</html>
