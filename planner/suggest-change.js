@@ -84,9 +84,9 @@
         <label for="sgc-from">From</label>
         <input id="sgc-from" readonly>
         <label for="sgc-subject">Subject</label>
-        <input id="sgc-subject" maxlength="120" placeholder="e.g. Staff tab won't save Friday's hours">
+        <input id="sgc-subject" maxlength="120">
         <label for="sgc-body">What would you like changed?</label>
-        <textarea id="sgc-body" maxlength="4000" placeholder="What happened, what you expected, and where on the app."></textarea>
+        <textarea id="sgc-body" maxlength="4000"></textarea>
         <div class="sgc-msg" id="sgc-msg" role="status"></div>
         <div class="sgc-actions">
           <button type="button" class="sgc-cancel" id="sgc-cancel">Cancel</button>
