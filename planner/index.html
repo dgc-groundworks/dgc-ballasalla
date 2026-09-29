@@ -105,6 +105,7 @@ a{color:var(--accent);text-decoration:none}
 .jbox-sub{font-size:10.5px;color:var(--muted);margin:-4px 0 7px}
 .jbox-list{display:flex;flex-direction:column;gap:5px}
 .jbox.jbox-pool{border-style:dashed;border-top-style:solid}
+.jbox.jbox-over{outline:2px dashed var(--bc,var(--accent));outline-offset:2px;background:color-mix(in srgb, var(--bc,#94a3b8) 10%, var(--surf))}
 .job-list-toggle{margin:16px 12px 0}
 .job-list-toggle summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);padding:6px 0}
 .job-list-toggle summary:hover{color:var(--accent)}
@@ -490,7 +491,7 @@ a{color:var(--accent);text-decoration:none}
   <div id="tab-timeline" class="panel active">
     <div style="padding:8px 12px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:8px">
       <button class="btn-add" onclick="openAdd()">+ Add Job</button>
-      <button id="arch-tab-btn" onclick="showTab('archive',this)" style="background:none;border:1px solid var(--bord);color:var(--muted);padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:auto">Archive</button>
+      <button id="arch-tab-btn" onclick="showTab('archive',this)" style="background:none;border:1px solid var(--bord);color:var(--muted);padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:auto">Archive &amp; finished jobs</button>
     </div>
     <div id="tl-wrap"><div id="tl-svg"></div></div>
     <div id="tl-pool" class="job-boxes" aria-label="Jobs by stage"></div>
@@ -585,6 +586,19 @@ a{color:var(--accent);text-decoration:none}
           <th></th>
         </tr></thead>
         <tbody id="archive-body"></tbody>
+      </table>
+    </div>
+    <div class="arch-hdr" style="margin-top:18px">Finished jobs <span style="font-size:11px;font-weight:600;opacity:.7">(last day has passed; open one and change its dates to bring it back)</span></div>
+    <div style="overflow-x:auto">
+      <table class="job-tbl">
+        <thead><tr>
+          <th>Job</th>
+          <th>Weeks</th>
+          <th>People</th>
+          <th>Status</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="finished-body"></tbody>
       </table>
     </div>
   </div>
@@ -687,7 +701,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.65';
+const VERSION = 'v2.66';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1048,16 +1062,16 @@ document.addEventListener('keydown', e => {
 
 // ── Still tendering list (jobs parked off the timeline) ────
 const JOB_BOXES = [
-  { status:'running',          title:'On site now',         sub:'' },
-  { status:'awarded',          title:'Won',                 sub:'' },
-  { status:'confirmed',        title:'Waiting on a start date', sub:'' },
-  { status:'tendering_likely', title:'Likely to win',       sub:'' },
-  { status:'placeholder',      title:'Just come in',        sub:'' },
-  { status:'tendering',        title:'Still pricing',       sub:'Drag up onto the timeline to plan' },
+  { title:'Running',          statuses:['running'],          drop:'running' },
+  { title:'Awarded',          statuses:['awarded','confirmed'], drop:'awarded' },
+  { title:'Probably Awarded', statuses:['tendering_likely'], drop:'tendering_likely' },
+  { title:'Other',            statuses:['placeholder'],      drop:'placeholder', catchAll:true },
+  { title:'Pricing',          statuses:['tendering'],        drop:'tendering', sub:'Drag a job up onto the timeline to plan it' },
 ];
 function renderPool(jobs) {
   const el = document.getElementById('tl-pool');
   if (!el) return;
+  jobs = jobs.filter(j => !isFinished(j));
   const card = j => {
     const col = STATUS_COL[j.status] || '#94a3b8';
     const ppl = (j.people_needed || 0) ? `${j.people_needed} guys` : 'crew tbc';
@@ -1065,33 +1079,57 @@ function renderPool(jobs) {
     const when = off
       ? `Not on timeline · ${(j.base_weeks || 0) ? j.base_weeks + 'w' : '1 day'}`
       : `${fmtDate(j.start_date || toDateStr(new Date()))} to ${fmtDate(jobEndDate(j))}`;
-    return `<div class="pool-card" ${off ? 'draggable="true"' : ''} data-id="${esc(j.id)}" style="--pc:${col}" title="${off ? 'Drag up onto the timeline, or click to edit' : 'Click to edit'}">
+    return `<div class="pool-card" draggable="true" data-id="${esc(j.id)}" style="--pc:${col}" title="Drag to another box to change its status, or up onto the timeline. Click to edit.">
       <div class="pool-row"><span class="pool-name">${esc(j.name)}</span>${off ? `<button class="pool-add" data-id="${esc(j.id)}">Add to timeline</button>` : ''}</div>
       <span class="pool-meta">${when} · ${ppl}</span>
     </div>`;
   };
-  const known = JOB_BOXES.map(b => b.status);
-  el.innerHTML = JOB_BOXES.map(b => {
-    const list = jobs.filter(j => j.status === b.status || (b.status === 'placeholder' && !known.includes(j.status)))
+  const known = JOB_BOXES.flatMap(b => b.statuses);
+  el.innerHTML = JOB_BOXES.map((b, bi) => {
+    const list = jobs.filter(j => b.statuses.includes(j.status) || (b.catchAll && !known.includes(j.status)))
       .sort((a, c) => (a.start_date || '').localeCompare(c.start_date || ''));
-    const col = STATUS_COL[b.status] || '#94a3b8';
-    return `<section class="jbox${b.status === 'tendering' ? ' jbox-pool' : ''}" style="--bc:${col}">
+    const col = STATUS_COL[b.drop] || '#94a3b8';
+    return `<section class="jbox${b.drop === 'tendering' ? ' jbox-pool' : ''}" data-box="${bi}" style="--bc:${col}">
       <div class="jbox-hd"><h3>${b.title}</h3><span class="jbox-count">${list.length}</span></div>
       ${b.sub ? `<div class="jbox-sub">${b.sub}</div>` : ''}
-      <div class="jbox-list">${list.map(card).join('') || '<div class="pool-empty">None</div>'}</div>
+      <div class="jbox-list">${list.map(card).join('') || '<div class="pool-empty">Drop a job here</div>'}</div>
     </section>`;
   }).join('');
   el.querySelectorAll('.pool-card').forEach(c => {
-    if (c.getAttribute('draggable') === 'true') {
-      c.addEventListener('dragstart', e => { e.dataTransfer.setData('text/dgc-pool', c.dataset.id); e.dataTransfer.effectAllowed = 'move'; c.classList.add('pool-dragging'); });
-      c.addEventListener('dragend', () => c.classList.remove('pool-dragging'));
-    }
+    c.addEventListener('dragstart', e => { e.dataTransfer.setData('text/dgc-pool', c.dataset.id); e.dataTransfer.effectAllowed = 'move'; c.classList.add('pool-dragging'); });
+    c.addEventListener('dragend', () => { c.classList.remove('pool-dragging'); el.querySelectorAll('.jbox').forEach(b => b.classList.remove('jbox-over')); });
     c.addEventListener('click', () => { const j = _jobs.find(x => x.id == c.dataset.id); if (j) openEdit(j); });
   });
   el.querySelectorAll('.pool-add').forEach(b => b.addEventListener('click', ev => {
     ev.stopPropagation();
     poolToTimeline(b.dataset.id, snapToWorkingDay(mondayOf(toDateStr(new Date()))));
   }));
+  const isCard = e => Array.from(e.dataTransfer.types || []).includes('text/dgc-pool');
+  el.querySelectorAll('.jbox').forEach(box => {
+    box.addEventListener('dragover', e => { if (!isCard(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; box.classList.add('jbox-over'); });
+    box.addEventListener('dragleave', e => { if (!box.contains(e.relatedTarget)) box.classList.remove('jbox-over'); });
+    box.addEventListener('drop', e => {
+      if (!isCard(e)) return;
+      e.preventDefault(); box.classList.remove('jbox-over');
+      moveJobToBox(e.dataTransfer.getData('text/dgc-pool'), JOB_BOXES[+box.dataset.box]);
+    });
+  });
+}
+// Dropping a card on a box sets its status. Pricing parks it off the timeline;
+// moving out of Pricing puts it on the timeline (this week if its date has passed).
+async function moveJobToBox(id, box) {
+  const j = _jobs.find(x => x.id == id);
+  if (!j || !box) return;
+  if (box.statuses.includes(j.status) && !(box.drop === 'tendering' && j.on_timeline !== false)) return;
+  if (!box.statuses.includes(j.status)) j.status = box.drop;
+  if (box.drop === 'tendering') j.on_timeline = false;
+  else if (j.on_timeline === false) {
+    j.on_timeline = true;
+    const today = toDateStr(new Date());
+    if (!j.start_date || j.start_date < today) j.start_date = snapToWorkingDay(mondayOf(today));
+  }
+  await upsertJob(j);
+  showUndoToast(`${j.name} moved to ${box.title}`);
 }
 async function poolToTimeline(id, startDate) {
   const j = _jobs.find(x => x.id == id);
@@ -1136,10 +1174,10 @@ async function refresh() {
   await _migrateLocalOverrides();
   _jobsSnap = new Map(_jobs.map(j => [j.id, JSON.parse(JSON.stringify(j))]));
   renderPool(_jobs.filter(j => !j.archived));
-  const tlJobs = applyTlRowOrder(_jobs.filter(j => !j.archived && j.on_timeline !== false));
-  renderTimeline(tlJobs);
-  renderTable(applyTlRowOrder(_jobs.filter(j => !j.archived)), 'jobs-body', false);
+  renderTimeline(tlJobs());
+  renderTable(applyTlRowOrder(_jobs.filter(j => !j.archived && !isFinished(j))), 'jobs-body', false);
   renderTable(_jobs.filter(j => j.archived), 'archive-body', true);
+  renderTable(_jobs.filter(j => !j.archived && isFinished(j)).sort((a, b) => jobEndDate(b).localeCompare(jobEndDate(a))), 'finished-body', true);
   bindTableRowDrag();
 }
 
@@ -1174,6 +1212,16 @@ function crewSegments(j) {
     if (g && g.people === p) g.to = d; else segs.push({ from: d, to: d, people: p });
   }
   return segs.length ? segs : [{ from: start, to: end, people: base }];
+}
+
+// A job is finished once its last working day has passed. Finished jobs leave the
+// timeline and boxes and show under Archive > Finished (change the dates to bring one back).
+function isFinished(j) {
+  if ((_drag && _drag.job.id == j.id) || (_resize && _resize.job.id == j.id)) return false;
+  return jobEndDate(j) < toDateStr(new Date());
+}
+function tlJobs() {
+  return applyTlRowOrder((_jobs || []).filter(j => !j.archived && j.on_timeline !== false && !isFinished(j)));
 }
 
 function renderTimeline(jobs) {
@@ -1662,7 +1710,7 @@ function _applyOverrideDates(jobId, dates, people) {
   ovs.sort((a, b) => a.date.localeCompare(b.date));
   saveJobOverrides(jobId, ovs);
   renderOverrideList(jobId);
-  renderTimeline(_jobs.filter(x => x.on_timeline && !x.archived));
+  renderTimeline(tlJobs());
 }
 function addDayOverride() {
   const jobId = document.getElementById('m-id').value;
@@ -1696,7 +1744,7 @@ function removeDayOverride(idx) {
   if (!g) return;
   saveJobOverrides(jobId, getJobOverrides(jobId).filter(o => !g.dates.includes(o.date)));
   renderOverrideList(jobId);
-  renderTimeline(_jobs.filter(x => x.on_timeline && !x.archived));
+  renderTimeline(tlJobs());
 }
 
 async function archiveJob() {
@@ -1721,7 +1769,7 @@ function showTab(name, btn) {
   if (iframe) { iframe.src = iframe.dataset.src; iframe.removeAttribute('data-src'); }
   if (name === 'resources') initResourcePlanner();
   if (name === 'timeline' && typeof renderTimeline === 'function' && typeof _jobs !== 'undefined') {
-    requestAnimationFrame(() => { const j = (_jobs||[]).filter(j=>j.on_timeline&&!j.archived); renderTimeline(j); });
+    requestAnimationFrame(() => renderTimeline(tlJobs()));
   }
 }
 
@@ -2499,7 +2547,7 @@ function _applyDragMove(clientX, clientY) {
   if (!j) return;
   j.start_date = previewDate;
   const tl = document.getElementById('tab-timeline');
-  if (tl && tl.classList.contains('active')) renderTimeline(_jobs.filter(x => x.on_timeline && !x.archived));
+  if (tl && tl.classList.contains('active')) renderTimeline(tlJobs());
 }
 
 function _applyResizeMove(clientX, clientY) {
@@ -2554,7 +2602,7 @@ window.addEventListener('mouseup', async e => {
       { const cl = checkDeploymentClashes(); if (cl.length) showClashToast(cl); }
     } else {
       j.start_date = origStart;
-      renderTimeline(_jobs.filter(x => x.on_timeline && !x.archived));
+      renderTimeline(tlJobs());
     }
   } else if (_resize) {
     const deltaX = e.clientX - _resize.origX;
@@ -2575,7 +2623,7 @@ window.addEventListener('mouseup', async e => {
     } else {
       j.base_weeks = origWeeks;
       saveBaseDays(j.id, origDays || 0);
-      renderTimeline(_jobs.filter(x => x.on_timeline && !x.archived));
+      renderTimeline(tlJobs());
     }
   }
 });
@@ -3107,7 +3155,7 @@ window.addEventListener('touchend', async e => {
       { const cl = checkDeploymentClashes(); if (cl.length) showClashToast(cl); }
     } else {
       j.start_date = origStart;
-      renderTimeline(_jobs.filter(x => x.on_timeline && !x.archived));
+      renderTimeline(tlJobs());
     }
   } else if (_resize) {
     const deltaX = touch.clientX - _resize.origX;
@@ -3128,7 +3176,7 @@ window.addEventListener('touchend', async e => {
     } else {
       j.base_weeks = origWeeks;
       saveBaseDays(j.id, origDays || 0);
-      renderTimeline(_jobs.filter(x => x.on_timeline && !x.archived));
+      renderTimeline(tlJobs());
     }
   }
 });
