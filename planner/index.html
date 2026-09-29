@@ -83,11 +83,12 @@ a{color:var(--accent);text-decoration:none}
 .logo-txt{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.2px}
 .logo-txt span{color:var(--accent)}
 .hdr-r{display:flex;align-items:center;gap:10px}
-.ov-add{display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap}
-.ov-add input[type=date]{flex:1;min-width:120px}
-.ov-add select{width:92px}
-.ov-lbl{font-size:10.5px;font-weight:700;color:var(--muted);width:68px;flex-shrink:0}
-.ov-to{font-size:11px;color:var(--muted)}
+.ov-grp{margin-bottom:8px}
+.ov-lbl{display:block;font-size:10.5px;font-weight:700;color:var(--muted);margin-bottom:3px}
+.ov-line{display:flex;gap:6px;align-items:center;margin-bottom:5px}
+.ov-line input[type=date]{flex:1 1 0;min-width:0;width:auto !important}
+.ov-line select{flex:1 1 0;min-width:0;width:auto !important}
+.ov-to{font-size:11px;color:var(--muted);flex:0 0 auto}
 .ov-btn{background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit;white-space:nowrap}
 .ov-btn:hover{background:#2563eb}
 .undo-btn{background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em}
@@ -640,19 +641,25 @@ a{color:var(--accent);text-decoration:none}
     <div class="fr"><label>Note</label><textarea id="m-note" rows="2" placeholder="Any notes..."></textarea></div>
     <div class="fr" id="day-ov-section">
       <label>Crew changes <span style="font-size:10px;color:var(--muted)">(different headcount on one day or for a stretch of the job)</span></label>
-      <div class="ov-add">
+      <div class="ov-grp">
         <span class="ov-lbl">One day</span>
-        <input id="ov-date" type="date" aria-label="Day">
-        <select id="ov-people" aria-label="People on that day"></select>
-        <button type="button" class="ov-btn" onclick="addDayOverride()">Add day</button>
+        <div class="ov-line">
+          <input id="ov-date" type="date" aria-label="Day">
+          <select id="ov-people" aria-label="People on that day"></select>
+          <button type="button" class="ov-btn" onclick="addDayOverride()">Add</button>
+        </div>
       </div>
-      <div class="ov-add">
+      <div class="ov-grp">
         <span class="ov-lbl">Date range</span>
-        <input id="ov-from" type="date" aria-label="From">
-        <span class="ov-to">to</span>
-        <input id="ov-to" type="date" aria-label="To">
-        <select id="ov-rpeople" aria-label="People for that range"></select>
-        <button type="button" class="ov-btn" onclick="addRangeOverride()">Add range</button>
+        <div class="ov-line">
+          <input id="ov-from" type="date" aria-label="From">
+          <span class="ov-to">to</span>
+          <input id="ov-to" type="date" aria-label="To">
+        </div>
+        <div class="ov-line">
+          <select id="ov-rpeople" aria-label="People for that range"></select>
+          <button type="button" class="ov-btn" onclick="addRangeOverride()">Add range</button>
+        </div>
       </div>
       <div id="ov-list"></div>
     </div>
@@ -680,7 +687,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.62';
+const VERSION = 'v2.63';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1273,7 +1280,7 @@ function renderTimeline(jobs) {
           if (x1 <= x0) return;
           const hh = Math.max(Math.round(bh * (0.45 + 0.55 * (g.people / maxP))), 12);
           const yy = by + (bh - hh) / 2;
-          s += `<rect x="${x0}" y="${yy}" width="${x1 - x0}" height="${hh}" rx="4" fill="${col}" opacity="${g.people === (j.people_on_site || j.people_needed) ? .85 : .62}" pointer-events="none"/>`;
+          s += `<rect x="${x0}" y="${yy}" width="${x1 - x0}" height="${hh}" rx="4" fill="${col}" opacity=".85" pointer-events="none"/>`;
           if (gi > 0 && sx > LBL_W && sx < visEnd) s += `<line x1="${sx}" y1="${by+2}" x2="${sx}" y2="${by+bh-2}" stroke="white" stroke-width="1.5" opacity=".8" pointer-events="none"/>`;
           if (x1 - x0 > 22) {
             const bxx = x1 - 12;
