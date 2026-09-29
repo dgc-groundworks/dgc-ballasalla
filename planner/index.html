@@ -778,7 +778,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.77';
+const VERSION = 'v2.78';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -3643,7 +3643,22 @@ async function signOut() {
   location.replace(location.pathname);
 }
 (async () => {
-  const session = await ensureLoggedIn();
+  let session = await ensureLoggedIn();
+  // A login that was ended somewhere else (signed out in another window, or
+  // revoked) still sits in this browser: check it with Supabase and, if it's
+  // dead, show the sign-in page instead of a half-working planner.
+  if (session) {
+    try {
+      const r = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: authedHeaders(session) });
+      if (r.status === 401 || r.status === 403) {
+        session = await refreshSession(session); // clears it if the refresh is refused too
+        if (session) {
+          const r2 = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: authedHeaders(session) });
+          if (r2.status === 401 || r2.status === 403) { clearSession(); session = null; }
+        }
+      }
+    } catch (e) { /* offline: carry on with what we have */ }
+  }
   if (session) { showSignedIn(session); initPlanner(); return; }
   document.getElementById('plannerLoginOverlay').style.display = 'flex';
   setTimeout(() => document.getElementById('plannerLoginEmail').focus(), 50);
