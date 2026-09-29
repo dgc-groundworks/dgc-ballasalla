@@ -780,7 +780,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.82';
+const VERSION = 'v2.83';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1547,6 +1547,7 @@ function initRealtime() {
 // ── Drag state ─────────────────────────────────────────────
 let _drag = null;
 let _resize = null;
+const TL_EDGE_MIN = 40; // bars this wide or narrower: body always moves, stretch via the side tab
 let _wasDrag = false;
 let _origin = null; // current timeline origin (Monday of this week), set by renderTimeline
 let _lastTap = { id: null, time: 0 }; // touch double-tap tracking
@@ -1776,8 +1777,13 @@ function renderTimeline(jobs) {
         const thin = segs.length > 1 && dateY > by + 10;
         s += `<text x="${thin ? endActX - 24 : endActX}" y="${dateY}" font-size="7.5" text-anchor="end" fill="white" stroke="${col}" stroke-width="2.5" paint-order="stroke" font-weight="700" pointer-events="none">${fmtDate(endDate)}</text>`;
       }
+      // Short bars (a day or two): the whole bar moves, and a small tab just
+      // past the right end stretches it, so a grab never turns into a stretch.
+      if (cw <= TL_EDGE_MIN && cx + cw + 9 <= LBL_W + WEEKS * W_PX) {
+        s += `<rect x="${cx + cw + 2}" y="${by + bh * 0.22}" width="7" height="${bh * 0.56}" rx="3" fill="${col}" opacity=".45" data-id="${j.id}" class="tl-grip" style="cursor:ew-resize"><title>Drag to make it longer or shorter</title></rect>`;
+      }
       // Resize grip — three vertical lines at right edge (visual cue to drag here)
-      if (bw > 30) {
+      if (bw > TL_EDGE_MIN) {
         const gx = Math.min(bx + bw - 11, LBL_W + WEEKS * W_PX - 5);
         if (gx > cx) {
           for (let l = 0; l < 3; l++) s += `<line x1="${gx+l*3}" y1="${by+5}" x2="${gx+l*3}" y2="${by+bh-5}" stroke="rgba(255,255,255,0.38)" stroke-width="1.5" stroke-linecap="round" pointer-events="none"/>`;
@@ -1855,11 +1861,24 @@ function renderTimeline(jobs) {
   s += '</svg>';
   document.getElementById('tl-svg').innerHTML = s;
 
-  // Bar: drag body=move, drag right edge=resize, double-click=edit
+  // Bar: drag body=move, drag right edge=resize, double-click=edit.
+  // Short bars have no stretch edge (the tab beside them does that).
+  const edgeHit = (rect, x, touch) => rect.width > TL_EDGE_MIN && (rect.right - x) < Math.min(touch ? 18 : 10, rect.width * 0.2);
+  document.querySelectorAll('.tl-grip').forEach(el => {
+    const start = (x, e) => {
+      const j = _jobs.find(v => v.id == el.getAttribute('data-id'));
+      if (!j) return;
+      _resize = { job: j, origX: x, origWeeks: j.base_weeks, origDays: getBaseDays(j.id), lastDeltaDays: null };
+      _wasDrag = false;
+      e.preventDefault(); e.stopPropagation();
+    };
+    el.addEventListener('mousedown', e => start(e.clientX, e));
+    el.addEventListener('touchstart', e => start(e.touches[0].clientX, e), { passive: false });
+  });
   document.querySelectorAll('.tl-bar').forEach(el => {
     el.style.cursor = 'grab';
     el.addEventListener('mousemove', e => {
-      el.style.cursor = (el.getBoundingClientRect().right - e.clientX) < 14 ? 'ew-resize' : 'grab';
+      el.style.cursor = edgeHit(el.getBoundingClientRect(), e.clientX, false) ? 'ew-resize' : 'grab';
     });
     el.addEventListener('mousedown', e => {
       const j = _jobs.find(x => x.id == el.getAttribute('data-id'));
@@ -1874,7 +1893,7 @@ function renderTimeline(jobs) {
       }
       _lastTap = { id: j.id, time: now };
       const rect = el.getBoundingClientRect();
-      if ((rect.right - e.clientX) < 14) {
+      if (edgeHit(rect, e.clientX, false)) {
         _resize = { job: j, origX: e.clientX, origWeeks: j.base_weeks, origDays: getBaseDays(j.id), lastDeltaDays: null };
       } else {
         const actualStart = j.start_date || toDateStr(new Date());
@@ -1899,7 +1918,7 @@ function renderTimeline(jobs) {
       _lastTap = { id: j.id, time: now };
       const rect = el.getBoundingClientRect();
       const tx = e.touches[0].clientX;
-      if ((rect.right - tx) < rect.width * 0.22) {
+      if (edgeHit(rect, tx, true)) {
         _resize = { job: j, origX: tx, origWeeks: j.base_weeks, origDays: getBaseDays(j.id), lastDeltaDays: null };
       } else {
         const actualStart = j.start_date || toDateStr(new Date());
