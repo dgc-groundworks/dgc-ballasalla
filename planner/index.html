@@ -166,7 +166,25 @@ a{color:var(--accent);text-decoration:none}
 .sync-dot.live{background:var(--c-run)}
 .sync-dot.local{background:var(--accent)}
 .ver{font-size:11px;color:var(--text);font-weight:700;opacity:.7}
-.usr{font-size:11px;color:var(--muted);cursor:pointer}
+.usr{font-size:11px;color:var(--muted)}
+.lg-back{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;background:linear-gradient(135deg,#0d1117 0%,#1a1d27 60%,#1e2538 100%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow-y:auto}
+.lg-card{width:100%;max-width:370px;background:#1a1d27;border:1px solid rgba(245,158,11,.22);border-radius:18px;padding:30px 26px 24px;box-shadow:0 24px 60px rgba(0,0,0,.55);color:#e2e8f0;box-sizing:border-box}
+.lg-brand{font-size:12px;font-weight:800;letter-spacing:3px;color:#f59e0b}
+.lg-h{margin:4px 0 4px;font-size:22px;font-weight:800;color:#f1f5f9}
+.lg-sub{margin:0 0 18px;font-size:13px;line-height:1.45;color:#94a3b8}
+.lg-form{display:flex;flex-direction:column;gap:6px}
+.lg-form label{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#94a3b8;margin-top:6px}
+.lg-form input{width:100%;box-sizing:border-box;background:#0f1117;border:1px solid #2e3347;border-radius:9px;padding:12px 13px;color:#e2e8f0;font-size:15px;font-family:inherit;outline:none}
+.lg-form input:focus{border-color:#f59e0b}
+.lg-pw{position:relative}
+.lg-pw input{padding-right:64px}
+.lg-show{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:#f59e0b;font-size:12px;font-weight:700;cursor:pointer;padding:6px 8px;font-family:inherit}
+.lg-err{color:#f87171;font-size:12.5px;margin:6px 0 0;min-height:16px}
+.lg-btn{margin-top:4px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:9px;padding:13px;color:#1a1d27;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
+.lg-btn:disabled{opacity:.6;cursor:default}
+.lg-btn:focus-visible,.lg-show:focus-visible{outline:2px solid #f59e0b;outline-offset:2px}
+.lg-tips{margin:18px 0 0;padding:14px 0 0 18px;border-top:1px solid #2e3347;font-size:12px;line-height:1.5;color:#94a3b8;display:flex;flex-direction:column;gap:5px}
+.lg-tips b{color:#cbd5e1}
 .usr:hover{color:var(--text)}
 
 /* ── Update banner ── */
@@ -493,19 +511,27 @@ a{color:var(--accent);text-decoration:none}
 <body>
 
 <!-- Login overlay — shown before app loads if no session -->
-<div id="plannerLoginOverlay" style="display:none;position:fixed;inset:0;background:#0f1117;z-index:9999;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <div style="background:#1a1d27;border:1px solid #2e3347;border-radius:12px;padding:40px 36px;width:340px;text-align:center;">
-    <div style="font-size:24px;font-weight:800;color:#e2e8f0;margin-bottom:4px;letter-spacing:2px;">DGC</div>
-    <div style="font-size:13px;color:#64748b;margin-bottom:32px;">Job Planner — Sign in</div>
-    <form id="plannerLoginForm" style="display:flex;flex-direction:column;gap:12px;">
-      <input type="email" id="plannerLoginEmail" placeholder="Email address" required autocomplete="username"
-        style="background:#0f1117;border:1px solid #2e3347;border-radius:8px;padding:11px 14px;color:#e2e8f0;font-size:14px;outline:none;width:100%;">
-      <input type="password" id="plannerLoginPassword" placeholder="Password" required autocomplete="current-password"
-        style="background:#0f1117;border:1px solid #2e3347;border-radius:8px;padding:11px 14px;color:#e2e8f0;font-size:14px;outline:none;width:100%;">
-      <p id="plannerLoginError" style="color:#ef4444;font-size:12px;margin:0;min-height:16px;text-align:left;"></p>
-      <button type="submit" id="plannerLoginBtn"
-        style="background:#f59e0b;border:none;border-radius:8px;padding:11px;color:#1a1d27;font-size:14px;font-weight:700;cursor:pointer;width:100%;">Sign in</button>
+<div id="plannerLoginOverlay" class="lg-back" style="display:none">
+  <div class="lg-card">
+    <div class="lg-brand">DGC</div>
+    <h1 class="lg-h">Job Planner</h1>
+    <p class="lg-sub">Sign in with your work email and the password you picked.</p>
+    <form id="plannerLoginForm" class="lg-form" method="post" action="#">
+      <label for="plannerLoginEmail">Email</label>
+      <input type="email" id="plannerLoginEmail" name="email" placeholder="you@dgc.im" required autocomplete="username" autocapitalize="none" spellcheck="false">
+      <label for="plannerLoginPassword">Password</label>
+      <div class="lg-pw">
+        <input type="password" id="plannerLoginPassword" name="password" placeholder="Your password" required autocomplete="current-password">
+        <button type="button" id="plannerLoginShow" class="lg-show" aria-label="Show password" aria-pressed="false">Show</button>
+      </div>
+      <p id="plannerLoginError" class="lg-err" role="alert"></p>
+      <button type="submit" id="plannerLoginBtn" class="lg-btn">Sign in</button>
     </form>
+    <ul class="lg-tips">
+      <li>When your browser offers to <b>save the password</b>, say yes.</li>
+      <li>You stay signed in on this device until you press <b>Sign out</b>.</li>
+      <li>First time? Use the set-up link Ash sent you. Forgotten your password? Ask Ash for a new link.</li>
+    </ul>
   </div>
 </div>
 
@@ -524,6 +550,7 @@ a{color:var(--accent);text-decoration:none}
       <span class="ver" id="ver-badge"></span>
       <span class="sync-dot" id="sync-dot" title="Sync status"></span>
       <span class="usr" id="usr-badge"></span>
+      <button id="signout-btn" class="undo-btn" onclick="signOut()" style="display:none" title="Sign out of the Job Planner on this device">Sign out</button>
     </div>
   </div>
 
@@ -744,7 +771,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.75';
+const VERSION = 'v2.76';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -3589,11 +3616,38 @@ const SUPABASE_KEY = SB_KEY;
 </script>
 <script src="../staff/auth.js"></script>
 <script>
+// Who's signed in (top right) and a Sign out button
+function _sessEmail(s) {
+  if (s && s.email) return s.email;
+  try { return JSON.parse(atob(s.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || ''; } catch (e) { return ''; }
+}
+function showSignedIn(s) {
+  const em = _sessEmail(s);
+  const b = document.getElementById('usr-badge'); if (b) { b.textContent = em; b.title = 'Signed in as ' + em; }
+  const o = document.getElementById('signout-btn'); if (o) o.style.display = '';
+}
+async function signOut() {
+  const s = getStoredSession();
+  if (!confirm('Sign out of the Job Planner on this device?' + (s ? '\n\nSigned in as ' + _sessEmail(s) : ''))) return;
+  try {
+    if (s) await fetch(SUPABASE_URL + '/auth/v1/logout', { method: 'POST', headers: authedHeaders(s) });
+  } catch (e) { /* still sign out locally */ }
+  clearSession();
+  location.replace(location.pathname);
+}
 (async () => {
   const session = await ensureLoggedIn();
-  if (session) { initPlanner(); return; }
+  if (session) { showSignedIn(session); initPlanner(); return; }
   document.getElementById('plannerLoginOverlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('plannerLoginEmail').focus(), 50);
 })();
+document.getElementById('plannerLoginShow').addEventListener('click', e => {
+  const i = document.getElementById('plannerLoginPassword'), show = i.type === 'password';
+  i.type = show ? 'text' : 'password';
+  e.currentTarget.textContent = show ? 'Hide' : 'Show';
+  e.currentTarget.setAttribute('aria-pressed', String(show));
+  e.currentTarget.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+});
 
 document.getElementById('plannerLoginForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -3605,10 +3659,14 @@ document.getElementById('plannerLoginForm').addEventListener('submit', async e =
       document.getElementById('plannerLoginEmail').value.trim(),
       document.getElementById('plannerLoginPassword').value
     );
+    document.getElementById('plannerLoginPassword').type = 'password';
     document.getElementById('plannerLoginOverlay').style.display = 'none';
+    showSignedIn(getStoredSession());
     initPlanner();
   } catch (err) {
-    errEl.textContent = err.message;
+    errEl.textContent = /invalid/i.test(err.message)
+      ? "That email and password don't match. Check for typos, or ask Ash for a new set-up link."
+      : err.message;
     btn.disabled = false; btn.textContent = 'Sign in';
   }
 });

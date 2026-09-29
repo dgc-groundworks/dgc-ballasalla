@@ -57,9 +57,9 @@ document.getElementById('inviteForm').addEventListener('submit', async e => {
     const first = (name.split(/\s+/)[0]) || 'there';
     document.getElementById('invMsg').value =
       `Hi ${first}, here's your login for the DGC Job Planner.\n\n` +
-      `1. Open this link and press "Accept":\n${joinUrl}\n\n` +
-      `2. Pick a password. Your login is ${data.email}\n\n` +
-      `After that, sign in any time at https://dgc-groundworks.github.io/dgc-ballasalla/planner/`;
+      `1. Set up (first time only): open this link, press "Accept" and pick a password. It works once, within 24 hours.\n${joinUrl}\n\n` +
+      `2. Every time after that, use this link. Bookmark it or add it to your home screen:\nhttps://dgc-groundworks.github.io/dgc-ballasalla/planner/\n\n` +
+      `Your login is ${data.email}. Let your browser save the password and you'll stay signed in on that device.`;
     document.getElementById('invResult').style.display = 'block';
     status.className = 'form-status success';
     status.textContent = data.type === 'invite'
