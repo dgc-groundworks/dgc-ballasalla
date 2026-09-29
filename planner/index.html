@@ -91,6 +91,19 @@ a{color:var(--accent);text-decoration:none}
 .ov-to{font-size:11px;color:var(--muted);flex:0 0 auto}
 .ov-btn{background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit;white-space:nowrap}
 .ov-btn:hover{background:#2563eb}
+.cmp-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10001;display:none;align-items:center;justify-content:center;padding:16px}
+.cmp-back.open{display:flex}
+.cmp-box{width:100%;max-width:420px;background:var(--surf);color:var(--text);border:1px solid var(--bord);border-radius:12px;padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.cmp-box h2{margin:0 0 10px;font-size:17px;font-weight:800}
+.cmp-job{margin:0;font-size:15px;font-weight:800;border-left:4px solid var(--pc,#94a3b8);padding-left:9px}
+.cmp-meta{margin:6px 0 14px 13px;font-size:12px;color:var(--muted)}
+.cmp-actions{display:flex;flex-direction:column;gap:7px}
+.cmp-actions button{border-radius:7px;padding:10px 12px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer;text-align:left}
+.cmp-yes{background:#22c55e;border:none;color:#06260f}
+.cmp-no{background:none;border:1px solid var(--bord);color:var(--text)}
+.cmp-later{background:none;border:none;color:var(--muted)}
+.cmp-actions button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cmp-hint{margin:12px 0 0;font-size:11px;color:var(--muted)}
 .undo-btn{background:none;border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#8ab0cc;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;font-family:inherit;letter-spacing:.02em}
 .undo-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
 .undo-btn:disabled{opacity:.35;cursor:default}
@@ -491,7 +504,7 @@ a{color:var(--accent);text-decoration:none}
   <div id="tab-timeline" class="panel active">
     <div style="padding:8px 12px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:8px">
       <button class="btn-add" onclick="openAdd()">+ Add Job</button>
-      <button id="arch-tab-btn" onclick="showTab('archive',this)" style="background:none;border:1px solid var(--bord);color:var(--muted);padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:auto">Archive &amp; finished jobs</button>
+      <button id="arch-tab-btn" onclick="showTab('archive',this)" style="background:none;border:1px solid var(--bord);color:var(--muted);padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:auto">Archive &amp; completed jobs</button>
     </div>
     <div id="tl-wrap"><div id="tl-svg"></div></div>
     <div id="tl-pool" class="job-boxes" aria-label="Jobs by stage"></div>
@@ -579,7 +592,7 @@ a{color:var(--accent);text-decoration:none}
 
   <!-- Archive tab -->
   <div id="tab-archive" class="panel">
-    <div class="arch-hdr">Archived jobs</div>
+    <div class="arch-hdr">Archived &amp; completed jobs <span style="font-size:11px;font-weight:600;opacity:.7">(click one and press Restore to bring it back)</span></div>
     <div style="overflow-x:auto">
       <table class="job-tbl">
         <thead><tr>
@@ -590,19 +603,6 @@ a{color:var(--accent);text-decoration:none}
           <th></th>
         </tr></thead>
         <tbody id="archive-body"></tbody>
-      </table>
-    </div>
-    <div class="arch-hdr" style="margin-top:18px">Finished jobs <span style="font-size:11px;font-weight:600;opacity:.7">(last day has passed; open one and change its dates to bring it back)</span></div>
-    <div style="overflow-x:auto">
-      <table class="job-tbl">
-        <thead><tr>
-          <th>Job</th>
-          <th>Weeks</th>
-          <th>People</th>
-          <th>Status</th>
-          <th></th>
-        </tr></thead>
-        <tbody id="finished-body"></tbody>
       </table>
     </div>
   </div>
@@ -705,7 +705,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.67';
+const VERSION = 'v2.68';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1075,7 +1075,6 @@ const JOB_BOXES = [
 function renderPool(jobs) {
   const el = document.getElementById('tl-pool');
   if (!el) return;
-  jobs = jobs.filter(j => !isFinished(j));
   const card = j => {
     const col = STATUS_COL[j.status] || '#94a3b8';
     const ppl = (j.people_needed || 0) ? `${j.people_needed} guys` : 'crew tbc';
@@ -1179,9 +1178,9 @@ async function refresh() {
   _jobsSnap = new Map(_jobs.map(j => [j.id, JSON.parse(JSON.stringify(j))]));
   renderPool(_jobs.filter(j => !j.archived));
   renderTimeline(tlJobs());
-  renderTable(applyTlRowOrder(_jobs.filter(j => !j.archived && !isFinished(j))), 'jobs-body', false);
+  renderTable(applyTlRowOrder(_jobs.filter(j => !j.archived)), 'jobs-body', false);
   renderTable(_jobs.filter(j => j.archived), 'archive-body', true);
-  renderTable(_jobs.filter(j => !j.archived && isFinished(j)).sort((a, b) => jobEndDate(b).localeCompare(jobEndDate(a))), 'finished-body', true);
+  setTimeout(askIfComplete, 600);
   bindTableRowDrag();
 }
 
@@ -1224,8 +1223,54 @@ function isFinished(j) {
   if ((_drag && _drag.job.id == j.id) || (_resize && _resize.job.id == j.id)) return false;
   return jobEndDate(j) < toDateStr(new Date());
 }
+// ── "Is this job now complete?" ───────────────────────────
+// When a job's last working day has passed, ask (one job at a time) before archiving.
+let _asking = false;
+function _snoozed() { try { return JSON.parse(localStorage.getItem('dgc-complete-snooze') || '{}'); } catch(e) { return {}; } }
+function askIfComplete() {
+  if (_asking || !_jobs || !_jobs.length) return;
+  const tl = document.getElementById('tab-timeline');
+  if (!tl || !tl.classList.contains('active')) return;
+  if (document.getElementById('edit-modal')?.classList.contains('open')) return;
+  const today = toDateStr(new Date()), sn = _snoozed();
+  const j = _jobs.filter(x => !x.archived && x.on_timeline !== false && isFinished(x) && !(sn[x.id] && sn[x.id] >= today))
+                 .sort((a, b) => jobEndDate(a).localeCompare(jobEndDate(b)))[0];
+  if (!j) return;
+  _asking = true;
+  let el = document.getElementById('complete-modal');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'complete-modal'; el.className = 'cmp-back';
+    document.body.appendChild(el);
+  }
+  const end = jobEndDate(j);
+  const dow = new Date(end + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
+  el.innerHTML = `<div class="cmp-box" role="dialog" aria-modal="true" aria-labelledby="cmp-t">
+    <h2 id="cmp-t">Is this job now complete?</h2>
+    <p class="cmp-job" style="--pc:${STATUS_COL[j.status] || '#94a3b8'}">${esc(j.name)}</p>
+    <p class="cmp-meta">Was due to finish ${dow} ${fmtDate(end)} · ${j.people_on_site || j.people_needed || 0} guys · ${esc(STATUS_LBL[j.status] || j.status)}</p>
+    <div class="cmp-actions">
+      <button type="button" class="cmp-yes">Yes, it's complete</button>
+      <button type="button" class="cmp-no">No, change the dates</button>
+      <button type="button" class="cmp-later">Ask me tomorrow</button>
+    </div>
+    <p class="cmp-hint">Completed jobs move to Archive, where you can restore them.</p>
+  </div>`;
+  el.classList.add('open');
+  const done = () => { el.classList.remove('open'); _asking = false; };
+  el.querySelector('.cmp-yes').onclick = async () => {
+    done(); j.archived = true; await upsertJob(j);
+    showUndoToast(`${j.name} marked complete and archived`);
+  };
+  el.querySelector('.cmp-no').onclick = () => { done(); openEdit(j); };
+  el.querySelector('.cmp-later').onclick = () => {
+    const s2 = _snoozed(); s2[j.id] = today; localStorage.setItem('dgc-complete-snooze', JSON.stringify(s2));
+    done(); setTimeout(askIfComplete, 300);
+  };
+  setTimeout(() => el.querySelector('.cmp-yes').focus(), 30);
+}
+
 function tlJobs() {
-  return applyTlRowOrder((_jobs || []).filter(j => !j.archived && j.on_timeline !== false && !isFinished(j)));
+  return applyTlRowOrder((_jobs || []).filter(j => !j.archived && j.on_timeline !== false));
 }
 
 function renderTimeline(jobs) {
