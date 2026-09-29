@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <link rel="icon" type="image/png" href="../icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="theme.js"></script>
+<script src="theme.js?v=2"></script>
 <style>
 /* ── Dark theme (default) ── */
 :root {
@@ -780,7 +780,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.79';
+const VERSION = 'v2.80';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -3649,6 +3649,18 @@ async function signOut() {
   clearSession();
   location.replace(location.pathname);
 }
+// Light or dark is saved on the person's login, so it follows them to any
+// device. No saved choice yet = keep whatever this device has (light for new users).
+function _useSavedTheme(user) {
+  const t = user && user.user_metadata && user.user_metadata.dgc_theme;
+  if ((t === 'light' || t === 'dark') && t !== document.documentElement.getAttribute('data-theme')) applyTheme(t);
+}
+window.dgcSaveTheme = async t => {
+  const s = getStoredSession();
+  if (!s) return;
+  try { await fetch(SUPABASE_URL + '/auth/v1/user', { method: 'PUT', headers: authedHeaders(s), body: JSON.stringify({ data: { dgc_theme: t } }) }); }
+  catch (e) { /* saved on this device anyway */ }
+};
 // Pages inside the planner (Staff, Site Diary, Dayworks) never ask for their
 // own login: if one finds no session it tells the planner, which re-checks
 // and either reloads that page or shows the one sign-in screen at the front.
@@ -3667,6 +3679,7 @@ window.addEventListener('message', async e => {
   if (session) {
     try {
       const r = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: authedHeaders(session) });
+      if (r.ok) _useSavedTheme(await r.json().catch(() => null));
       if (r.status === 401 || r.status === 403) {
         session = await refreshSession(session); // clears it if the refresh is refused too
         if (session) {
@@ -3705,6 +3718,8 @@ document.getElementById('plannerLoginForm').addEventListener('submit', async e =
     document.getElementById('plannerLoginPassword').type = 'password';
     document.getElementById('plannerLoginOverlay').style.display = 'none';
     showSignedIn(getStoredSession());
+    fetch(SUPABASE_URL + '/auth/v1/user', { headers: authedHeaders(getStoredSession()) })
+      .then(r => r.ok ? r.json() : null).then(_useSavedTheme).catch(() => {});
     if (_plannerStarted) { document.querySelectorAll('iframe[src]').forEach(f => { f.src = f.src; }); return; }
     _plannerStarted = true;
     initPlanner();
