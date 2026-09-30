@@ -779,7 +779,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.85';
+const VERSION = 'v2.86';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1525,6 +1525,7 @@ async function refresh() {
   renderTimeline(tlJobs());
   renderTable(applyTlRowOrder(_jobs.filter(j => !j.archived)), 'jobs-body', false);
   renderTable(_jobs.filter(j => j.archived), 'archive-body', true);
+  if (_resInitDone && document.getElementById('tab-resources')?.classList.contains('active')) renderResourcePlanner();
   setTimeout(askIfComplete, 600);
   bindTableRowDrag();
 }
@@ -2410,7 +2411,9 @@ function renderResourcePlanner() {
   const onLeaveStaff = _resStaff.filter(s => onLeaveIds.has(s.id));
 
   const statusOrder = { running:0, awarded:1, confirmed:2, tendering_likely:3, tendering:4, placeholder:5 };
-  let jobs = (_jobs || []).filter(j => !j.archived);
+  // Only jobs that are actually on: the same jobs as the timeline (not archived,
+  // not deleted, not parked in Pricing) and not already finished.
+  let jobs = resLiveJobs();
   if (_resActiveFilters.size > 0) jobs = jobs.filter(j => _resActiveFilters.has(j.status));
   // Apply saved column order
   resLoadColOrder();
@@ -2923,8 +2926,12 @@ function bindTableRowDrag() {
 // Who is booked on which jobs each week: { 'name|weekStart': [jobId, ...] }.
 // Only counts live (not archived or deleted) jobs, and only weeks inside the
 // job's current dates, so a clash is always with something you can see.
+function resLiveJobs() {
+  const today = toDateStr(new Date());
+  return (_jobs || []).filter(j => !j.archived && j.on_timeline !== false && jobEndDate(j) >= today);
+}
 function resClashMap(alloc) {
-  const live = new Map((_jobs || []).filter(j => !j.archived).map(j => [String(j.id), j]));
+  const live = new Map(resLiveJobs().map(j => [String(j.id), j]));
   const map = {};
   for (const [jId, weeks] of Object.entries(alloc)) {
     const j = live.get(String(jId));
