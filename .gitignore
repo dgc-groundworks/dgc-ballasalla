@@ -4,3 +4,14 @@ planner/dayworks-test-images/
 # Silverdale Canvassing: kept in the private Supabase store, never in this public repo (Ash, 26 Sep 2026)
 silverdale-canvassing/register-data/
 silverdale-canvassing/assets/harry-signature.jpeg
+
+# Old pages taken off the website 30 Sep 2026 (kept locally, and copied to
+# "../DGC Site Archive (removed from website 30 Sep 2026)"). Don't re-publish.
+control-panel.html
+dgc-field.html
+manifest-field.json
+ba4-programme-report.html
+interview.html
+PROJECT_DATA.md
+manifest.json
+drawings/
