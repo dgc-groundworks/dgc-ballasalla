@@ -779,7 +779,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.86';
+const VERSION = 'v2.87';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -832,12 +832,35 @@ document.getElementById('ver-badge').textContent = VERSION + ' · ' + BUILD;
 
 // ── Week calc ──────────────────────────────────────────────
 // ── localStorage extras (base_days + day overrides) ───────
+// Extra days on top of whole weeks. Saved on the job (base_days column, shared
+// with everyone) once that column exists; before that, only in this browser.
+function _bdColumn() { return !_local && (_jobs || []).some(j => j && Object.prototype.hasOwnProperty.call(j, 'base_days')); }
+function _localBaseDays(jobId) { try { return parseInt(JSON.parse(localStorage.getItem('dgc-job-days')||'{}')[jobId]||0)||0; } catch(e) { return 0; } }
 function getBaseDays(jobId) {
-  try { return parseInt(JSON.parse(localStorage.getItem('dgc-job-days')||'{}')[jobId]||0)||0; } catch(e) { return 0; }
+  if (_bdColumn()) { const j = (_jobs || []).find(x => x.id == jobId); if (j && j.base_days != null) return parseInt(j.base_days) || 0; }
+  return _localBaseDays(jobId);
 }
-function saveBaseDays(jobId, days) {
-  if (!_undoing && jobId && getBaseDays(jobId) !== (parseInt(days)||0)) recordUndo({ k:'days', id: jobId, before: getBaseDays(jobId) });
+// live = true while dragging (screen only); the save happens when you let go
+function saveBaseDays(jobId, days, live) {
+  days = parseInt(days) || 0;
+  const prev = getBaseDays(jobId);
+  if (!_undoing && (!live || !_bdColumn()) && jobId && prev !== days) recordUndo({ k:'days', id: jobId, before: prev });
   try { const s=JSON.parse(localStorage.getItem('dgc-job-days')||'{}'); s[jobId]=days; localStorage.setItem('dgc-job-days',JSON.stringify(s)); } catch(e) {}
+  if (_bdColumn()) {
+    const j = (_jobs || []).find(x => x.id == jobId);
+    if (j) j.base_days = days;
+    if (!live && prev !== days && _sb && jobId && !String(jobId).startsWith('local-')) _sb.from('dgc_planner_jobs').update({ base_days: days }).eq('id', jobId).then(({ error }) => { if (error) console.error(error); });
+  }
+}
+// One-off: copy days saved in this browser onto jobs that don't have any yet
+async function _migrateLocalBaseDays() {
+  if (!_bdColumn() || localStorage.getItem('dgc-bd-migrated')) return;
+  let loc = {}; try { loc = JSON.parse(localStorage.getItem('dgc-job-days') || '{}'); } catch(e) {}
+  for (const [id, d] of Object.entries(loc)) {
+    const j = _jobs.find(x => x.id == id);
+    if (j && j.base_days == null && (parseInt(d) || 0) > 0) { j.base_days = parseInt(d); await _sb.from('dgc_planner_jobs').update({ base_days: j.base_days }).eq('id', id); }
+  }
+  localStorage.setItem('dgc-bd-migrated', '1');
 }
 // Crew changes live on the job row (day_overrides column, shared with everyone)
 // when the column exists; otherwise they fall back to this browser only.
@@ -1090,7 +1113,7 @@ function recordUndo(op) {
   _saveUndo();
 }
 function jobChanged(a, b) {
-  return ['name','base_weeks','people_needed','people_on_site','start_date','status','note','on_timeline','archived','board_col','board_pos']
+  return ['name','base_weeks','base_days','people_needed','people_on_site','start_date','status','note','on_timeline','archived','board_col','board_pos']
     .some(k => String(a[k] ?? '') !== String(b[k] ?? ''))
     || JSON.stringify(a.day_overrides || []) !== JSON.stringify(b.day_overrides || []);
 }
@@ -1518,6 +1541,7 @@ async function refresh() {
   _jobs = await loadJobs();
   await _autoStartDueJobs();
   await _migrateLocalOverrides();
+  await _migrateLocalBaseDays();
   _jobsSnap = new Map(_jobs.map(j => [j.id, JSON.parse(JSON.stringify(j))]));
   _boardCols = _local || !_jobs.length || _jobs.some(j => Object.prototype.hasOwnProperty.call(j, 'board_col'));
   await loadBoard();
@@ -2103,6 +2127,7 @@ async function saveModal() {
   };
   { const ex = id ? _jobs.find(x => x.id == id) : null;
     job.on_timeline = ex ? ex.on_timeline !== false : job.status !== 'tendering'; }
+  if (_bdColumn()) job.base_days = bd;
   if (id) { job.id = id; saveBaseDays(id, bd); }
   else if (_local) { job.id = 'local-' + Date.now(); saveBaseDays(job.id, bd); }
   closeModal();
@@ -3003,6 +3028,7 @@ async function confirmSplit() {
   const base = { people_needed: j.people_needed, people_on_site: j.people_on_site, status: j.status, note: j.note, on_timeline: true, archived: false };
   const part1 = { ...base, name: j.name + ' (1)', base_weeks: Math.floor(p1Days / 5), start_date: j.start_date };
   const part2 = { ...base, name: j.name + ' (2)', base_weeks: Math.max(1, Math.floor(p2Days / 5)), start_date: p2Start };
+  if (_bdColumn()) { part1.base_days = rem1; part2.base_days = rem2; }
   closeModal();
   j.archived = true;
   await upsertJob(j);
@@ -3031,6 +3057,7 @@ async function initPlanner() {
     },
   });
   await bootApp();
+  if (window.dgcBellStart) window.dgcBellStart();
   // Hash routing — e.g. planner/#resources opens that tab directly
   const hash = location.hash.replace('#', '');
   if (hash) {
@@ -3098,7 +3125,7 @@ function _applyResizeMove(clientX, clientY) {
   const j = _jobs.find(x => x.id == _resize.job.id);
   if (!j) return;
   j.base_weeks = newWeeks;
-  saveBaseDays(j.id, newRem);
+  saveBaseDays(j.id, newRem, true);
   // Direct DOM update — smooth per-day feedback (full re-render on release)
   const barEl = document.querySelector(`.tl-bar[data-id="${j.id}"]`);
   if (barEl && _origin) {
@@ -3819,5 +3846,6 @@ document.getElementById('plannerLoginForm').addEventListener('submit', async e =
 });
 </script>
 <script src="suggest-change.js?v=3"></script>
+<script src="bell.js?v=1"></script>
 </body>
 </html>
