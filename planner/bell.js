@@ -79,7 +79,11 @@
   function visible() {
     const cut = Date.now() - SETTLE_MS, oldest = new Date(Date.now() - DAYS_BACK * 864e5).toISOString().slice(0, 10);
     const out = [], shuffles = {};
-    for (const r of rows) {
+    for (const r0 of rows) {
+      // Extra days going from "not saved yet" to a number is the one-off copy
+      // from someone's browser onto the job, not a real change: ignore it.
+      const r = (r0.kind === 'job' && r0.before && r0.after && r0.before.base_days == null)
+        ? { ...r0, before: { ...r0.before, base_days: r0.after.base_days } } : r0;
       if (r.day < oldest || new Date(r.last_at).getTime() > cut || same(r.before, r.after)) continue;
       const auto = isAutoStart(r);
       if (!auto && (r.actor || '').toLowerCase() === me) continue;
