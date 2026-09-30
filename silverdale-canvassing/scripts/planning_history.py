@@ -464,8 +464,12 @@ def update(latest_path):
         except ImportError:
             site_extent = None
         if site_extent:
-            todo = [a for a in latest if a.get("keyVal") and not a["ref"].endswith(ADMIN_REF_SUFFIXES)
-                    and not history[a["ref"]].get("documentsCheckedAt")]
+            # A site plan is only worth looking for on a main application —
+            # a follow-up won't resubmit one. A CEMP is the opposite: it's
+            # routinely submitted precisely as a condition-discharge (AIR)
+            # follow-up, not the original application, so that check runs
+            # for every reference type, not just main ones.
+            todo = [a for a in latest if a.get("keyVal") and not history[a["ref"]].get("documentsCheckedAt")]
             print(f"Reading documents for {len(todo)} new applications...", file=sys.stderr)
             session = new_session()
             for i, a in enumerate(todo, 1):
@@ -475,7 +479,8 @@ def update(latest_path):
                     # FLOOR PLANS" or "3-BED HOUSE TYPE" name says a lot on
                     # its own) — names only, never the documents themselves.
                     history[a["ref"]]["documentNames"] = [d["description"] for d in docs if d.get("description")] or None
-                    history[a["ref"]]["siteExtent"] = site_extent.measure(session, BASE, doc_url, docs)
+                    if not a["ref"].endswith(ADMIN_REF_SUFFIXES):
+                        history[a["ref"]]["siteExtent"] = site_extent.measure(session, BASE, doc_url, docs)
                 except requests.RequestException as e:
                     print(f"  documents fetch failed for {a['ref']}: {e}", file=sys.stderr)
                 history[a["ref"]]["documentsCheckedAt"] = today.isoformat()
