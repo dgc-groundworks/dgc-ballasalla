@@ -418,7 +418,7 @@ async function handleInvoiceUpload(file) {
       <div style="font-weight:700;margin-bottom:8px">${unknown.length} card${unknown.length !== 1 ? 's' : ''} on this invoice ${unknown.length !== 1 ? "aren't" : "isn't"} in your Vehicles list yet. Choose what to do with each:</div>
       ${unknown.map((u, i) => `
         <div class="fuel-unknown" data-i="${i}" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-top:1px solid rgba(227,179,65,.25)">
-          <div style="min-width:220px;color:var(--text)"><b>Card …${esc(u.card.slice(-4))}</b> · ${esc(u.reg || 'no reg shown')}<br><span style="color:var(--muted)">${u.list.length} fill-up${u.list.length !== 1 ? 's' : ''} · ${money(u.total)}</span></div>
+          <div style="min-width:220px;color:#fde68a"><b>Card …${esc(u.card.slice(-4))}</b> · ${esc(u.reg || 'no reg shown')}<br><span style="color:#e3b341">${u.list.length} fill-up${u.list.length !== 1 ? 's' : ''} · ${money(u.total)}</span></div>
           <select class="fu-pick" style="flex:1;min-width:200px">
             <option value="new" ${u.pick === 'new' ? 'selected' : ''}>Add as a new vehicle</option>
             <optgroup label="It's one of these (its card number gets updated)">
