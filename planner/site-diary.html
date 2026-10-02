@@ -139,10 +139,15 @@ textarea{resize:vertical;line-height:1.5}
 .report-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 .btn-print{background:#1a2a3f;color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
 .btn-print:hover{background:#243552}
+.btn-savepdf{background:#0f766e}
+.btn-savepdf:hover{background:#115e59}
+.btn-print:disabled{opacity:.6;cursor:default}
+.save-note{font-size:0.78rem;color:var(--muted,#64748b);margin:8px 0 0;min-height:1em}
+.save-note.err{color:var(--red,#ef4444)}
 
 /* Print */
 @media print {
-  .topbar,.list-panel,.report-actions,#newEntryBtn{display:none!important}
+  .topbar,.list-panel,.report-actions,.save-note,#newEntryBtn{display:none!important}
   body{background:#fff}
   .layout{display:block}
   .form-panel{padding:0;overflow:visible}
@@ -347,6 +352,100 @@ function renderList() {
   });
 }
 
+// ── Save PDF ─────────────────────────────────────────────────────────────────
+// Makes the PDF here, then asks where to save it. The Save window opens in the
+// folder this person last used for this site (or, for a site they haven't saved
+// before, the last folder they used at all), so it's one click to save in the
+// same place, or pick somewhere new. Remembered per login, per site, on this
+// device. Browsers without a Save window (Safari, iPhone) just download it.
+function diaryUser() {
+  const s = (typeof getStoredSession === 'function' && getStoredSession()) || session || {};
+  if (s.email) return s.email.toLowerCase();
+  try { return (JSON.parse(atob(s.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || 'me').toLowerCase(); } catch (e) { return 'me'; }
+}
+function _sdDb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('dgc-site-diary-saves', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('places');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function _sdGet(key) {
+  try { const db = await _sdDb(); return await new Promise(res => { const q = db.transaction('places').objectStore('places').get(key); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); } catch (e) { return null; }
+}
+async function _sdPut(key, val) {
+  try { const db = await _sdDb(); await new Promise(res => { const t = db.transaction('places', 'readwrite'); t.objectStore('places').put(val, key); t.oncomplete = res; t.onerror = res; }); } catch (e) {}
+}
+async function showLastSave(site) {
+  const note = document.getElementById('saveNote');
+  if (!note) return;
+  const last = await _sdGet(diaryUser() + '|' + (site || ''));
+  note.className = 'save-note';
+  note.textContent = last && last.name ? `Last saved for this site: ${last.name}. Save opens in that same folder.` : '';
+}
+let _html2pdf = null;
+function _loadHtml2pdf() {
+  if (_html2pdf) return _html2pdf;
+  _html2pdf = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    sc.onload = () => res(window.html2pdf); sc.onerror = () => { _html2pdf = null; rej(new Error('could not load the PDF maker')); };
+    document.head.appendChild(sc);
+  });
+  return _html2pdf;
+}
+async function saveDiaryPdf(e, refNum) {
+  const btn = document.getElementById('savePdfBtn'), note = document.getElementById('saveNote');
+  const site = e.site || '';
+  const fileName = `${refNum} Site Diary - ${site.replace(/[\\/:*?"<>|]+/g, '').trim() || 'Site'}.pdf`;
+  const siteKey = diaryUser() + '|' + site, userKey = diaryUser() + '|*';
+  const canPick = typeof window.showSaveFilePicker === 'function';
+  // Ask where first (the browser only allows this straight after the click)
+  let handle = null;
+  if (canPick) {
+    const start = (await _sdGet(siteKey)) || (await _sdGet(userKey));
+    try {
+      handle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+        ...(start && start.handle ? { startIn: start.handle } : { startIn: 'documents' }),
+      });
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // they pressed Cancel
+      // startIn can fail if the old folder was moved: try again without it
+      try { handle = await window.showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }] }); }
+      catch (err2) { if (err2 && err2.name === 'AbortError') return; handle = null; }
+    }
+  }
+  btn.disabled = true; const old = btn.innerHTML; btn.textContent = 'Making PDF…';
+  note.className = 'save-note'; note.textContent = '';
+  try {
+    const h2p = await _loadHtml2pdf();
+    const blob = await h2p().set({
+      margin: [8, 8, 8, 8], filename: fileName,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }).from(document.getElementById('printArea')).outputPdf('blob');
+    if (handle) {
+      const w = await handle.createWritable(); await w.write(blob); await w.close();
+      const rec = { handle, name: handle.name, at: new Date().toISOString() };
+      await _sdPut(siteKey, rec); await _sdPut(userKey, rec);
+      note.textContent = `Saved: ${handle.name}. Next time Save opens in the same folder for ${site || 'this site'}.`;
+    } else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      note.textContent = `Downloaded: ${fileName}. (This browser doesn't let a page choose the folder; Chrome or Edge on a computer does.)`;
+    }
+  } catch (err) {
+    note.className = 'save-note err';
+    note.textContent = "Couldn't save the PDF (" + (err.message || err) + '). Print works as a backup: choose "Save as PDF" there.';
+  } finally {
+    btn.disabled = false; btn.innerHTML = old;
+  }
+}
+
 function showView(e) {
   if (!e) return;
   const panel = document.getElementById('formPanel');
@@ -423,11 +522,15 @@ function showView(e) {
 
     <!-- Actions — hidden on print -->
     <div class="report-actions">
-      <button class="btn-print" onclick="window.print()">&#128438; Print / Save PDF</button>
+      <button class="btn-print" onclick="window.print()">&#128424; Print</button>
+      <button class="btn-print btn-savepdf" id="savePdfBtn">&#11015; Save PDF</button>
       <button class="btn-save" id="editBtn" style="background:var(--blue)">&#9998; Edit</button>
       <button class="btn-del" id="delBtn">Delete</button>
-    </div>`;
+    </div>
+    <p class="save-note" id="saveNote"></p>`;
 
+  document.getElementById('savePdfBtn').addEventListener('click', () => saveDiaryPdf(e, refNum));
+  showLastSave(e.site);
   document.getElementById('editBtn').addEventListener('click', () => showForm(e));
   document.getElementById('delBtn').addEventListener('click', async () => {
     if (!confirm('Delete this diary entry?')) return;
