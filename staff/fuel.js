@@ -40,11 +40,15 @@ async function sbDelete(table, filter) {
 }
 
 // ── Invoice parser (ported from invoice_parser.py) ───────────────────────────
-const CARD_RE   = /Card-number\s*:\s*(\d+)\s+Registr\.\s*:\s*(.+)/;
+// Card lines are sometimes printed twice on top of each other (to look bold),
+// which reads back as "Card-number Card-number : : 444… 444… Registr. Registr. …".
+// So: find the first long number after "Card-number", and the reg after "Registr.".
+const CARD_RE   = /Card-number\b[^\d]*?(\d{8,})/;
+const REG_RE    = /Registr\.(?:\s*Registr\.)?[\s:]*(.+)$/;
 const TXN_RE    = /^\s*(\d{1,2}\.\d{2})\s+(\d{1,2}:\d{2})\s+(.*)$/;
 const NUMERIC_RE = /^-?[\d.,]+$/;
 const PERIOD_RE  = /Sales period\s+(\d{1,2}\.\d{1,2}\.\d{4})\s*-\s*(\d{1,2}\.\d{1,2}\.\d{4})/;
-const INV_NO_RE  = /Number Invoice:\s*(\S+)/;
+const INV_NO_RE  = /Number Invoice:\s*(\d+)/;
 
 function parseNum(s) {
   s = (s || '').trim();
@@ -54,6 +58,14 @@ function parseNum(s) {
   const n = parseFloat(s);
   return isNaN(n) ? null : n;
 }
+
+// "TMN TMN 285 285 G G" (overprinted) -> "TMN 285 G"
+function cleanReg(s) {
+  let t = (s || '').replace(/:/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (t.length % 2 === 0 && t.length && t.every((x, i) => i % 2 || x === t[i + 1])) t = t.filter((x, i) => i % 2 === 0);
+  return t.join(' ');
+}
+const normReg = s => (s || '').replace(/\s+/g, '').toUpperCase();
 
 function reformatDDMMYYYY(s) {
   const [d, m, y] = s.split('.');
@@ -78,11 +90,17 @@ function parseInvoiceText(text) {
   if (im) invoiceNumber = im[1];
 
   const transactions = [];
+  const regs = {};
   let currentCard = null;
 
   for (const line of lines) {
     const cm = CARD_RE.exec(line);
-    if (cm) { currentCard = cm[1].trim(); continue; }
+    if (cm) {
+      currentCard = cm[1].trim();
+      const rm = REG_RE.exec(line);
+      if (rm && !regs[currentCard]) regs[currentCard] = cleanReg(rm[1]);
+      continue;
+    }
     if (!currentCard || line.trim().startsWith('Subtotals')) continue;
     const tm = TXN_RE.exec(line);
     if (!tm) continue;
@@ -101,7 +119,7 @@ function parseInvoiceText(text) {
     transactions.push({ card_number: currentCard, date, article, site, litres, amount });
   }
 
-  return { invoiceNumber, periodStart, periodEnd, transactions };
+  return { invoiceNumber, periodStart, periodEnd, transactions, regs };
 }
 
 // Extract text from PDF using PDF.js (loaded on demand)
@@ -342,6 +360,14 @@ function bindEvents() {
 }
 
 // ── Invoice upload flow ───────────────────────────────────────────────────────
+// Fill-ups on cards already in the Vehicles list are matched automatically.
+// Cards we don't know yet are listed with their registration, and you choose:
+// add as a new vehicle (named as you like), put on an existing vehicle (its
+// card number is updated to the new one), or leave out. Nothing is saved until
+// you press Import.
+const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const money = n => '£' + Number(n || 0).toFixed(2);
+
 async function handleInvoiceUpload(file) {
   const statusEl = document.getElementById('uploadStatus');
   const preview  = document.getElementById('invoicePreview');
@@ -360,88 +386,121 @@ async function handleInvoiceUpload(file) {
 
   const parsed = parseInvoiceText(text);
   if (!parsed.transactions.length) {
-    statusEl.textContent = 'No transactions found — is this an Ellan Vannin Fuels invoice?'; statusEl.className = 'form-status error';
+    statusEl.textContent = 'No fill-ups found in this PDF. Is it an Ellan Vannin Fuels invoice?'; statusEl.className = 'form-status error';
     return;
   }
-
-  // Match transactions to vehicles by card number
-  const cardToVehicle = {};
-  vehicles.forEach(v => { if (v.card_number) cardToVehicle[v.card_number.trim()] = v; });
-
-  const matched   = [];
-  const unmatched = [];
-  parsed.transactions.forEach(t => {
-    const v = cardToVehicle[t.card_number];
-    if (v) matched.push({ ...t, vehicle_id: v.id, vehicle_name: v.nickname });
-    else   unmatched.push(t);
-  });
-
-  // Check for duplicate fill-ups already in DB (same vehicle + date + amount)
-  const existingKeys = new Set(fillups.map(f => `${f.vehicle_id}|${f.fill_date}|${Number(f.cost).toFixed(2)}`));
-  const toImport  = matched.filter(t => !existingKeys.has(`${t.vehicle_id}|${t.date}|${Number(t.amount).toFixed(2)}`));
-  const duplicate = matched.filter(t =>  existingKeys.has(`${t.vehicle_id}|${t.date}|${Number(t.amount).toFixed(2)}`));
-
   statusEl.textContent = '';
 
-  // Build preview
-  const unmatchedHtml = unmatched.length ? `
-    <div style="margin-top:10px;padding:10px;background:#2d1e00;border:1px solid #7d4e17;border-radius:6px;font-size:0.8rem;color:#e3b341">
-      ${unmatched.length} fill-up(s) couldn't be matched to a vehicle (cards: ${[...new Set(unmatched.map(u => u.card_number))].join(', ')}).
-      Add those card numbers to the Vehicles list below, then re-upload.
+  const cardToVehicle = {};
+  vehicles.forEach(v => { if (v.card_number) cardToVehicle[v.card_number.trim()] = v; });
+  const existingKeys = new Set(fillups.map(f => `${f.vehicle_id}|${f.fill_date}|${Number(f.cost).toFixed(2)}`));
+  const isDup = (vid, t) => existingKeys.has(`${vid}|${t.date}|${Number(t.amount).toFixed(2)}`);
+
+  const matched = [], unmatched = [];
+  parsed.transactions.forEach(t => {
+    const v = cardToVehicle[t.card_number];
+    if (v) matched.push({ ...t, vehicle_id: v.id, vehicle_name: v.nickname }); else unmatched.push(t);
+  });
+  const toImport  = matched.filter(t => !isDup(t.vehicle_id, t));
+  const duplicate = matched.length - toImport.length;
+
+  const unknown = [...new Set(unmatched.map(u => u.card_number))].map(card => {
+    const list = unmatched.filter(u => u.card_number === card);
+    const reg = parsed.regs[card] || '';
+    const sameReg = vehicles.find(v => normReg(v.registration) && normReg(v.registration) === normReg(reg));
+    return { card, reg, list, total: list.reduce((a, t) => a + (t.amount || 0), 0), pick: sameReg ? sameReg.id : 'new' };
+  });
+  const invTotal = parsed.transactions.reduce((a, t) => a + (t.amount || 0), 0);
+  const activeVehicles = vehicles.filter(v => v.status !== 'Retired');
+
+  const unknownHtml = unknown.length ? `
+    <div style="margin:12px 0;padding:12px;background:#2d1e00;border:1px solid #7d4e17;border-radius:8px;font-size:0.82rem;color:#e3b341">
+      <div style="font-weight:700;margin-bottom:8px">${unknown.length} card${unknown.length !== 1 ? 's' : ''} on this invoice ${unknown.length !== 1 ? "aren't" : "isn't"} in your Vehicles list yet. Choose what to do with each:</div>
+      ${unknown.map((u, i) => `
+        <div class="fuel-unknown" data-i="${i}" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-top:1px solid rgba(227,179,65,.25)">
+          <div style="min-width:220px;color:var(--text)"><b>Card …${esc(u.card.slice(-4))}</b> · ${esc(u.reg || 'no reg shown')}<br><span style="color:var(--muted)">${u.list.length} fill-up${u.list.length !== 1 ? 's' : ''} · ${money(u.total)}</span></div>
+          <select class="fu-pick" style="flex:1;min-width:200px">
+            <option value="new" ${u.pick === 'new' ? 'selected' : ''}>Add as a new vehicle</option>
+            <optgroup label="It's one of these (its card number gets updated)">
+              ${activeVehicles.map(v => `<option value="${v.id}" ${u.pick === v.id ? 'selected' : ''}>${esc(v.nickname)}${v.registration ? ' (' + esc(v.registration) + ')' : ''}</option>`).join('')}
+            </optgroup>
+            <option value="skip">Leave these out</option>
+          </select>
+          <input class="fu-name" type="text" value="${esc(u.reg)}" placeholder="Name for the new vehicle" style="flex:1;min-width:160px;${u.pick === 'new' ? '' : 'display:none'}">
+        </div>`).join('')}
     </div>` : '';
 
   preview.innerHTML = `
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px">
-      <h3 style="margin:0 0 6px;font-size:0.95rem">Invoice: ${parsed.invoiceNumber || file.name}</h3>
+      <h3 style="margin:0 0 6px;font-size:0.95rem">Invoice ${esc(parsed.invoiceNumber || file.name)}</h3>
       <p style="color:var(--muted);font-size:0.82rem;margin:0 0 12px">
-        Period: ${parsed.periodStart || '?'} → ${parsed.periodEnd || '?'} &nbsp;·&nbsp;
-        ${parsed.transactions.length} fill-up(s) found &nbsp;·&nbsp;
-        ${toImport.length} new &nbsp;·&nbsp;
-        ${duplicate.length} already imported
+        Period: ${parsed.periodStart || '?'} to ${parsed.periodEnd || '?'} · ${parsed.transactions.length} fill-ups, ${money(invTotal)} · ${toImport.length} new on known vehicles · ${duplicate} already imported
       </p>
       <div class="staff-list" style="margin-bottom:12px;max-height:260px;overflow-y:auto">
         ${toImport.map(t => `
           <div class="list-row" style="cursor:default;font-size:0.82rem">
-            <div class="row-main"><div class="row-name" style="font-size:0.85rem">${t.vehicle_name}</div></div>
-            <div class="row-role">${t.date} · ${t.site}</div>
+            <div class="row-main"><div class="row-name" style="font-size:0.85rem">${esc(t.vehicle_name)}</div></div>
+            <div class="row-role">${t.date} · ${esc(t.site)}</div>
             <div class="row-spacer"></div>
-            <span style="color:var(--text);font-weight:600;margin-right:12px">£${Number(t.amount).toFixed(2)}</span>
+            <span style="color:var(--text);font-weight:600;margin-right:12px">${money(t.amount)}</span>
             <span style="color:var(--muted)">${t.litres ?? '?'}L</span>
-          </div>`).join('') || '<p class="empty-msg">All fill-ups from this invoice are already imported.</p>'}
+          </div>`).join('') || (matched.length ? '<p class="empty-msg">All fill-ups on known vehicles are already imported.</p>' : '')}
       </div>
-      ${unmatchedHtml}
-      ${toImport.length ? `
-        <div style="display:flex;gap:10px;align-items:center">
-          <button id="confirmImportBtn" class="primary-btn">Import ${toImport.length} fill-up${toImport.length !== 1 ? 's' : ''}</button>
-          <button id="cancelImportBtn" class="secondary-btn">Cancel</button>
-          <p id="importStatus" class="form-status" style="margin:0"></p>
-        </div>` : `<button id="cancelImportBtn" class="secondary-btn">Close</button>`}
+      ${unknownHtml}
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button id="confirmImportBtn" class="primary-btn">Import</button>
+        <button id="cancelImportBtn" class="secondary-btn">Cancel</button>
+        <p id="importStatus" class="form-status" style="margin:0"></p>
+      </div>
     </div>`;
 
-  document.getElementById('cancelImportBtn').addEventListener('click', () => { preview.innerHTML = ''; });
+  const rows = [...preview.querySelectorAll('.fuel-unknown')];
+  const plan = () => unknown.map((u, i) => ({ ...u, pick: rows[i].querySelector('.fu-pick').value, name: rows[i].querySelector('.fu-name').value.trim() }));
+  const countFor = p => p.pick === 'skip' ? 0 : p.pick === 'new' ? p.list.length : p.list.filter(t => !isDup(p.pick, t)).length;
+  const refreshBtn = () => {
+    const n = toImport.length + plan().reduce((a, p) => a + countFor(p), 0);
+    const btn = document.getElementById('confirmImportBtn');
+    btn.textContent = n ? `Import ${n} fill-up${n !== 1 ? 's' : ''}` : 'Nothing new to import';
+    btn.disabled = !n;
+  };
+  rows.forEach(r => r.querySelector('.fu-pick').addEventListener('change', e => {
+    r.querySelector('.fu-name').style.display = e.target.value === 'new' ? '' : 'none';
+    refreshBtn();
+  }));
+  refreshBtn();
 
-  if (toImport.length) {
-    document.getElementById('confirmImportBtn').addEventListener('click', async () => {
-      const impStatus = document.getElementById('importStatus');
-      const btn = document.getElementById('confirmImportBtn');
-      btn.disabled = true; btn.textContent = 'Importing…';
-      impStatus.textContent = '';
-      try {
-        for (const t of toImport) {
-          await sbPost('dgc_fuel_fillups', {
-            vehicle_id: t.vehicle_id, fill_date: t.date, garage: t.site || null,
-            litres: t.litres ?? null, cost: t.amount,
-          });
+  document.getElementById('cancelImportBtn').addEventListener('click', () => { preview.innerHTML = ''; });
+  document.getElementById('confirmImportBtn').addEventListener('click', async () => {
+    const impStatus = document.getElementById('importStatus');
+    const btn = document.getElementById('confirmImportBtn');
+    btn.disabled = true; btn.textContent = 'Importing…'; impStatus.textContent = '';
+    try {
+      const rowsToSave = [...toImport];
+      for (const p of plan()) {
+        if (p.pick === 'skip') continue;
+        let vid = p.pick;
+        if (p.pick === 'new') {
+          const made = await sbPost('dgc_vehicles', { nickname: p.name || p.reg || ('Card ' + p.card.slice(-4)), registration: p.reg || null, card_number: p.card, status: 'Active' });
+          vid = made[0].id;
+          p.list.forEach(t => rowsToSave.push({ ...t, vehicle_id: vid }));
+        } else {
+          await sbPatch('dgc_vehicles', 'id=eq.' + vid, { card_number: p.card });
+          p.list.filter(t => !isDup(vid, t)).forEach(t => rowsToSave.push({ ...t, vehicle_id: vid }));
         }
-        preview.innerHTML = '';
-        selectedMonth = parsed.periodEnd ? mk(parsed.periodEnd) : selectedMonth;
-        await loadAll();
-      } catch (err) {
-        impStatus.textContent = 'Error: ' + err.message; impStatus.className = 'form-status error';
-        btn.disabled = false; btn.textContent = 'Retry';
       }
-    });
-  }
+      for (const t of rowsToSave) {
+        await sbPost('dgc_fuel_fillups', { vehicle_id: t.vehicle_id, fill_date: t.date, garage: t.site || null, litres: t.litres ?? null, cost: t.amount });
+      }
+      preview.innerHTML = '';
+      statusEl.textContent = `Imported ${rowsToSave.length} fill-up${rowsToSave.length !== 1 ? 's' : ''} from invoice ${parsed.invoiceNumber || ''}.`;
+      statusEl.className = 'form-status success';
+      selectedMonth = parsed.periodEnd ? mk(parsed.periodEnd) : selectedMonth;
+      await loadAll();
+    } catch (err) {
+      impStatus.textContent = 'Error: ' + err.message; impStatus.className = 'form-status error';
+      btn.disabled = false; btn.textContent = 'Retry';
+    }
+  });
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
