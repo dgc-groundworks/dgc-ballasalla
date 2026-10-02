@@ -157,6 +157,8 @@ const saveTimers = {};
 function computePeriodDates() {
   periodDates = [];
   for (let i = 0; i < PERIOD_DAYS; i++) periodDates.push(isoFromVal(addDaysVal(periodStartVal, i)));
+  // Export button follows the week on screen (each week has its own file)
+  setTimeout(() => { try { refreshExportUI(); } catch (e) {} }, 0);
 }
 
 async function loadAll() {
@@ -940,7 +942,10 @@ async function buildWorkbook() {
   const sheetLabel = `${fromDt.getDate()} ${fromDt.toLocaleString('en-GB',{month:'short'})} - ${toDt.getDate()} ${toDt.toLocaleString('en-GB',{month:'short'})}`;
 
   const ws = wb.addWorksheet(sheetLabel);
-  ws.views = [{}];
+  ws.views = [{ showGridLines: false }];
+  // Prints/saves as PDF on one landscape page width
+  ws.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true,
+                   margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } };
 
   // helper: fill a whole row with background
   const fillRow = (row, bg) => { row.eachCell({ includeEmpty: true }, cell => { cell.fill = fl(bg); }); };
@@ -978,57 +983,35 @@ async function buildWorkbook() {
   // Build a LAST_COL-element array of 0s (for addRow — forces all cells into sheetData)
   const zeros = () => new Array(LAST_COL).fill(0);
 
-  // ── ROWS 1-4: dark header block ───────────────────────────────────────────────
-  // Row 1: logo bar — all LAST_COL cells explicitly created and filled dark
-  const logoRow = ws.addRow(zeros());
-  logoRow.height = 49;
-  for (let ci = 1; ci <= LAST_COL; ci++) hiddenCell(logoRow.getCell(ci), BG);
-  if (logoId !== null) {
-    ws.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: 2.9, row: 4.0 } });
-  }
+  // ── ROWS 1-2: dark title bar ──────────────────────────────────────────────
+  // Row 1: logo (placed at the very END of this function: in ExcelJS 4.4 adding
+  // a picture that reaches down several rows creates empty rows under it, which
+  // is what left 4 blank white rows at the top) + STAFF HOURS + the week.
+  // Row 2: company name + pay day. Text cells are merged so nothing is cut off
+  // at the edge of column A (the hidden 0 fillers stop text spilling across).
+  const darkRow = (h, bg = BG) => {
+    const r = ws.addRow(zeros()); r.height = h;
+    for (let ci = 1; ci <= LAST_COL; ci++) hiddenCell(r.getCell(ci), bg);
+    return r;
+  };
+  const putText = (r, c1, c2, text, font, align, bg = BG) => {
+    if (c2 > c1) ws.mergeCells(r.number, c1, r.number, c2);
+    const cell = r.getCell(c1);
+    cell.value = text; cell.numFmt = 'General'; cell.font = font; cell.fill = fl(bg);
+    cell.alignment = { vertical: 'middle', ...align };
+  };
+  const titleRow = darkRow(46);
+  putText(titleRow, 2, 11, 'STAFF HOURS', fo(TEXT_C, true, false, 18), { horizontal: 'left', indent: 1 });
+  putText(titleRow, 12, LAST_COL, `${sheetLabel} ${toDt.getFullYear()}`, fo(TEXT_C, true, false, 12), { horizontal: 'right', indent: 1 });
+  const subRow = darkRow(20);
+  putText(subRow, 1, 11, 'Drainage & Groundwork Contractors Ltd', fo(MUTED, false, false, 9), { horizontal: 'left', indent: 1 });
+  putText(subRow, 12, LAST_COL, `Pay Day: ${payDayStr}`, fo(MUTED, false, false, 10), { horizontal: 'right', indent: 1 });
 
-  // Row 2: title left + pay-day right; no merge (merge kills the master cell in sheetData)
-  const r2arr = zeros();
-  const titleRow = ws.addRow(r2arr);
-  titleRow.height = 20;
-  for (let ci = 1; ci <= LAST_COL; ci++) {
-    const cell = titleRow.getCell(ci);
-    if (ci === 1) {
-      cell.value     = `STAFF HOURS  ·  ${sheetLabel} ${toDt.getFullYear()}`;
-      cell.fill      = fl(BG);
-      cell.font      = { color: { argb: MUTED }, size: 10, name: 'Calibri' };
-      cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
-    } else if (ci === LAST_COL) {
-      cell.value     = `Pay Day: ${payDayStr}`;
-      cell.fill      = fl(BG);
-      cell.font      = { color: { argb: MUTED }, size: 10, name: 'Calibri' };
-      cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
-    } else {
-      hiddenCell(cell, BG);
-    }
-  }
-
-  // Rows 3-4: pure dark filler
-  for (let ri = 3; ri <= 4; ri++) {
-    const fRow = ws.addRow(zeros());
-    if (ri === 3) fRow.height = 20;
-    for (let ci = 1; ci <= LAST_COL; ci++) hiddenCell(fRow.getCell(ci), BG);
-  }
-
-  // ── ROW 7: legend ─────────────────────────────────────────────────────────────
-  const legRow = ws.addRow(zeros());
-  legRow.height = 16;
-  for (let ci = 1; ci <= LAST_COL; ci++) {
-    const cell = legRow.getCell(ci);
-    if (ci === 1) {
-      cell.value     = '    H = Paid Holiday (8h)    ·    BH = Bank Holiday (8h)    ·    [8] = Hours worked    ·    Est. Tax = IoM income tax estimate    ·    Est. NI = IoM Class 1 employee NI (2026/27: 11% PT→UEL, 1% above)    ·    Est. After Tax = gross − tax − NI    ·    Not a real payslip — no individual tax codes, no employer NI';
-      cell.fill      = fl(SURF);
-      cell.font      = { color: { argb: MUTED }, size: 8, name: 'Calibri' };
-      cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 2 };
-    } else {
-      hiddenCell(cell, SURF);
-    }
-  }
+  // ── ROW 3: key (wraps across the full width) ─────────────────────────────────
+  const legRow = darkRow(26, SURF);
+  putText(legRow, 1, LAST_COL,
+    'H = Paid Holiday (8h)  ·  BH = Bank Holiday (8h)  ·  [8] = Hours worked  ·  Est. Tax = IoM income tax estimate  ·  Est. NI = IoM Class 1 employee NI (2026/27: 11% PT→UEL, 1% above)  ·  Est. After Tax = gross − tax − NI  ·  Not a real payslip: no individual tax codes, no employer NI',
+    fo(MUTED, false, false, 8), { horizontal: 'left', indent: 1, wrapText: true }, SURF);
 
   // ── ROW 8: thin separator ─────────────────────────────────────────────────────
   const sepRow = ws.addRow(zeros());
@@ -1114,20 +1097,20 @@ async function buildWorkbook() {
         cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
       } else if (ci === RATE_COL) {
         cell.fill   = fl(rbg); cell.font = fo(MUTED, false, false, 9);
-        if (v) cell.numFmt = '"£"0.##';
+        if (v) cell.numFmt = '"£"0.00';
       } else if (ci === TOT_COL) {
         cell.fill = fl(rbg); cell.font = fo(TOT_FG, true, false, 11);
-        if (v) cell.numFmt = '0.##';
+        if (v) cell.numFmt = 'General';
       } else if (ci === OT_COL) {
         cell.fill = fl(rbg); cell.font = ot ? fo(OT_FG, true, false, 10) : fo(FAINT, false, false, 9);
-        if (ot) cell.numFmt = '0.##';
+        if (ot) cell.numFmt = 'General';
       } else if (v === 'H' || v === 'BH') {
         cell.fill = fl(H_BG); cell.font = fo(H_FG, true, false, 10);
       } else if (v === 'U') {
         cell.fill = fl(U_BG); cell.font = fo(U_FG, false, true, 10);
       } else if (typeof v === 'number' && v > 0) {
         cell.fill = fl(wk ? WKND_BG : rbg); cell.font = fo(NUM_FG, true, false, 10);
-        cell.numFmt = '0.##';
+        cell.numFmt = 'General';
       } else {
         cell.fill = fl(wk ? WKND_BG : rbg); cell.font = fo(wk ? WKND_FG : FAINT, false, false, 9);
         cell.value = null;
@@ -1174,7 +1157,7 @@ async function buildWorkbook() {
     :                    fo(FAINT,   false, false, 9);
     if (v && ci > 1) {
       if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL || ci === TAX_COL || ci === NI_COL || ci === AFTERTAX_COL) cell.numFmt = '"£"#,##0.00';
-      else cell.numFmt = '0.##';
+      else cell.numFmt = 'General';
     }
     if (ci === GROSS_COL || ci === ADV_COL || ci === NET_COL || ci === TAX_COL || ci === NI_COL || ci === AFTERTAX_COL)
       cell.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
@@ -1225,7 +1208,7 @@ async function buildWorkbook() {
         if (ci === 1) { cell.font = fo(MUTED, false, false, 9); cell.alignment = { horizontal: 'left', vertical: 'middle' }; if (a.entry_date) cell.numFmt = 'DD MMM'; }
         else if (ci === 3) { cell.font = fo(TEXT_C, false, false, 10); cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }; }
         else if (ci === 7) { cell.font = fo(isOT ? OT_FG : ADV_FG, true, false, 9); cell.alignment = { horizontal: 'left', vertical: 'middle' }; }
-        else if (ci === 11) { cell.font = fo(isOT ? OT_FG : ADV_FG, true, false, 10); cell.numFmt = isAdv ? '"£"#,##0' : '0.##'; cell.alignment = { horizontal: 'right', vertical: 'middle' }; }
+        else if (ci === 11) { cell.font = fo(isOT ? OT_FG : ADV_FG, true, false, 10); cell.numFmt = isAdv ? '"£"#,##0' : 'General'; cell.alignment = { horizontal: 'right', vertical: 'middle' }; }
         else if (ci === 14) { cell.font = fo(FAINT, false, false, 9); cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }; }
       }
       ws.mergeCells(row2.number, 3, row2.number, 6);
@@ -1273,11 +1256,12 @@ async function buildWorkbook() {
       const isUnp = (b.leave_type || '').includes('Unpaid');
       const days  = weekdayCountClipped(b.from_date, b.to_date);
       const pad   = new Array(Math.max(0, LAST_COL - 14)).fill('');
-      const row3  = ws.addRow([b.from_date, b.to_date, s ? s.name : '(unknown)', '', '', '', b.leave_type, '', '', '', days, '', '', b.notes || '', ...pad]);
+      // real dates (not text) so DD MMM applies and they fit the narrow column
+      const row3  = ws.addRow([new Date(b.from_date + 'T12:00:00Z'), new Date(b.to_date + 'T12:00:00Z'), s ? s.name : '(unknown)', '', '', '', b.leave_type, '', '', '', days, '', '', b.notes || '', ...pad]);
       row3.height = 20;
       for (let ci = 1; ci <= LAST_COL; ci++) {
         const cell = row3.getCell(ci); cell.fill = fl(rbg); cell.border = thinBot;
-        if (ci <= 2) { cell.font = fo(MUTED, false, false, 9); cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }; cell.numFmt = 'DD MMM'; }
+        if (ci <= 2) { cell.font = fo(MUTED, false, false, 9); cell.alignment = { horizontal: 'left', vertical: 'middle', indent: ci === 1 ? 1 : 0 }; cell.numFmt = 'DD MMM'; }
         else if (ci === 3) { cell.font = fo(TEXT_C, false, false, 10); cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }; }
         else if (ci >= 7 && ci <= 10) { const typeBg = isHol ? H_BG : isUnp ? U_BG : rbg; cell.fill = fl(typeBg); if (ci === 7) { cell.font = fo(isHol ? H_FG : isUnp ? U_FG : MUTED, true, false, 9); cell.alignment = { horizontal: 'left', vertical: 'middle' }; } }
         else if (ci === 11) { cell.font = fo(NUM_FG, true, false, 10); cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
@@ -1286,6 +1270,18 @@ async function buildWorkbook() {
       ws.mergeCells(row3.number, 3, row3.number, 6);
       ws.mergeCells(row3.number, 7, row3.number, 10);
       ws.mergeCells(row3.number, 14, row3.number, LAST_COL);
+    });
+  }
+
+  // ── logo (added last, see the note at the title bar) ──────────────────────────
+  // Fixed size in pixels so it keeps its shape (the file is 420 × 145), sitting
+  // inside row 1 with a little padding.
+  if (logoId !== null) {
+    const LOGO_H = 44, LOGO_W = Math.round(LOGO_H * 420 / 145);
+    ws.addImage(logoId, {
+      tl: { nativeCol: 0, nativeColOff: 8 * 9525, nativeRow: 0, nativeRowOff: 9 * 9525 },
+      ext: { width: LOGO_W, height: LOGO_H },
+      editAs: 'oneCell',
     });
   }
 
@@ -1304,10 +1300,12 @@ async function buildWorkbook() {
   return await wb.xlsx.writeBuffer();
 }
 
-// Remembers the exact file the user picked (Chrome/Edge only, via the File
-// System Access API) so every later click overwrites that same file with no
-// dialog — point it at a OneDrive-synced folder once and Microsoft's own
-// sync does the "everyone else sees it" part, nothing extra needed here.
+// Remembers the file picked for each week (Chrome/Edge only, via the File
+// System Access API): saving the same week again overwrites its own file with
+// no dialog; a new week asks once, opening in the folder used last time. (It
+// used to keep ONE file and overwrite it every week, so a later week ended up
+// inside a file named for an earlier one.) Point it at a OneDrive-synced folder
+// and Microsoft's own sync does the "everyone else sees it" part.
 // Safari/Firefox don't support this API — they fall back to a plain download.
 const FS_SUPPORTED = 'showSaveFilePicker' in window;
 const HANDLE_DB = 'dgc-staff-tracker', HANDLE_STORE = 'handles', HANDLE_KEY = 'exportFile';
@@ -1320,32 +1318,41 @@ function openHandleDB() {
     req.onerror = () => reject(req.error);
   });
 }
-async function getSavedHandle() {
+// Each week gets its own file, remembered under 'week:<first date>'. The last
+// file saved (any week) is remembered under HANDLE_KEY, so a new week's Save
+// window opens in the same folder.
+async function getSavedHandle(key = HANDLE_KEY) {
   try {
     const db = await openHandleDB();
     return await new Promise((resolve, reject) => {
-      const req = db.transaction(HANDLE_STORE, 'readonly').objectStore(HANDLE_STORE).get(HANDLE_KEY);
+      const req = db.transaction(HANDLE_STORE, 'readonly').objectStore(HANDLE_STORE).get(key);
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => reject(req.error);
     });
   } catch (e) { return null; }
 }
-async function saveHandle(handle) {
+async function saveHandle(handle, key = HANDLE_KEY) {
   try {
     const db = await openHandleDB();
     const tx = db.transaction(HANDLE_STORE, 'readwrite');
-    tx.objectStore(HANDLE_STORE).put(handle, HANDLE_KEY);
+    tx.objectStore(HANDLE_STORE).put(handle, key);
   } catch (e) { /* ignore — worst case it just asks again next time */ }
 }
-async function clearSavedHandle() {
+async function clearSavedHandle(key = HANDLE_KEY) {
   try {
     const db = await openHandleDB();
-    db.transaction(HANDLE_STORE, 'readwrite').objectStore(HANDLE_STORE).delete(HANDLE_KEY);
+    db.transaction(HANDLE_STORE, 'readwrite').objectStore(HANDLE_STORE).delete(key);
   } catch (e) { /* ignore */ }
 }
+const weekKey = () => 'week:' + (periodDates[0] || '');
+// Button shows this week's file if it has been saved before, otherwise "Export to Excel"
 function updateExportUI(handle) {
   document.getElementById('exportBtn').textContent = handle ? `Save to ${handle.name}` : 'Export to Excel';
   document.getElementById('exportChangeBtn').hidden = !handle;
+}
+async function refreshExportUI() {
+  if (!FS_SUPPORTED || !document.getElementById('exportBtn')) return;
+  updateExportUI(await getSavedHandle(weekKey()));
 }
 
 let exportInFlight = false;
@@ -1389,12 +1396,38 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
   const from = periodDates[0], to = periodDates[PERIOD_DAYS - 1];
   const suggestedName = `Staff Hours ${from} to ${to}.xlsx`;
   const status = document.getElementById('hoursStatus');
-  status.textContent = 'Building styled Excel…';
-  status.className = 'form-status';
-  const buffer = await buildWorkbook();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const xlsxType = { description: 'Excel Workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } };
 
   try {
+    // Pick the file FIRST (browsers only allow the Save window straight after the click):
+    // this week's own file if it has one, otherwise ask, opening in the last folder used.
+    let handle = null;
+    if (FS_SUPPORTED) {
+      handle = await getSavedHandle(weekKey());
+      if (handle) {
+        let perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') perm = await handle.requestPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') handle = null;
+      }
+      if (!handle) {
+        const last = await getSavedHandle(HANDLE_KEY);
+        try {
+          handle = await window.showSaveFilePicker({ suggestedName, types: [xlsxType], ...(last ? { startIn: last } : {}) });
+        } catch (e) {
+          if (e.name === 'AbortError') throw e;
+          handle = await window.showSaveFilePicker({ suggestedName, types: [xlsxType] }); // old folder gone
+        }
+        await saveHandle(handle, weekKey());
+        await saveHandle(handle, HANDLE_KEY);
+        updateExportUI(handle);
+      }
+    }
+
+    status.textContent = 'Building styled Excel…';
+    status.className = 'form-status';
+    const buffer = await buildWorkbook();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
     if (!FS_SUPPORTED) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1405,20 +1438,6 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
       return;
     }
 
-    let handle = await getSavedHandle();
-    if (handle) {
-      let perm = await handle.queryPermission({ mode: 'readwrite' });
-      if (perm !== 'granted') perm = await handle.requestPermission({ mode: 'readwrite' });
-      if (perm !== 'granted') handle = null;
-    }
-    if (!handle) {
-      handle = await window.showSaveFilePicker({
-        suggestedName,
-        types: [{ description: 'Excel Workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }],
-      });
-      await saveHandle(handle);
-      updateExportUI(handle);
-    }
     const writable = await handle.createWritable();
     await writable.write(blob);
     await writable.close();
@@ -1428,23 +1447,25 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
     if (e.name !== 'AbortError') {
       status.textContent = 'Export failed — try again';
       console.error(e);
+    } else {
+      status.textContent = '';
     }
   } finally {
     exportInFlight = false;
     btn.disabled = false;
-    btn.textContent = prevLabel;
+    refreshExportUI().catch(() => { btn.textContent = prevLabel; });
   }
 });
 
+// "Change save location": forget this week's file, so the next Save asks again
 document.getElementById('exportChangeBtn').addEventListener('click', async () => {
-  await clearSavedHandle();
+  await clearSavedHandle(weekKey());
   updateExportUI(null);
 });
 
 (async () => {
   if (FS_SUPPORTED) {
-    const h = await getSavedHandle();
-    if (h) updateExportUI(h);
+    await refreshExportUI();
   } else {
     document.getElementById('exportChangeBtn').hidden = true;
   }
