@@ -266,6 +266,9 @@ a{color:var(--accent);text-decoration:none}
 .fr input,.fr select,.fr textarea{width:100%;background:var(--surf2);border:1px solid var(--bord);color:var(--text);padding:8px 10px;border-radius:7px;font-size:14px;font-family:inherit}
 .fr textarea{resize:vertical;min-height:52px}
 .fr input:focus,.fr select:focus,.fr textarea:focus{outline:1px solid var(--accent);border-color:var(--accent)}
+.m-status-hint{font-size:11.5px;color:var(--muted);margin-top:4px;min-height:14px}
+.m-status-hint.err{color:#ef4444;font-weight:700}
+.fr select.m-need{border-color:#ef4444}
 .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .wks-calc{font-size:11px;color:var(--muted);margin-top:3px;min-height:14px}
 .wks-calc.fast{color:var(--c-run)}
@@ -721,14 +724,16 @@ a{color:var(--accent);text-decoration:none}
     </div>
     <div class="fr">
       <label>Status</label>
-      <select id="m-status">
+      <select id="m-status" onchange="statusHint()">
+        <option value="" disabled>Choose one before saving</option>
         <option value="running">Running</option>
         <option value="awarded">Awarded</option>
         <option value="confirmed">Confirmed</option>
-        <option value="tendering_likely">Tendering — Likely</option>
-        <option value="tendering">Tendering</option>
-        <option value="placeholder">Placeholder</option>
+        <option value="tendering_likely">Probably awarded (tendering, likely)</option>
+        <option value="tendering">Pricing (tendering)</option>
+        <option value="placeholder">Other</option>
       </select>
+      <div id="m-status-hint" class="m-status-hint" role="status"></div>
     </div>
     <div class="fr"><label>Note</label><textarea id="m-note" rows="2" placeholder="Any notes..."></textarea></div>
     <div class="fr" id="day-ov-section">
@@ -779,7 +784,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.89';
+const VERSION = 'v2.90';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -2033,7 +2038,8 @@ function openAdd() {
   document.getElementById('m-needed').value = 2;
   document.getElementById('m-onsite').value = 2;
   document.getElementById('m-start').value = toDateStr(new Date());
-  document.getElementById('m-status').value = 'awarded';
+  document.getElementById('m-status').value = ''; // must be picked before Save
+  statusHint();
   document.getElementById('m-note').value = '';
   document.getElementById('btn-archive-action').style.display = 'none';
   document.getElementById('btn-pool-action').style.display = 'none';
@@ -2060,6 +2066,7 @@ function openEdit(j) {
   document.getElementById('m-start').value = sd;
   document.getElementById('m-finish').value = addWeekdays(sd, Math.max((j.base_weeks || 0) * 5 + bd, 1));
   document.getElementById('m-status').value = j.status;
+  statusHint();
   document.getElementById('m-note').value = j.note||'';
   const archBtn = document.getElementById('btn-archive-action');
   archBtn.style.display = '';
@@ -2113,8 +2120,20 @@ function onFinishChange() {
   _finishLock = false;
 }
 
+// Says where the job will go; on a new job, Save waits until a status is picked
+function statusHint(err) {
+  const sel = document.getElementById('m-status'), h = document.getElementById('m-status-hint');
+  if (!sel || !h) return;
+  const v = sel.value;
+  sel.classList.toggle('m-need', !!err && !v);
+  h.className = 'm-status-hint' + (err && !v ? ' err' : '');
+  h.textContent = !v ? (err ? 'Choose a status first: Awarded, Pricing and so on.' : '')
+    : v === 'tendering' ? 'Goes in the Pricing box under the timeline until it\'s won.'
+    : 'Goes on the timeline.';
+}
 async function saveModal() {
   const id = document.getElementById('m-id').value;
+  if (!document.getElementById('m-status').value) { statusHint(true); document.getElementById('m-status').focus(); return; }
   const bd = Math.min(4, Math.max(0, parseInt(document.getElementById('m-days').value)||0));
   const job = {
     name: document.getElementById('m-name').value.trim() || 'New Job',
