@@ -495,10 +495,11 @@ async function handleInvoiceUpload(file) {
         await sbPost('dgc_fuel_fillups', { vehicle_id: t.vehicle_id, fill_date: t.date, garage: t.site || null, litres: t.litres ?? null, cost: t.amount });
       }
       preview.innerHTML = '';
-      statusEl.textContent = `Imported ${rowsToSave.length} fill-up${rowsToSave.length !== 1 ? 's' : ''} from invoice ${parsed.invoiceNumber || ''}.`;
-      statusEl.className = 'form-status success';
       selectedMonth = parsed.periodEnd ? mk(parsed.periodEnd) : selectedMonth;
       await loadAll();
+      // the page redraws, so show the confirmation on the fresh status line
+      const done = document.getElementById('uploadStatus');
+      if (done) { done.textContent = `Imported ${rowsToSave.length} fill-up${rowsToSave.length !== 1 ? 's' : ''} from invoice ${parsed.invoiceNumber || ''}.`; done.className = 'form-status success'; }
     } catch (err) {
       impStatus.textContent = 'Error: ' + err.message; impStatus.className = 'form-status error';
       btn.disabled = false; btn.textContent = 'Retry';
