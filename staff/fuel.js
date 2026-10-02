@@ -391,8 +391,9 @@ async function handleInvoiceUpload(file) {
   }
   statusEl.textContent = '';
 
+  // A vehicle can hold more than one card (old and new), comma-separated
   const cardToVehicle = {};
-  vehicles.forEach(v => { if (v.card_number) cardToVehicle[v.card_number.trim()] = v; });
+  vehicles.forEach(v => { (v.card_number || '').split(/[,\s]+/).filter(Boolean).forEach(c => { cardToVehicle[c] = v; }); });
   const existingKeys = new Set(fillups.map(f => `${f.vehicle_id}|${f.fill_date}|${Number(f.cost).toFixed(2)}`));
   const isDup = (vid, t) => existingKeys.has(`${vid}|${t.date}|${Number(t.amount).toFixed(2)}`);
 
@@ -421,7 +422,7 @@ async function handleInvoiceUpload(file) {
           <div style="min-width:220px;color:#fde68a"><b>Card …${esc(u.card.slice(-4))}</b> · ${esc(u.reg || 'no reg shown')}<br><span style="color:#e3b341">${u.list.length} fill-up${u.list.length !== 1 ? 's' : ''} · ${money(u.total)}</span></div>
           <select class="fu-pick" style="flex:1;min-width:200px">
             <option value="new" ${u.pick === 'new' ? 'selected' : ''}>Add as a new vehicle</option>
-            <optgroup label="It's one of these (its card number gets updated)">
+            <optgroup label="It's one of these (this card is added to it)">
               ${activeVehicles.map(v => `<option value="${v.id}" ${u.pick === v.id ? 'selected' : ''}>${esc(v.nickname)}${v.registration ? ' (' + esc(v.registration) + ')' : ''}</option>`).join('')}
             </optgroup>
             <option value="skip">Leave these out</option>
@@ -484,7 +485,9 @@ async function handleInvoiceUpload(file) {
           vid = made[0].id;
           p.list.forEach(t => rowsToSave.push({ ...t, vehicle_id: vid }));
         } else {
-          await sbPatch('dgc_vehicles', 'id=eq.' + vid, { card_number: p.card });
+          const v = vehicles.find(x => x.id === vid);
+          const cards = (v && v.card_number || '').split(/[,\s]+/).filter(Boolean);
+          await sbPatch('dgc_vehicles', 'id=eq.' + vid, { card_number: [p.card, ...cards.filter(c => c !== p.card)].join(', ') });
           p.list.filter(t => !isDup(vid, t)).forEach(t => rowsToSave.push({ ...t, vehicle_id: vid }));
         }
       }
