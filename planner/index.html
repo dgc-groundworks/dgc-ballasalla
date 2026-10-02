@@ -779,7 +779,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.88';
+const VERSION = 'v2.89';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -2026,12 +2026,14 @@ function openAdd() {
   document.getElementById('modal-title').textContent = 'New Job';
   document.getElementById('m-id').value = '';
   document.getElementById('m-name').value = '';
-  document.getElementById('m-weeks').value = 4;
+  // New jobs land on the timeline as Awarded, 1 week. (They used to start as
+  // Tendering, 4 weeks, which parked them in Pricing, off the timeline.)
+  document.getElementById('m-weeks').value = 1;
   document.getElementById('m-days').value = 0;
   document.getElementById('m-needed').value = 2;
   document.getElementById('m-onsite').value = 2;
   document.getElementById('m-start').value = toDateStr(new Date());
-  document.getElementById('m-status').value = 'tendering';
+  document.getElementById('m-status').value = 'awarded';
   document.getElementById('m-note').value = '';
   document.getElementById('btn-archive-action').style.display = 'none';
   document.getElementById('btn-pool-action').style.display = 'none';
@@ -2133,6 +2135,7 @@ async function saveModal() {
   closeModal();
   const savedId = await upsertJob(job);
   if (!id && !_local && savedId && bd > 0) saveBaseDays(savedId, bd);
+  if (!id && savedId && job.on_timeline === false) showUndoToast(`${job.name} saved in Pricing (Tendering jobs sit under the timeline). Drag it up when it's won.`);
 }
 
 // ── Day override UI ───────────────────────────────────────
