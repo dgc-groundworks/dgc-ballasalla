@@ -784,7 +784,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.96';
+const VERSION = 'v2.97';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -2477,10 +2477,8 @@ function renderResourcePlanner() {
   jobs = orderedJobs;
   const alloc = resGetAlloc();
 
-  // Build conflict set: 'name|weekStart' pairs allocated in 2+ jobs
-  const _wpj = resClashMap(alloc);
-  const conflictSet = new Set(Object.entries(_wpj).filter(([,ids]) => ids.length > 1).map(([k]) => k));
-  const totalConflicts = conflictSet.size;
+  // Clashes: someone booked on another live job in an overlapping week
+  const totalConflicts = checkDeploymentClashes().length;
 
   const chipHtml = (s, onLeave) => {
     const badge = onLeave ? '<span class="res-leave-badge">(leave)</span>' : '';
@@ -2495,13 +2493,15 @@ function renderResourcePlanner() {
     const collapsed = _resCollapsed.has(j.id);
     const weeksHtml = weeks.map(w => {
       const placed = ((alloc[j.id] || {})[w.startIso] || []);
+      const clashNames = {};
+      placed.forEach(name => { const o = resBookedElsewhere(alloc, name, j.id, w.startIso); if (o.length) clashNames[name] = o.join(', '); });
       const placedHtml = placed.map(name => {
-        const isClash = conflictSet.has(name + '|' + w.startIso);
-        const others = isClash ? resClashWith(_wpj, name, w.startIso, j.id) : '';
+        const isClash = !!clashNames[name];
+        const others = clashNames[name] || '';
         return `<div class="res-placed-chip${isClash ? ' res-placed-chip--conflict' : ''}" ${isClash ? `title="Also booked on ${esc(others)} this week"` : ''}>${esc(name)}<button class="res-remove-btn" data-job="${esc(j.id)}" data-week="${w.startIso}" data-name="${esc(name)}" title="Remove">×</button></div>`
           + (isClash ? `<div class="res-clash-with">Also on <b>${esc(others)}</b> this week</div>` : '');
       }).join('');
-      const cellConflict = placed.some(name => conflictSet.has(name + '|' + w.startIso));
+      const cellConflict = Object.keys(clashNames).length > 0;
       const pastCls = w.isPast ? ' res-week-cell--past' : '';
       const conflictCellCls = cellConflict ? ' res-week-cell--conflict' : '';
       const clearBtn = placed.length > 0
@@ -2606,13 +2606,8 @@ function bindResDragDrop() {
       const alloc = resGetAlloc();
       const conflicts = [];
 
-      for (const [otherJobId, weeks] of Object.entries(alloc)) {
-        if (String(otherJobId) === String(jobId)) continue;
-        if ((weeks[weekStart] || []).includes(name)) {
-          const otherJob = (_jobs || []).find(j => String(j.id) === String(otherJobId));
-          conflicts.push(`already on "${otherJob ? otherJob.name : 'another project'}" this week`);
-        }
-      }
+      // Only live jobs you can see on this page (archived/finished jobs don't count)
+      resBookedElsewhere(alloc, name, jobId, weekStart).forEach(n => conflicts.push(`already on "${n}" this week`));
       const staffMember = _resStaff.find(s => s.name === name);
       if (staffMember && _resLeave.some(l =>
         l.staff_id === staffMember.id &&
@@ -2663,6 +2658,8 @@ function bindResDragDrop() {
     hdr.addEventListener('drop', e => {
       hdr.classList.remove('res-col-hdr--drop-target');
       if (_draggingColId) return;
+      // The PM slot sits inside the header: picking a PM never fills the weeks
+      if (e.target.closest && e.target.closest('.res-pm-zone')) return;
       e.preventDefault();
       const name = e.dataTransfer.getData('text/plain');
       if (!name) return;
@@ -2678,13 +2675,8 @@ function bindResDragDrop() {
         const wEnd = new Date(w.startIso + 'T00:00:00');
         wEnd.setDate(wEnd.getDate() + 6);
         const wEndIso = wEnd.toISOString().slice(0, 10);
-        for (const [otherId, wks] of Object.entries(alloc)) {
-          if (String(otherId) === String(jobId)) continue;
-          if ((wks[w.startIso] || []).includes(name)) {
-            const oj = (_jobs || []).find(j => String(j.id) === String(otherId));
-            conflictWeeks.push(`Wk ${w.wkNum} (${oj ? oj.name : 'another job'})`);
-          }
-        }
+        const elsewhere = resBookedElsewhere(alloc, name, jobId, w.startIso);
+        if (elsewhere.length) conflictWeeks.push(`Wk ${w.wkNum} (${elsewhere.join(', ')})`);
         if (staffMember && _resLeave.some(l =>
           l.staff_id === staffMember.id && l.from_date <= wEndIso && l.to_date >= w.startIso
         )) leaveWeeks.push('Wk ' + w.wkNum);
@@ -2715,7 +2707,7 @@ function bindResDragDrop() {
       if (!zone.contains(e.relatedTarget)) zone.classList.remove('res-pm-zone--drag-over');
     });
     zone.addEventListener('drop', e => {
-      e.preventDefault(); zone.classList.remove('res-pm-zone--drag-over');
+      e.preventDefault(); e.stopPropagation(); zone.classList.remove('res-pm-zone--drag-over');
       if (_draggingColId) return;
       const name = e.dataTransfer.getData('text/plain');
       if (!name) return;
@@ -2995,39 +2987,39 @@ function bindTableRowDrag() {
 }
 
 // ── Deployment clash detection ─────────────────────────────
-// Who is booked on which jobs each week: { 'name|weekStart': [jobId, ...] }.
 // Only counts live (not archived or deleted) jobs, and only weeks inside the
 // job's current dates, so a clash is always with something you can see.
 function resLiveJobs() {
   const today = toDateStr(new Date());
   return (_jobs || []).filter(j => !j.archived && j.on_timeline !== false && jobEndDate(j) >= today);
 }
-function resClashMap(alloc) {
-  const live = new Map(resLiveJobs().map(j => [String(j.id), j]));
-  const map = {};
-  for (const [jId, weeks] of Object.entries(alloc)) {
-    const j = live.get(String(jId));
-    if (!j) continue;
-    const valid = new Set(resWeeks(j).map(w => w.startIso));
-    for (const [wkStart, names] of Object.entries(weeks)) {
-      if (!valid.has(wkStart)) continue;
-      for (const n of (names || [])) (map[n + '|' + wkStart] = map[n + '|' + wkStart] || []).push(String(jId));
-    }
-  }
-  return map;
+// Other live jobs this person is booked on in a week that overlaps
+// weekStart..+4 days. Jobs start on different weekdays, so weeks are matched
+// by overlap, not by the exact start date. The PM slot doesn't count.
+function _resIsoPlus(iso, n) {
+  const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
-function resClashWith(map, name, wkStart, jobId) {
-  return (map[name + '|' + wkStart] || []).filter(id => id !== String(jobId))
-    .map(id => ((_jobs || []).find(x => String(x.id) === id) || {}).name || 'another job').join(', ');
+function resBookedElsewhere(alloc, name, jobId, weekStart) {
+  const end = _resIsoPlus(weekStart, 4), found = [];
+  for (const j of resLiveJobs()) {
+    if (String(j.id) === String(jobId)) continue;
+    const wks = alloc[j.id] || alloc[String(j.id)];
+    if (!wks) continue;
+    if (resWeeks(j).some(w => w.startIso <= end && _resIsoPlus(w.startIso, 4) >= weekStart && (wks[w.startIso] || []).includes(name))) found.push(j.name);
+  }
+  return found;
 }
 function checkDeploymentClashes() {
   const alloc = resGetAlloc();
-  const weekPersonJobs = resClashMap(alloc);
-  const clashes = [];
-  for (const [k, jobIds] of Object.entries(weekPersonJobs)) {
-    if (jobIds.length > 1) {
-      const [name, weekStart] = k.split('|');
-      clashes.push({ name, weekStart });
+  const clashes = [], seen = new Set();
+  for (const j of resLiveJobs()) {
+    const wks = alloc[j.id] || alloc[String(j.id)];
+    if (!wks) continue;
+    for (const w of resWeeks(j)) for (const name of (wks[w.startIso] || [])) {
+      if (!resBookedElsewhere(alloc, name, j.id, w.startIso).length) continue;
+      const k = name + '|' + w.startIso;
+      if (!seen.has(k)) { seen.add(k); clashes.push({ name, weekStart: w.startIso }); }
     }
   }
   return clashes;
