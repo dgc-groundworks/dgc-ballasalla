@@ -784,7 +784,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.97';
+const VERSION = 'v2.98';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -2515,7 +2515,7 @@ function renderResourcePlanner() {
     const statusLabel = STATUS_LBL[j.status] || j.status;
     const hasAnyAlloc = weeks.some(w => ((alloc[j.id] || {})[w.startIso] || []).length > 0);
     const clearJobBtn = hasAnyAlloc
-      ? `<button class="res-clear-job-btn" data-clearjob="${esc(j.id)}" ondragstart="event.stopPropagation()" title="Remove all staff from all weeks">Clear all weeks</button>`
+      ? `<button class="res-clear-job-btn" data-clearjob="${esc(j.id)}" ondragstart="event.stopPropagation()" title="Remove all staff from all weeks (the PM stays)">Clear all weeks</button>`
       : '';
     const jBd = getBaseDays(j.id);
     const jTotalDays = (j.base_weeks || 0) * 5 + jBd;
@@ -2748,9 +2748,11 @@ function bindResDragDrop() {
       e.stopPropagation();
       const jobId = btn.dataset.clearjob;
       const alloc = resGetAlloc();
-      if (alloc[jobId] && Object.keys(alloc[jobId]).length) {
+      if (alloc[jobId] && Object.keys(alloc[jobId]).some(k => k !== 'pm')) {
         resPushUndo(JSON.parse(JSON.stringify(alloc)));
-        delete alloc[jobId];
+        // Clears the weeks only: the PM stays (remove the PM with its own ×)
+        const pm = alloc[jobId].pm;
+        alloc[jobId] = pm ? { pm } : {};
         resSaveAlloc(alloc);
         renderResourcePlanner();
       }
