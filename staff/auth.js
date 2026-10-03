@@ -21,10 +21,9 @@ function clearSession() {
   localStorage.removeItem(AUTH_SESSION_KEY);
 }
 
-// remember = false: sign out automatically 12 hours after signing in
-// ("Save password and keep me signed in" switched off on the sign-in page).
-const AUTH_FORGET_MS = 12 * 60 * 60 * 1000;
-async function login(email, password, remember = true) {
+// Everyone stays signed in on their device until they press Sign out
+// (Ash, 3 Oct 2026: no timed sign-out, no "keep me signed in" switch).
+async function login(email, password) {
   const r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
     method: 'POST', headers: authHeaders(), body: JSON.stringify({ email, password }),
   });
@@ -35,7 +34,6 @@ async function login(email, password, remember = true) {
     refresh_token: data.refresh_token,
     expires_at: Date.now() + (data.expires_in - 60) * 1000, // refresh a minute early
     email: data.user && data.user.email,
-    forget_at: remember ? null : Date.now() + AUTH_FORGET_MS,
   });
   return data;
 }
@@ -94,7 +92,6 @@ async function refreshSession(session) {
       refresh_token: data.refresh_token,
       expires_at: Date.now() + (data.expires_in - 60) * 1000,
       email: data.user && data.user.email || cur.email,
-      forget_at: cur.forget_at || null,
     };
     storeSession(updated);
     return updated;
@@ -110,7 +107,8 @@ async function ensureLoggedIn() {
   consumeMagicLinkFromUrl();
   let session = getStoredSession();
   if (!session) { _askPlannerToSignIn(); return null; }
-  if (session.forget_at && Date.now() > session.forget_at) { clearSession(); _askPlannerToSignIn(); return null; }
+  // Logins made while the old 12-hour option existed: keep them signed in too
+  if (session.forget_at) { delete session.forget_at; storeSession(session); }
   if (Date.now() >= session.expires_at) session = await refreshSession(session);
   if (!session) _askPlannerToSignIn();
   return session;
