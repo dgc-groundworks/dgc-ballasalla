@@ -1435,11 +1435,18 @@ async function idbSet(key, val) {
 // Must be called as the FIRST await after the click, before any slow
 // work — the browser only allows the picker/permission prompt while the
 // click's "user activation" is still fresh.
+// Ash, 5 Oct 2026: "always save to the same place". The folder picked
+// must be Daywork > Dandara itself (the one holding the weekly photo
+// folders). A remembered folder with any other name (it had been
+// Living Hope Church since 18 Sep) is ignored, and a wrong pick is
+// refused, so a pack can never land in another job's folder again.
+const DANDARA_FOLDER_NAME = 'Dandara';
 async function getDandaraFolderHandle(opts) {
   const forcePick = !!(opts && opts.forcePick);
   if (!('showDirectoryPicker' in window)) return null;
   if (!forcePick) {
     let handle = await idbGet('dandaraFolder').catch(() => null);
+    if (handle && handle.name !== DANDARA_FOLDER_NAME) handle = null;
     if (handle) {
       try {
         const perm = await handle.queryPermission({ mode: 'readwrite' });
@@ -1452,13 +1459,32 @@ async function getDandaraFolderHandle(opts) {
   // ignoring whatever was remembered — and remembers THIS choice as the
   // new default for next time, same as a real "Save As" changing where
   // "Save" points afterwards.
+  let handle;
   try {
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    await idbSet('dandaraFolder', handle);
-    return handle;
+    handle = await window.showDirectoryPicker({ id: 'dgc-dayworks-dandara', mode: 'readwrite' });
   } catch (e) {
     return null; // user cancelled the picker
   }
+  if (handle.name !== DANDARA_FOLDER_NAME) {
+    throw new Error(`that's the "${handle.name}" folder. Press Save again and pick DGC Projects - Documents › Daywork › Dandara (the folder with the weekly timesheet folders in it)`);
+  }
+  await idbSet('dandaraFolder', handle);
+  return handle;
+}
+// The week's own folder inside Dandara (where its timesheet photos are),
+// found by its week-ending Sunday in any of the spellings already used
+// ("Week Ending 2026-09-20", "WE 27.09.26", "Week Eding 04.10.26").
+// If there isn't one yet it's made as "Week Ending dd.mm.yy".
+async function getWeekFolderHandle(dandara, to) {
+  const mon = new Date(getMonday(to) + 'T12:00:00');
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const dd = String(sun.getDate()).padStart(2, '0'), mm = String(sun.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(sun.getFullYear()), yy = yyyy.slice(2);
+  const forms = [`${dd}.${mm}.${yy}`, `${dd}.${mm}.${yyyy}`, `${yyyy}-${mm}-${dd}`, `${dd}-${mm}-${yyyy}`, `${dd}-${mm}-${yy}`, `${dd}_${mm}_${yy}`];
+  for await (const [name, h] of dandara.entries()) {
+    if (h.kind === 'directory' && forms.some(f => name.includes(f))) return h;
+  }
+  return dandara.getDirectoryHandle(`Week Ending ${dd}.${mm}.${yy}`, { create: true });
 }
 async function writeFileToDir(dirHandle, name, blob) {
   const fh = await dirHandle.getFileHandle(name, { create: true });
@@ -1592,11 +1618,13 @@ async function saveClientPackToDisk(rows, from, to, opts) {
     // that week lands inside it, under "Client Copies" — never mixed in
     // with the raw timesheet photos, and never overwriting an earlier
     // pay run's copy since each one gets its own date-range folder.
-    const clientCopies = await dirHandle.getDirectoryHandle('Client Copies', { create: true });
+    // Ash, 5 Oct 2026: always Dandara › <that week's folder> › Client Copies › <range>.
+    const weekDir = await getWeekFolderHandle(dirHandle, to);
+    const clientCopies = await weekDir.getDirectoryHandle('Client Copies', { create: true });
     const dated = await clientCopies.getDirectoryHandle(range, { create: true });
     await writeFileToDir(dated, `DGC Dayworks Hours ${range}.pdf`, hoursBlob);
     await writeFileToDir(dated, `DGC Dayworks Photos ${range}.pdf`, photosBlob);
-    return { wroteToDisk: true, range };
+    return { wroteToDisk: true, range, where: `Dandara › ${weekDir.name} › Client Copies › ${range}` };
   }
 
   const a = document.createElement('a');
@@ -1681,11 +1709,11 @@ function showSendPreview(pool, from, to) {
     status.style.display = 'block';
     buttons().forEach(b => b.disabled = true);
     (forceAs ? saveAsBtn : justSaveBtn).textContent = 'Saving…';
-    status.textContent = forceAs ? 'Pick a folder, then building the PDFs…' : 'Building the PDFs…';
+    status.textContent = forceAs ? 'Pick the Daywork › Dandara folder, then building the PDFs…' : 'Building the PDFs…';
     try {
       const result = await saveClientPackToDisk(pool, from, to, { forcePick: forceAs });
       status.textContent = result.wroteToDisk
-        ? `Saved into "Client Copies/${range}" inside ${forceAs ? 'the folder you picked' : 'the remembered folder'} — nothing has been sent to the client, this was just the files.`
+        ? `Saved into ${result.where}. Nothing has been sent to the client, this was just the files.`
         : `Downloaded "DGC Dayworks ${range}.zip" — nothing has been sent to the client, this was just the files.`;
     } catch (err) {
       status.textContent = 'Save failed: ' + err.message;
@@ -1721,7 +1749,7 @@ function showSendPreview(pool, from, to) {
         await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: batchRef, approvedBy, approvedAt }));
       }
       status.textContent = (result.wroteToDisk
-        ? `Saved into "Client Copies/${range}" inside the remembered folder`
+        ? `Saved into ${result.where}`
         : `Downloaded "DGC Dayworks ${range}.zip"`) + ` and archived — this batch is now in Historic.`;
       setTimeout(() => { state.job = null; state.name = null; state.tab = 'current'; render(); }, 1200);
     } catch (err) {
