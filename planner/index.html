@@ -521,6 +521,14 @@ a{color:var(--accent);text-decoration:none}
 #tab-resources .res-col-toggle:hover{border-color:rgba(245,158,11,.4);color:var(--accent)}
 /* Drop-on-header */
 #tab-resources .res-col-hdr--drop-target{background:rgba(245,158,11,.22) !important;outline:2px dashed rgba(245,158,11,.7);outline-offset:-1px}
+/* View-only timeline (office staff, Ash 6 Oct 2026): they can look at
+   everything but can't add, move, stretch, edit or archive jobs. */
+body.tl-viewonly #tab-timeline .btn-add,body.tl-viewonly .jbox-add,body.tl-viewonly .tl-grip,
+body.tl-viewonly #edit-modal .btn-sv,body.tl-viewonly #edit-modal .btn-arch,body.tl-viewonly #edit-modal .btn-split,
+body.tl-viewonly #edit-modal .ov-btn{display:none!important}
+body.tl-viewonly .pool-card[draggable="true"],body.tl-viewonly .jbox-hd[draggable="true"]{cursor:pointer}
+body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;color:var(--muted);font-size:.8em}
+.tl-vo-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#f8fafc;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 </style>
 </head>
 <body>
@@ -784,7 +792,7 @@ a{color:var(--accent);text-decoration:none}
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v2.99';
+const VERSION = 'v3.00';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1611,6 +1619,7 @@ let _asking = false;
 function _snoozed() { try { return JSON.parse(localStorage.getItem('dgc-complete-snooze') || '{}'); } catch(e) { return {}; } }
 function askIfComplete() {
   if (_asking || !_jobs || !_jobs.length) return;
+  if (isTlViewOnly()) return; // office staff don't decide when jobs are finished
   const tl = document.getElementById('tab-timeline');
   if (!tl || !tl.classList.contains('active')) return;
   if (document.getElementById('edit-modal')?.classList.contains('open')) return;
@@ -3090,6 +3099,13 @@ async function initPlanner() {
     auth: { persistSession: false },
     global: {
       fetch: async (input, init = {}) => {
+        // View-only logins can read jobs and columns but never change them
+        const url = typeof input === 'string' ? input : (input && input.url) || '';
+        const method = String(init.method || (input && input.method) || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'HEAD' && /\/rest\/v1\/dgc_planner_(jobs|board)\b/.test(url) && isTlViewOnly()) {
+          tlViewOnlyBlocked();
+          return new Response(JSON.stringify({ message: 'View only: the timeline can\'t be changed from this login' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+        }
         const sess = await ensureLoggedIn();
         const headers = new Headers(init.headers || {});
         if (sess) headers.set('Authorization', 'Bearer ' + sess.access_token);
@@ -3790,7 +3806,39 @@ function _sessEmail(s) {
   if (s && s.email) return s.email;
   try { return JSON.parse(atob(s.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || ''; } catch (e) { return ''; }
 }
+// Ash, 6 Oct 2026: office staff (India) get the whole Planner, but the
+// timeline is view-only for them: no "Is this job complete?" pop-ups, no
+// adding, dragging, stretching, editing or archiving jobs or columns.
+// Add an email here to make another login view-only.
+const TL_VIEW_ONLY = ['india.christian@silverdale.im'];
+function isTlViewOnly() {
+  const s = getStoredSession();
+  return !!s && TL_VIEW_ONLY.includes(String(_sessEmail(s)).toLowerCase());
+}
+let _voToastAt = 0;
+function tlViewOnlyBlocked() {
+  const now = Date.now();
+  if (now - _voToastAt < 3000) return;
+  _voToastAt = now;
+  const t = document.createElement('div');
+  t.className = 'tl-vo-toast'; t.setAttribute('role', 'status');
+  t.textContent = 'View only: the timeline can\'t be changed from this login.';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+  setTimeout(() => { try { refresh(); } catch (e) {} }, 300); // put back anything moved on screen
+}
+// Stop drags on the timeline, boxes, job list and archive before they start
+['mousedown', 'touchstart', 'pointerdown', 'dragstart', 'dblclick'].forEach(ev => document.addEventListener(ev, e => {
+  if (!document.body.classList.contains('tl-viewonly') || !e.target.closest) return;
+  const t = e.target;
+  if (!t.closest('#tab-timeline, #tab-archive')) return;
+  if (ev === 'dblclick' && !t.closest('.jbox-title')) return; // double-click a bar still opens it to read
+  if (ev !== 'dblclick' && t.closest('button, summary, a, input, select, textarea, label')) return;
+  if (ev === 'dragstart' || ev === 'dblclick') e.preventDefault();
+  e.stopPropagation();
+}, true));
 function showSignedIn(s) {
+  document.body.classList.toggle('tl-viewonly', isTlViewOnly());
   const em = _sessEmail(s);
   const b = document.getElementById('usr-badge'); if (b) { b.textContent = em; b.title = 'Signed in as ' + em; }
   const o = document.getElementById('signout-btn'); if (o) o.style.display = '';
