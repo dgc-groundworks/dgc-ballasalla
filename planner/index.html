@@ -529,6 +529,13 @@ body.tl-viewonly #edit-modal .ov-btn{display:none!important}
 body.tl-viewonly .pool-card[draggable="true"],body.tl-viewonly .jbox-hd[draggable="true"]{cursor:pointer}
 body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;color:var(--muted);font-size:.8em}
 .tl-vo-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#f8fafc;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+/* Quick length buttons on the job form (Ash, 7 Oct 2026): pick the start
+   date and tap a length, no finish date needed */
+.dur-quick{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.dur-quick button{background:none;border:1px solid var(--bord);color:var(--muted);border-radius:999px;padding:3px 10px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer}
+.dur-quick button:hover{color:var(--accent);border-color:var(--accent)}
+.dur-quick button.on{background:var(--accent);border-color:var(--accent);color:#111}
+.dur-quick button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 </style>
 </head>
 <body>
@@ -708,6 +715,13 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
           <span style="color:var(--muted);font-size:12px">wks</span>
           <input id="m-days" type="number" min="0" max="4" oninput="calcPreview()" style="width:46px" placeholder="0">
           <span style="color:var(--muted);font-size:12px">days</span>
+        </div>
+        <div class="dur-quick" role="group" aria-label="Quick length">
+          <button type="button" data-w="0" data-d="1" onclick="setQuickDuration(0,1)">1 day</button>
+          <button type="button" data-w="0" data-d="2" onclick="setQuickDuration(0,2)">2 days</button>
+          <button type="button" data-w="0" data-d="3" onclick="setQuickDuration(0,3)">3 days</button>
+          <button type="button" data-w="0" data-d="4" onclick="setQuickDuration(0,4)">4 days</button>
+          <button type="button" data-w="1" data-d="0" onclick="setQuickDuration(1,0)">1 week</button>
         </div>
       </div>
       <div class="fr">
@@ -2041,10 +2055,10 @@ function openAdd() {
   document.getElementById('modal-title').textContent = 'New Job';
   document.getElementById('m-id').value = '';
   document.getElementById('m-name').value = '';
-  // New jobs land on the timeline as Awarded, 1 week. (They used to start as
-  // Tendering, 4 weeks, which parked them in Pricing, off the timeline.)
-  document.getElementById('m-weeks').value = 1;
-  document.getElementById('m-days').value = 0;
+  // New jobs start as a 1-day booking (Ash, 7 Oct 2026: most quick jobs and
+  // meetings are a day; tap 2, 3, 4 days or 1 week, or type a longer length).
+  document.getElementById('m-weeks').value = 0;
+  document.getElementById('m-days').value = 1;
   document.getElementById('m-needed').value = 2;
   document.getElementById('m-onsite').value = 2;
   document.getElementById('m-start').value = toDateStr(new Date());
@@ -2098,9 +2112,16 @@ function closeModal() {
 }
 
 let _finishLock = false;
+// One tap sets the length; the finish date follows from the start date
+function setQuickDuration(w, d) {
+  document.getElementById('m-weeks').value = w;
+  document.getElementById('m-days').value = d;
+  calcPreview();
+}
 function calcPreview() {
   const bw = parseInt(document.getElementById('m-weeks').value)||0;
   const bd = Math.min(4, Math.max(0, parseInt(document.getElementById('m-days').value)||0));
+  document.querySelectorAll('.dur-quick button').forEach(b => b.classList.toggle('on', +b.dataset.w === bw && +b.dataset.d === bd));
   const totalDays = bw * 5 + bd;
   const np = parseInt(document.getElementById('m-needed').value)||0;
   const os = parseInt(document.getElementById('m-onsite').value)||0;
