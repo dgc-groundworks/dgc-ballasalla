@@ -584,6 +584,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
     <button class="active" onclick="showTab('timeline',this)">Timeline</button>
     <button onclick="showTab('staffhours',this)">Staff</button>
     <button onclick="showTab('sitediary',this)">Site Diary</button>
+    <button onclick="showTab('accidents',this)">Accident Report</button>
     <button onclick="showTab('resources',this)">Deployment — Testing</button>
     <button onclick="showTab('daywork',this)">Day work Testing</button>
   </div>
@@ -647,6 +648,11 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
   <!-- Site Diary tab -->
   <div id="tab-sitediary" class="panel">
     <iframe data-src="site-diary.html?v=296" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Site Diary"></iframe>
+  </div>
+
+  <!-- Accident Report tab (7 Oct 2026): same fields as the DGC OS Site App form; one register for Planner and tablet reports -->
+  <div id="tab-accidents" class="panel">
+    <iframe data-src="accidents.html?v=1" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Accident Report"></iframe>
   </div>
 
   <!-- Resources tab -->
@@ -806,7 +812,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v3.03';
+const VERSION = 'v3.04';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
