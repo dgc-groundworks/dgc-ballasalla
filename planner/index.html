@@ -806,7 +806,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v3.02';
+const VERSION = 'v3.03';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1633,7 +1633,7 @@ let _asking = false;
 function _snoozed() { try { return JSON.parse(localStorage.getItem('dgc-complete-snooze') || '{}'); } catch(e) { return {}; } }
 function askIfComplete() {
   if (_asking || !_jobs || !_jobs.length) return;
-  if (isTlViewOnly()) return; // office staff don't decide when jobs are finished
+  if (isTlViewOnly() || skipsCompletePrompt()) return; // only the people who know (John etc.) are asked
   const tl = document.getElementById('tab-timeline');
   if (!tl || !tl.classList.contains('active')) return;
   if (document.getElementById('edit-modal')?.classList.contains('open')) return;
@@ -3831,7 +3831,15 @@ function _sessEmail(s) {
 // timeline is view-only for them: no "Is this job complete?" pop-ups, no
 // adding, dragging, stretching, editing or archiving jobs or columns.
 // Add an email here to make another login view-only.
-const TL_VIEW_ONLY = ['india.christian@silverdale.im', 'ash@dgc.im', 'ash@silverdale.im']; // Ash asked for view-only too (7 Oct 2026): he looks in to see where things are up to, without deciding when jobs are finished
+const TL_VIEW_ONLY = ['india.christian@silverdale.im'];
+// Ash, 7 Oct 2026: he builds and tests the app, so he keeps full editing,
+// but the "Is this job now complete?" question is for John (who knows the
+// answer), not for him. These logins never get that pop-up.
+const NO_COMPLETE_PROMPT = ['ash@dgc.im', 'ash@silverdale.im'];
+function skipsCompletePrompt() {
+  const s = getStoredSession();
+  return !!s && NO_COMPLETE_PROMPT.includes(String(_sessEmail(s)).toLowerCase());
+}
 function isTlViewOnly() {
   const s = getStoredSession();
   return !!s && TL_VIEW_ONLY.includes(String(_sessEmail(s)).toLowerCase());
