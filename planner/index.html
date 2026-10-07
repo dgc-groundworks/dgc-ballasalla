@@ -792,7 +792,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v3.00';
+const VERSION = 'v3.01';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -3810,7 +3810,7 @@ function _sessEmail(s) {
 // timeline is view-only for them: no "Is this job complete?" pop-ups, no
 // adding, dragging, stretching, editing or archiving jobs or columns.
 // Add an email here to make another login view-only.
-const TL_VIEW_ONLY = ['india.christian@silverdale.im'];
+const TL_VIEW_ONLY = ['india.christian@silverdale.im', 'ash@dgc.im', 'ash@silverdale.im']; // Ash asked for view-only too (7 Oct 2026): he looks in to see where things are up to, without deciding when jobs are finished
 function isTlViewOnly() {
   const s = getStoredSession();
   return !!s && TL_VIEW_ONLY.includes(String(_sessEmail(s)).toLowerCase());
