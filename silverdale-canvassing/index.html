@@ -55,6 +55,8 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .lead-row{display:flex;align-items:flex-start;gap:16px;padding:14px 18px;border-bottom:1px solid var(--bord)}
 .lead-list .lead-row:last-child{border-bottom:none}
 .lead-row.flagged{background:rgba(110,140,190,.09)}
+.doc-value{display:inline-block;font-size:0.76rem;font-weight:700;color:#7cc4ea;border:1px solid rgba(124,196,234,.4);border-radius:999px;padding:2px 10px;margin-right:auto}
+.doc-value.none{color:var(--muted);border-color:var(--bord);font-weight:600}
 .addr-flag{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-size:0.78rem;font-weight:600}
 .addr-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.25);flex:none}
 .lr-main{flex:1;min-width:0}
@@ -3050,6 +3052,18 @@ function addrFlag(l){
   return !hasPc && !ukPc ? { text: 'No postcode on the register. Find it and add it with "Edit this one".' } : null;
 }
 
+// Estimated whole-job value (from the Monday market estimates) shown small on each letter/envelope, so low-value jobs can be sent later.
+function jobEst(l){
+  if (typeof estimateFor !== 'function' || isBizLead(l)) return null;
+  const e = estimateFor(l.ref, typeof parentRefOf === 'function' ? parentRefOf(l) : null);
+  return e && e.total ? e : null;
+}
+function valueChipHtml(l){
+  const e = jobEst(l);
+  return e ? `<span class="doc-value" title="Estimated whole-job value (a rough guide, graded ${esc(e.grade || '')})">Est. job ${esc(moneyRange(e.total))}</span>`
+           : `<span class="doc-value none" title="Not priced yet">Value not priced</span>`;
+}
+
 // Names of the PDFs just saved, so the Archive can say which file each letter and envelope is in.
 const LAST_PDF = { letter: '', envelope: '' };
 function renderPrint(main, kind){
@@ -3059,7 +3073,10 @@ function renderPrint(main, kind){
   // filter Review uses to hide them, applied here so an archived lead
   // can never silently get printed/sent again.
   // Addresses with a red dot first (same order for the letters and the envelopes, so they always match).
-  const batch = leads.filter(l => l.include && !l.alreadyProcessed).sort((x, y) => (addrFlag(y) ? 1 : 0) - (addrFlag(x) ? 1 : 0));
+  const sortMode = state.printSort || 'default';
+  const val = l => { const e = jobEst(l); return e ? (e.total[0] + e.total[1]) / 2 : -1; };
+  const batch = leads.filter(l => l.include && !l.alreadyProcessed).sort((x, y) => (addrFlag(y) ? 1 : 0) - (addrFlag(x) ? 1 : 0)
+    || (sortMode === 'high' ? val(y) - val(x) : sortMode === 'low' ? val(x) - val(y) : 0));
   if (!batch.length) {
     main.innerHTML = `${putBackBarHtml()}<p class="empty-state">Nothing on the print list yet — open Approved, Pending, Businesses or Personalised and press "Send to print" (one at a time, or "Send all to print").</p>`;
     wirePutBack();
@@ -3080,6 +3097,10 @@ function renderPrint(main, kind){
     <div class="row-actions">
       <button class="btn" id="printBtn">&#128438; Print (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
       <button class="btn" id="savePdfBtn">&#11015; Save letters &amp; envelopes as PDFs&hellip;</button>
+ <label class="hint" style="margin:0">Order <select id="printSortSel" class="f-move">
+        <option value="default"${sortMode === 'default' ? ' selected' : ''}>As added</option>
+        <option value="high"${sortMode === 'high' ? ' selected' : ''}>Biggest jobs first</option>
+        <option value="low"${sortMode === 'low' ? ' selected' : ''}>Smallest jobs first</option></select></label>
       <button class="btn-secondary" id="clearPrintBtn" title="Puts every letter back in its folder, waiting. Nothing is deleted or archived.">&#8617; Take all ${batch.length} off the print list</button>
       <button class="btn-secondary" id="markSentBtn" title="Files these as sent in the Archive and clears this page. Do it once the PDFs are saved and sent on.">&#10003; Saved: move these ${batch.length} to Archive</button>
       ${alignToggleHtml}
@@ -3098,6 +3119,7 @@ function renderPrint(main, kind){
     saveLeadsToStorage();
     render();
   });
+  document.getElementById('printSortSel').addEventListener('change', e => { state.printSort = e.target.value; render(); });
   const slippedBtn = document.getElementById('slippedOffBtn');
   if (slippedBtn) slippedBtn.addEventListener('click', () => { slippedThrough(batch).forEach(x => { x.l.include = false; }); saveLeadsToStorage(); render(); });
   document.getElementById('pdfArea').addEventListener('click', (e) => {
@@ -3233,10 +3255,11 @@ function docWrapHtml(l, idx, kind){
     : '';
   return `<div class="doc-wrap" data-idx="${idx}">
     <div class="doc-toolbar no-print">
+      ${valueChipHtml(l)}
       <span class="doc-copy-label">${FOLDERS[leadFolder(l)]} letter</span>
       ${(() => { const f = addrFlag(l); return f ? `<span class="addr-flag"><span class="addr-dot"></span>${esc(f.text)}</span>` : ''; })()}
       <button class="doc-edit-btn" type="button">&#9998; Edit this one</button>
-      <button class="doc-edit-btn doc-remove-btn" type="button">&#10005; Take off print list</button>
+      <button class="doc-edit-btn doc-remove-btn" type="button" title="Back to waiting in its folder. Send it later.">&#10005; Send later (take off the list)</button>
     </div>
     ${kind === 'letter' && typeof contactFlagHtml === 'function' ? `<div class="no-print">${contactFlagHtml(l)}</div>` : ''}
     ${docHtml}
