@@ -108,6 +108,10 @@ function splitStreet(head){
   }
   // 3) house name + two-word street: "Hazelbank | Minorca Hill"
   if (before.length === 3 && !STREET_PREFIX.test(before[0])) return [before[0], before.slice(1).join(' ')].concat(after.length ? [after.join(' ')] : []);
+  // 3b) house name + three-word street that starts with a street word: "Howstrake | King Edward Road"
+  if (before.length === 4 && !STREET_PREFIX.test(before[0]) && /^(king|queen|queens|kings|mount|glen|church|station|old|new|upper|lower|north|south|east|west|great|little|st|saint|high|main)$/i.test(before[1])) {
+    return [before[0], before.slice(1).join(' ')].concat(after.length ? [after.join(' ')] : []);
+  }
   return [before.join(' ')].concat(after.length ? [after.join(' ')] : []);
 }
 
