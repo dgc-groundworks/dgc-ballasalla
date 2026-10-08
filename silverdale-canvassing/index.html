@@ -2783,6 +2783,7 @@ function renderArchive(main){
       </label>
       <span class="hint" style="margin:0">Click any name to see what it was and the letter that went out.</span>
     </div>
+    ${putBackBarHtml()}
     ${section('Homeowners &amp; planning applicants', planning)}
     ${section('Businesses &mdash; architects &amp; engineers', business)}
     <details style="margin-top:28px">
@@ -2798,6 +2799,7 @@ function renderArchive(main){
     </details>`;
 
   document.getElementById('arFilter').addEventListener('change', e => { state.archiveFilter = e.target.value; render(); });
+  wirePutBack();
   main.querySelectorAll('.ar-toggle').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.key;
     if (open.has(k)) open.delete(k); else open.add(k);
@@ -2871,6 +2873,34 @@ function pendingLetterBody(){
   ];
 }
 
+// Pressing "Save PDF & mark as sent" or "Mark these as sent" files the letters as sent, which takes them off the
+// Print page. These let Ash put a day's batch back on the print list in one go (e.g. if the PDF never reached him).
+function sentOnDate(iso){ const lg = getLog(); return Object.keys(lg).filter(ref => lg[ref] && lg[ref].date === iso && leads.some(l => l.ref === ref)); }
+function putBackOnPrint(iso){
+  const refs = sentOnDate(iso);
+  const lg = getLog();
+  refs.forEach(ref => { delete lg[ref]; });
+  saveLog(lg);
+  leads = leads.map(classify);
+  leads.forEach(l => { if (refs.includes(l.ref)) { l.include = true; l.alreadyProcessed = false; } });
+  saveLeadsToStorage();
+  return refs.length;
+}
+function putBackBarHtml(){
+  const n = sentOnDate(todayISO()).length;
+  return n ? `<div class="stat-bar" style="flex-wrap:wrap;gap:10px"><span><b>${n}</b> letters were marked as sent today, which is why they are not here.</span><button class="btn" id="putBackBtn">&#8617; Put today's ${n} back on the print list</button></div>` : '';
+}
+function wirePutBack(){
+  const b = document.getElementById('putBackBtn');
+  if (b) b.addEventListener('click', () => {
+    if (!confirm('Take today\'s letters off the sent record and put them back on the print list? Only do this if you have not actually sent them.')) return;
+    putBackOnPrint(todayISO());
+    render();
+  });
+}
+
+// Names of the PDFs just saved, so the Archive can say which file each letter and envelope is in.
+const LAST_PDF = { letter: '', envelope: '' };
 function renderPrint(main, kind){
   // Already-sent leads never belong in Print, even if `include` is
   // somehow still true (e.g. a fresh re-import of the same list sets
@@ -2879,7 +2909,8 @@ function renderPrint(main, kind){
   // can never silently get printed/sent again.
   const batch = leads.filter(l => l.include && !l.alreadyProcessed);
   if (!batch.length) {
-    main.innerHTML = `<p class="empty-state">Nothing on the print list yet — open Approved, Pending, Businesses or Personalised and press "Send to print" (one at a time, or "Send all to print").</p>`;
+    main.innerHTML = `${putBackBarHtml()}<p class="empty-state">Nothing on the print list yet — open Approved, Pending, Businesses or Personalised and press "Send to print" (one at a time, or "Send all to print").</p>`;
+    wirePutBack();
     return;
   }
   const byFolder = { approved: 0, pending: 0, business: 0, personal: 0 };
@@ -2896,9 +2927,8 @@ function renderPrint(main, kind){
   main.innerHTML = `
     <div class="row-actions">
       <button class="btn" id="printBtn">&#128438; Print (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
-      <button class="btn" id="savePdfBtn">&#11015; Save as PDF&hellip;</button>
-      <button class="btn" id="saveArchiveBtn">&#128190; Save PDF &amp; mark as sent&hellip;</button>
-      <button class="btn-secondary" id="markSentBtn">&#10003; Mark these ${batch.length} as sent</button>
+      <button class="btn" id="savePdfBtn">&#11015; Save ${kind === 'letter' ? 'letters' : 'envelopes'} as PDF&hellip;</button>
+      <button class="btn-secondary" id="markSentBtn" title="Files these as sent in the Archive and clears this page. Do it once the PDFs are saved and sent on.">&#10003; Saved: move these ${batch.length} to Archive</button>
       ${alignToggleHtml}
       <span id="printMsg" style="color:var(--muted);font-size:0.82rem"></span>
     </div>
@@ -2974,6 +3004,7 @@ function renderPrint(main, kind){
         }
       }
       pdf.save(filename);
+      LAST_PDF[kind] = filename;
       if (msg) msg.textContent = `Saved — check your Downloads (or wherever your browser saves files) for "${filename}".`;
       ok = filename;
     } catch (err) {
@@ -2997,7 +3028,8 @@ function renderPrint(main, kind){
         copy: leadFolder(l), recipientLines: l.recipientLines, salutation: l.salutation, letterDate, bodyParas: letterParas(l),
         description: l.description || '', appliedDate: l.appliedDate || '', decidedDate: l.decidedDate || '',
         keyVal: l.keyVal || '', siteExtent: l.siteExtent || null, sentToPrintAt: l.sentToPrintAt || '',
-        ...(pdfFile ? (kind === 'letter' ? { pdfFile, pdfPage: i + 1 } : { envelopePdfFile: pdfFile, envelopePdfPage: i + 1 }) : {})
+        ...(LAST_PDF.letter ? { pdfFile: LAST_PDF.letter, pdfPage: i + 1 } : {}),
+        ...(LAST_PDF.envelope ? { envelopePdfFile: LAST_PDF.envelope, envelopePdfPage: i + 1 } : {})
       };
       l.alreadyProcessed = true;
       if (hide) l.include = false;
@@ -3006,19 +3038,11 @@ function renderPrint(main, kind){
     saveLeadsToStorage();
   }
   document.getElementById('savePdfBtn').addEventListener('click', () => { if (okToSend('Make the PDF')) buildAndSavePdf(document.getElementById('savePdfBtn')); });
-  document.getElementById('saveArchiveBtn').addEventListener('click', async () => {
-    if (!okToSend('Save and mark them as sent')) return;
-    const btn = document.getElementById('saveArchiveBtn');
-    const filename = await buildAndSavePdf(btn);
-    if (!filename) return;
-    archiveBatch(true, filename);
-    render();
-  });
   document.getElementById('markSentBtn').addEventListener('click', () => {
-    if (!okToSend('Mark them as sent')) return;
-    archiveBatch(false);
-    document.getElementById('markSentBtn').textContent = '✓ Logged';
-    document.getElementById('markSentBtn').disabled = true;
+    if (!okToSend('Move them to the Archive')) return;
+    if (!LAST_PDF[kind] && !confirm('You have not saved a PDF of these in this session. Move them to the Archive anyway?')) return;
+    archiveBatch(true);
+    render();
   });
 }
 
