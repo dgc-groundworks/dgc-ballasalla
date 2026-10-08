@@ -11,7 +11,7 @@
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
 <script src="market.js?v=13"></script>
-<script src="address.js?v=1"></script>
+<script src="address.js?v=2"></script>
 <script src="contacts.js?v=10"></script>
 <script src="enquiries.js?v=2"></script>
 <script defer src="search.js?v=1"></script>
@@ -54,7 +54,9 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .lead-list{display:flex;flex-direction:column;background:var(--surf);border:1px solid var(--bord);border-radius:10px;overflow:hidden}
 .lead-row{display:flex;align-items:flex-start;gap:16px;padding:14px 18px;border-bottom:1px solid var(--bord)}
 .lead-list .lead-row:last-child{border-bottom:none}
-.lead-row.flagged{background:rgba(245,158,11,.06)}
+.lead-row.flagged{background:rgba(110,140,190,.09)}
+.addr-flag{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-size:0.78rem;font-weight:600}
+.addr-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.25);flex:none}
 .lr-main{flex:1;min-width:0}
 .lr-applicant{font-size:0.98rem;font-weight:700;margin-bottom:3px}
 .reg-name-toggle{background:none;border:none;padding:0;margin-bottom:3px;font:inherit;font-size:0.98rem;font-weight:700;color:var(--text);cursor:pointer;text-align:left;display:block}
@@ -3031,9 +3033,21 @@ function slippedThrough(batch){
 function printSummaryHtml(batch){
   const n = Object.keys(getLog()).length;
   const slipped = slippedThrough(batch);
+  const flagged = batch.filter(l => addrFlag(l)).length;
   return `<div class="stat-bar"><span>People you've messaged: <b>${n}</b>, all kept in the Archive.</span></div>`
+    + (flagged ? `<div class="contact-flag" style="font-size:0.9rem"><span class="addr-dot"></span> <b>${flagged} ${flagged === 1 ? 'address needs' : 'addresses need'} a look</b> (red dot). ${flagged === 1 ? 'It is' : 'They are'} at the top of both the letters and the envelopes, in the same order. Fix with "Edit this one"; the dot goes once there is a postcode you have confirmed.</div>` : '')
     + (slipped.length ? `<div class="contact-flag" style="font-size:0.9rem"><b>&#9888; ${slipped.length} here ${slipped.length === 1 ? 'was' : 'were'} written to before.</b> ${slipped.slice(0, 8).map(x => `${esc(x.l.applicant)} (${esc(x.c.why)}${x.c.date ? ', ' + esc(prettyDate(x.c.date)) : ''})`).join('; ')}${slipped.length > 8 ? ` and ${slipped.length - 8} more` : ''}.
         <button class="btn-secondary" id="slippedOffBtn" style="margin-left:8px">Take ${slipped.length === 1 ? 'it' : 'them'} off the print list</button></div>` : '');
+}
+
+// Red dot: an address that needs a human look (no postcode on the register, or a postcode we guessed). Those go to the top of
+// Print so the letter and its envelope can be fixed with "Edit this one" before anything is printed.
+function addrFlag(l){
+  if (l.addrGuess) return { text: l.addrGuess.note };
+  const lines = stackLines(l.recipientLines);
+  const hasPc = lines.some(x => /^IM\d{1,2} \d[A-Z]{2}$/.test(x));
+  const ukPc = lines.some(x => /\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b/i.test(x));
+  return !hasPc && !ukPc ? { text: 'No postcode on the register. Find it and add it with "Edit this one".' } : null;
 }
 
 // Names of the PDFs just saved, so the Archive can say which file each letter and envelope is in.
@@ -3044,7 +3058,8 @@ function renderPrint(main, kind){
   // its own default before knowing it's a repeat) — this is the same
   // filter Review uses to hide them, applied here so an archived lead
   // can never silently get printed/sent again.
-  const batch = leads.filter(l => l.include && !l.alreadyProcessed);
+  // Addresses with a red dot first (same order for the letters and the envelopes, so they always match).
+  const batch = leads.filter(l => l.include && !l.alreadyProcessed).sort((x, y) => (addrFlag(y) ? 1 : 0) - (addrFlag(x) ? 1 : 0));
   if (!batch.length) {
     main.innerHTML = `${putBackBarHtml()}<p class="empty-state">Nothing on the print list yet — open Approved, Pending, Businesses or Personalised and press "Send to print" (one at a time, or "Send all to print").</p>`;
     wirePutBack();
@@ -3104,8 +3119,9 @@ function renderPrint(main, kind){
       const salInput = wrap.querySelector('.edit-salutation');
       if (salInput) lead.salutation = salInput.value.trim();
       lead.edited = true;
+      if (stackLines(lead.recipientLines).some(x => /^IM\d{1,2} \d[A-Z]{2}$/.test(x))) delete lead.addrGuess;   // you have confirmed it
       saveLeadsToStorage();
-      wrap.outerHTML = docWrapHtml(lead, Number(wrap.dataset.idx), kind);
+      render();
     }
   });
   if (kind === 'envelope') {
@@ -3218,6 +3234,7 @@ function docWrapHtml(l, idx, kind){
   return `<div class="doc-wrap" data-idx="${idx}">
     <div class="doc-toolbar no-print">
       <span class="doc-copy-label">${FOLDERS[leadFolder(l)]} letter</span>
+      ${(() => { const f = addrFlag(l); return f ? `<span class="addr-flag"><span class="addr-dot"></span>${esc(f.text)}</span>` : ''; })()}
       <button class="doc-edit-btn" type="button">&#9998; Edit this one</button>
       <button class="doc-edit-btn doc-remove-btn" type="button">&#10005; Take off print list</button>
     </div>
