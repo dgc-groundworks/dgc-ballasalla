@@ -173,7 +173,8 @@ function contactFlagHtml(l){
 // The one question before anything is sent twice. True = go ahead.
 function confirmRepeats(list, action){
   if (typeof confirmEnquiries === 'function' && !confirmEnquiries(list, action)) return false;
-  const hits = list.map(l => ({ l, p: priorContacts(l).filter(c => !(c.why === 'this application' && l.alreadyProcessed)) })).filter(x => x.p.length);
+  const toPrint = /print list/i.test(action);   // settleTwins() sorts out two of the same house going to print, so don't nag about that here
+  const hits = list.map(l => ({ l, p: priorContacts(l).filter(c => !(c.why === 'this application' && l.alreadyProcessed) && !(toPrint && c.why === 'also on the print list')) })).filter(x => x.p.length);
   if (!hits.length) return true;
   // Prime directive: nobody gets a second letter within 6 months, and no house gets two letters in one batch.
   const locked = hits.filter(x => x.p.some(c => isLocked(c) || c.why === 'also on the print list'));
@@ -181,8 +182,7 @@ function confirmRepeats(list, action){
     const why = x => { const c = x.p.find(c => isLocked(c)) || x.p[0];
       return c.why === 'also on the print list' ? `${x.l.applicant}: the same house or person as ${c.name}, both in this batch. Keep one.`
         : `${x.l.applicant}: ${c.why}, written to ${prettyDate(c.date)} (${c.name}). Locked until ${prettyDate(lockedUntil(c.date))}.`; };
-    alert(`Not sent. ${locked.length === 1 ? 'This letter breaks' : `${locked.length} of these letters break`} the one-letter-per-household rule:\n\n${locked.slice(0, 10).map(x => '- ' + why(x)).join('\n')}${locked.length > 10 ? `\n...and ${locked.length - 10} more` : ''}\n\nTake ${locked.length === 1 ? 'it' : 'them'} off the print list (or archive ${locked.length === 1 ? 'it' : 'them'}), then try again.`);
-    return false;
+    return confirm(`${locked.length === 1 ? 'This letter breaks' : `${locked.length} of these letters break`} the one-letter-per-household rule:\n\n${locked.slice(0, 10).map(x => '- ' + why(x)).join('\n')}${locked.length > 10 ? `\n...and ${locked.length - 10} more` : ''}\n\nOverride and carry on anyway? (Cancel is the safe answer.)`);
   }
   const lines = hits.slice(0, 8).map(x => `- ${x.l.applicant}: ${x.p[0].why === 'also on the print list' ? 'also on the print list' : `${x.p[0].why}, sent ${prettyDate(x.p[0].date)}`}`);
   return confirm(`You've already written to ${hits.length === 1 ? 'this person' : `${hits.length} of these people`}:\n\n${lines.join('\n')}${hits.length > 8 ? `\n...and ${hits.length - 8} more` : ''}\n\n${action} anyway?`);

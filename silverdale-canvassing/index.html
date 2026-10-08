@@ -2249,6 +2249,8 @@ function renderRegisterPullLoaded(box, data){
     } else if (btn.classList.contains('reg-send-btn')) {
       const folder = btn.dataset.folder;
       if (typeof confirmEnquiries === 'function' && !confirmEnquiries([{ ref: a.ref, applicant: person, recipientLines: [person, a.address || ''] }], `Put ${person} in the ${FOLDERS[folder]} folder`)) return;
+      const prior = regPrior(a, person);
+      if (prior.length && !confirm(`You have already written to ${prior[0].name} (${prior[0].why}${prior[0].ref && prior[0].ref !== a.ref ? ', about ' + prior[0].ref : ''}${prior[0].date ? ', sent ' + prettyDate(prior[0].date) : ''}).\n\nPut ${person} in the ${FOLDERS[folder]} folder anyway? Cancel to leave it out.`)) return;
       if (addRegisterAppToBatch(a, folder)) {
         markDealt(a.ref);
         saveLeadsToStorage();
@@ -2317,12 +2319,20 @@ function renderRegisterPullLoaded(box, data){
     } else return;
     renderList();
   });
+  // Anyone we have already written to (same name, house or agent), for an application on the planning list.
+  function regPrior(a, person){
+    return typeof priorContacts === 'function' ? priorContacts({ ref: a.ref, applicant: person, recipientLines: [person, a.address || ''], agentText: `${a.agentName || ''} ${a.agentCompanyName || ''}` })
+      .filter(c => c.why !== 'this application' && c.why !== 'their agent') : [];
+  }
   function bulk(filterFn, folder, label){
     log = getLog(); dismissed = getDismissed();
-    let added = 0;
-    applyFilters().filter(filterFn).forEach(a => { if (folder ? addRegisterAppToBatch(a, folder) : addAgentToBatch(a)) { added++; if (folder) markDealt(a.ref); } });
+    let added = 0; const held = [];
+    applyFilters().filter(filterFn).forEach(a => {
+      if (folder && !known(a.ref)) { const person = a.applicantName || a.agentCompanyName || a.agentName || a.ref; if (regPrior(a, person).length) { held.push(person); return; } }
+      if (folder ? addRegisterAppToBatch(a, folder) : addAgentToBatch(a)) { added++; if (folder) markDealt(a.ref); }
+    });
     saveLeadsToStorage();
-    say(`Added ${added} to the ${label} folder (anything already in a folder, sent or archived was skipped).`);
+    say(`Added ${added} to the ${label} folder (anything already in a folder, sent or archived was skipped).${held.length ? ` Held back because you have written to them before: ${held.slice(0, 8).join(', ')}${held.length > 8 ? ` and ${held.length - 8} more` : ''}. Send those one at a time if you mean to.` : ''}`);
     renderList();
   }
   document.getElementById('regBulkApprovedBtn').addEventListener('click', () => bulk(a => decisionCategory(a) === 'approved' && !standingHit(a), 'approved', 'Approved'));
@@ -2564,7 +2574,10 @@ function renderFolder(main, folder){
   const sendAll = document.getElementById('fSendAllBtn');
   sendAll.addEventListener('click', () => {
     sendableClean.forEach(x => { x.l.include = true; x.l.sentToPrintAt = todayISO(); });
-    if (repeatsWaiting.length) state.folderMsg = `${repeatsWaiting.length} already written to were left off the print list.`;
+    const settled = sendableClean.flatMap(x => leads.includes(x.l) ? settleTwins(x.l) : []);
+    state.folderMsg = [
+      repeatsWaiting.length ? `Left off the print list because you have written to them before: ${repeatsWaiting.slice(0, 8).map(x => x.l.applicant).join(', ')}${repeatsWaiting.length > 8 ? ` and ${repeatsWaiting.length - 8} more` : ''}.` : '',
+      settled.length ? twinMsg(settled) : ''].filter(Boolean).join(' ');
     done();
   });
   const unsendAll = document.getElementById('fUnsendAllBtn');
@@ -2580,6 +2593,7 @@ function renderFolder(main, folder){
       if (!l.include && typeof confirmRepeats === 'function' && !confirmRepeats([l], 'Put this letter on the print list')) return;
       l.include = !l.include;
       if (l.include) l.sentToPrintAt = todayISO();
+      if (l.include) { const out = settleTwins(l); if (out.length) state.folderMsg = twinMsg(out); }
       done();
     });
     rowEl.querySelector('.sal-input').addEventListener('change', e => { l.salutation = e.target.value; l.edited = true; saveLeadsToStorage(); });
@@ -2899,6 +2913,47 @@ function wirePutBack(){
   });
 }
 
+// One letter per person or house per round (Ash, 8 Oct 2026). When a letter goes on the print list, anyone else on the
+// list who is the same person or house is settled here: the Approved one wins over Pending, then the newest application.
+// The others are archived ("covered by the other letter"), still recoverable from the Archive.
+const isBizLead = o => (o.ref || '').startsWith('ARCH-') || leadFolder(o) === 'business';
+function appliedStamp(o){
+  const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(o.appliedDate || '');
+  return (m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : Date.parse(o.appliedDate || '')) || Date.parse(o.addedAt || '') || 0;
+}
+function settleTwins(l){
+  if (!l.include || isBizLead(l) || typeof houseKeys !== 'function') return [];
+  const h = houseKeys(l.recipientLines), n = personNorm(l.applicant);
+  const group = leads.filter(o => o === l || (o.include && !o.alreadyProcessed && !isBizLead(o)
+    && ((n && samePerson(n, personNorm(o.applicant))) || sameHouse(h, houseKeys(o.recipientLines)))));
+  if (group.length < 2) return [];
+  const rank = o => ({ approved: 0, personal: 1, pending: 2 }[leadFolder(o)] ?? 3);
+  group.sort((x, y) => rank(x) - rank(y) || appliedStamp(y) - appliedStamp(x));
+  const winner = group[0], d = getDismissed(), out = [];
+  group.slice(1).forEach(o => {
+    o.include = false;
+    d[o.ref] = { date: todayISO(), name: o.applicant, source: 'planning', description: o.description || '', address: o.site || '',
+      appliedDate: o.appliedDate || '', decidedDate: o.decidedDate || '', keyVal: o.keyVal || '', siteExtent: o.siteExtent || null,
+      note: `Covered by the letter to ${winner.applicant} (${winner.ref}): same person or house in the same round.`, lead: o };
+    leads.splice(leads.indexOf(o), 1);
+    out.push({ gone: o, kept: winner });
+  });
+  saveDismissed(d);
+  return out;
+}
+const twinMsg = out => out.map(x => `${x.gone.applicant} (${x.gone.ref}) archived, covered by the letter to ${x.kept.applicant}.`).join(' ');
+// Anyone on the print list who was written to in the last 6 months. It should never happen, so it is flagged loudly.
+function slippedThrough(batch){
+  return batch.map(l => ({ l, c: priorContacts(l).find(c => c.why !== 'their agent' && c.why !== 'this application' && (isLocked(c) || c.why === 'also on the print list')) })).filter(x => x.c);
+}
+function printSummaryHtml(batch){
+  const n = Object.keys(getLog()).length;
+  const slipped = slippedThrough(batch);
+  return `<div class="stat-bar"><span>People you've messaged: <b>${n}</b>, all kept in the Archive.</span></div>`
+    + (slipped.length ? `<div class="contact-flag" style="font-size:0.9rem"><b>&#9888; ${slipped.length} here ${slipped.length === 1 ? 'was' : 'were'} written to before.</b> ${slipped.slice(0, 8).map(x => `${esc(x.l.applicant)} (${esc(x.c.why)}${x.c.date ? ', ' + esc(prettyDate(x.c.date)) : ''})`).join('; ')}${slipped.length > 8 ? ` and ${slipped.length - 8} more` : ''}.
+        <button class="btn-secondary" id="slippedOffBtn" style="margin-left:8px">Take ${slipped.length === 1 ? 'it' : 'them'} off the print list</button></div>` : '');
+}
+
 // Names of the PDFs just saved, so the Archive can say which file each letter and envelope is in.
 const LAST_PDF = { letter: '', envelope: '' };
 function renderPrint(main, kind){
@@ -2927,18 +2982,20 @@ function renderPrint(main, kind){
   main.innerHTML = `
     <div class="row-actions">
       <button class="btn" id="printBtn">&#128438; Print (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
-      <button class="btn" id="savePdfBtn">&#11015; Save ${kind === 'letter' ? 'letters' : 'envelopes'} as PDF&hellip;</button>
+      <button class="btn" id="savePdfBtn">&#11015; Save letters &amp; envelopes as PDFs&hellip;</button>
       <button class="btn-secondary" id="markSentBtn" title="Files these as sent in the Archive and clears this page. Do it once the PDFs are saved and sent on.">&#10003; Saved: move these ${batch.length} to Archive</button>
       ${alignToggleHtml}
       <span id="printMsg" style="color:var(--muted);font-size:0.82rem"></span>
     </div>
     <div class="stat-bar"><span>${mix}</span><span>Each ${kind === 'letter' ? 'letter uses' : 'envelope matches'} the copy for its folder — letters and envelopes are in the same order.</span>
     </div>
-    ${typeof contactedBarHtml === 'function' ? contactedBarHtml(batch) : ''}
+    ${printSummaryHtml(batch)}
     <div id="pdfArea">${batch.map((l, i) => docWrapHtml(l, i, kind)).join('')}</div>
   `;
   const okToSend = action => typeof confirmRepeats !== 'function' || confirmRepeats(batch, action);
   document.getElementById('printBtn').addEventListener('click', () => { if (okToSend('Print these')) window.print(); });
+  const slippedBtn = document.getElementById('slippedOffBtn');
+  if (slippedBtn) slippedBtn.addEventListener('click', () => { slippedThrough(batch).forEach(x => { x.l.include = false; }); saveLeadsToStorage(); render(); });
   document.getElementById('pdfArea').addEventListener('click', (e) => {
     const wrap = e.target.closest('.doc-wrap');
     if (!wrap) return;
@@ -2966,14 +3023,24 @@ function renderPrint(main, kind){
     document.getElementById('alignCenterBtn').addEventListener('click', () => { setEnvAlign('center'); render(); });
     document.getElementById('alignLeftBtn').addEventListener('click', () => { setEnvAlign('left'); render(); });
   }
-  async function buildAndSavePdf(btn){
+  // Builds one PDF (letters or envelopes). The other kind is rendered off-screen from the same list, in the same order,
+  // so envelope 1 always goes with letter 1.
+  async function buildAndSavePdf(btn, kindX){
+    kindX = kindX || kind;
     const msg = document.getElementById('printMsg');
-    const area = document.getElementById('pdfArea');
+    let area = document.getElementById('pdfArea'), temp = null;
+    if (kindX !== kind) {
+      temp = document.createElement('div');
+      temp.style.cssText = 'position:absolute;left:-12000px;top:0;background:#fff';
+      temp.innerHTML = batch.map((l, i) => docWrapHtml(l, i, kindX)).join('');
+      document.body.appendChild(temp);
+      area = temp;
+    }
     btn.disabled = true; const original = btn.innerHTML;
     const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const filename = `Silverdale ${kind === 'letter' ? 'Letters' : 'Envelopes'} - ${dateStr}.pdf`;
-    const format = kind === 'letter' ? 'a4' : [220, 110];
-    const orientation = kind === 'letter' ? 'portrait' : 'landscape';
+    const filename = `Silverdale ${kindX === 'letter' ? 'Letters' : 'Envelopes'} - ${dateStr}.pdf`;
+    const format = kindX === 'letter' ? 'a4' : [220, 110];
+    const orientation = kindX === 'letter' ? 'portrait' : 'landscape';
 
     area.classList.add('pdf-exporting');
     const pages = Array.from(area.querySelectorAll('.print-doc'));
@@ -3004,13 +3071,14 @@ function renderPrint(main, kind){
         }
       }
       pdf.save(filename);
-      LAST_PDF[kind] = filename;
-      if (msg) msg.textContent = `Saved — check your Downloads (or wherever your browser saves files) for "${filename}".`;
+      LAST_PDF[kindX] = filename;
+      if (msg) msg.textContent = `Saved "${filename}" (check your Downloads).`;
       ok = filename;
     } catch (err) {
       if (msg) msg.textContent = 'Could not build the PDF: ' + err.message;
     } finally {
       area.classList.remove('pdf-exporting');
+      if (temp) temp.remove();
       btn.disabled = false; btn.innerHTML = original;
     }
     return ok;
@@ -3037,10 +3105,17 @@ function renderPrint(main, kind){
     saveLog(log);
     saveLeadsToStorage();
   }
-  document.getElementById('savePdfBtn').addEventListener('click', () => { if (okToSend('Make the PDF')) buildAndSavePdf(document.getElementById('savePdfBtn')); });
+  document.getElementById('savePdfBtn').addEventListener('click', async () => {
+    if (!okToSend('Make the PDFs')) return;
+    const btn = document.getElementById('savePdfBtn'), msg = document.getElementById('printMsg');
+    const a = await buildAndSavePdf(btn, 'letter');
+    if (!a) return;
+    const b = await buildAndSavePdf(btn, 'envelope');
+    if (msg && b) msg.textContent = `Saved both: "${a}" and "${b}". If Chrome asks to allow multiple downloads, say yes.`;
+  });
   document.getElementById('markSentBtn').addEventListener('click', () => {
     if (!okToSend('Move them to the Archive')) return;
-    if (!LAST_PDF[kind] && !confirm('You have not saved a PDF of these in this session. Move them to the Archive anyway?')) return;
+    if (!(LAST_PDF.letter && LAST_PDF.envelope) && !confirm('You have not saved the letters and envelopes PDFs in this session. Move them to the Archive anyway?')) return;
     archiveBatch(true);
     render();
   });
