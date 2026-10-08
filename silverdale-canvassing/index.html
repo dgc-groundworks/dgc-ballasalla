@@ -3263,6 +3263,17 @@ async function boot(){
   await Promise.all([loadLetterImages(), loadEstimatesCache()]);
   leads = loadLeadsFromStorage().map(classify);
   if (location.hash === '#responses') state.tab = 'responses';   // link from the stats page
+  // One-off reset link (?clearprint=1): puts everything on the print list back in its folder as waiting. Nothing is deleted or archived.
+  if (/[?&]clearprint=1\b/.test(location.search) && mode === 'ok') {
+    const on = leads.filter(l => l.include && !l.alreadyProcessed);
+    keepLocalCopy('before_clearprint');
+    const by = {}; on.forEach(l => { const f = FOLDERS[leadFolder(l)]; by[f] = (by[f] || 0) + 1; });
+    on.forEach(l => { l.include = false; });
+    saveLeadsToStorage();
+    history.replaceState(null, '', location.pathname + location.hash);
+    state.tab = 'fPending';
+    setTimeout(() => alert(`Print list cleared: ${on.length} letters are back in their folders, waiting (${Object.entries(by).map(([f, n]) => n + ' ' + f).join(', ') || 'none'}). Nothing was deleted or archived.\n\nNow open Approved, then Pending, and press the "Send all" button at the top of each.`), 300);
+  }
   render();
 }
 boot();
