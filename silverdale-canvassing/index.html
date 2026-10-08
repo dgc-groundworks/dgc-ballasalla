@@ -2254,10 +2254,12 @@ function renderRegisterPullLoaded(box, data){
       if (prior.length && !confirm(`You have already written to ${prior[0].name} (${prior[0].why}${prior[0].ref && prior[0].ref !== a.ref ? ', about ' + prior[0].ref : ''}${prior[0].date ? ', sent ' + prettyDate(prior[0].date) : ''}).\n\nPut ${person} in the ${FOLDERS[folder]} folder anyway? Cancel to leave it out.`)) return;
       if (addRegisterAppToBatch(a, folder)) {
         markDealt(a.ref);
+        // Other applications from the same applicant or house go with it (one letter per person), so you only press once.
+        const covered = coverSiblings(a, person);
         saveLeadsToStorage();
         const added = leads.find(l => l.ref === a.ref);
         const p = added && typeof priorContacts === 'function' ? priorContacts(added) : [];
-        say(`${person} → ${FOLDERS[folder]} folder.${p.length ? ` Careful: ${p[0].name} was already written to (${p[0].why}${p[0].date ? ', ' + prettyDate(p[0].date) : ''}).` : ''}`);
+        say(`${person} → ${FOLDERS[folder]} folder.${covered ? ` ${covered} other application${covered === 1 ? '' : 's'} from the same person or house covered by this letter (in the Archive).` : ''}${p.length ? ` Careful: ${p[0].name} was already written to (${p[0].why}${p[0].date ? ', ' + prettyDate(p[0].date) : ''}).` : ''}`);
       }
     } else if (btn.classList.contains('reg-add-agent-btn')) {
       if (addAgentToBatch(a)) { saveLeadsToStorage(); say(`${a.agentName || a.agentCompanyName} (agent) → Businesses folder.`); }
@@ -2320,6 +2322,24 @@ function renderRegisterPullLoaded(box, data){
     } else return;
     renderList();
   });
+  // The same applicant's (or house's) other undealt applications on the planning list: archived as covered by this letter.
+  function coverSiblings(a, person){
+    if (!a.applicantName || typeof personNorm !== 'function') return 0;
+    const n = personNorm(a.applicantName), h = houseKeys([person, a.address || '']);
+    let k = 0;
+    const d = getDismissed();
+    apps.forEach(o => {
+      if (o.ref === a.ref || !o.applicantName || known(o.ref)) return;
+      if (!((n && samePerson(n, personNorm(o.applicantName))) || (a.address && o.address && sameHouse(h, houseKeys([o.applicantName, o.address]))))) return;
+      d[o.ref] = { date: todayISO(), name: o.applicantName, source: 'planning', description: o.description || '', address: o.address || '', appliedDate: o.received || '',
+        decidedDate: o.isDecided ? (o.decisionDate || '') : '', keyVal: o.keyVal || '', siteExtent: o.siteExtent || null,
+        note: `Covered by the letter to ${person} (${a.ref}): same person or house.` };
+      markDealt(o.ref);
+      k++;
+    });
+    if (k) saveDismissed(d);
+    return k;
+  }
   // Anyone we have already written to (same name, house or agent), for an application on the planning list.
   function regPrior(a, person){
     return typeof priorContacts === 'function' ? priorContacts({ ref: a.ref, applicant: person, recipientLines: [person, a.address || ''], agentText: `${a.agentName || ''} ${a.agentCompanyName || ''}` })
