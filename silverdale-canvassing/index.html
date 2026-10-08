@@ -11,7 +11,8 @@
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=2"></script>
 <script src="market.js?v=13"></script>
-<script src="contacts.js?v=9"></script>
+<script src="address.js?v=1"></script>
+<script src="contacts.js?v=10"></script>
 <script src="enquiries.js?v=2"></script>
 <script defer src="search.js?v=1"></script>
 <style>
@@ -946,7 +947,10 @@ function buildAddressBlock(lead){
   // segment (e.g. "Mann Crane Hire Ltd, Balthane Industrial Estate...")
   // — drop it there so it isn't printed twice.
   if (addrParts.length && addrParts[0].toLowerCase() === name.toLowerCase()) addrParts = addrParts.slice(1);
-  return [name || '(Name unclear — check)'].concat(addrParts);
+  // Stack it the way Royal Mail wants it: street, town, Isle of Man, postcode, one per line (address.js).
+  const rest = addrParts.join(', ');
+  const stacked = (IM_PC_RE.test(rest) || /\bisle of man\b/i.test(rest)) ? stackAddressText(rest) : addrParts;
+  return [name || '(Name unclear — check)'].concat(stacked);
 }
 
 // Strips a trailing "&"/"and" connector before taking the last word, so
@@ -3267,7 +3271,7 @@ function letterHtml(l){
       </div>
     </div>
     <div class="letter-date">${esc(l.letterDate || todayOrdinal())}</div>
-    <div class="letter-addr">${l.recipientLines.map(esc).join('<br>')}</div>
+    <div class="letter-addr">${stackLines(l.recipientLines).map(esc).join('<br>')}</div>
     <div class="letter-body">
       <p>${esc(l.salutation)}</p>
       ${(l.bodyParas || letterParas(l)).map(p => `<p>${p}</p>`).join('')}
@@ -3278,7 +3282,7 @@ function letterHtml(l){
   </div>`;
 }
 function envelopeHtml(l){
-  const [name, ...addr] = l.recipientLines;
+  const [name, ...addr] = stackLines(l.recipientLines);
   const alignClass = getEnvAlign() === 'left' ? ' align-left' : '';
   return `<div class="print-doc env-page${alignClass}">
     <div class="env-logo"><img src="${IMG.logo}" alt="Silverdale"></div>

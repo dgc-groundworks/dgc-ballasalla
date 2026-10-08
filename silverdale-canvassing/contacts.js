@@ -76,6 +76,7 @@ function postcodeOf(lines){
 }
 // First address line plus postcode, so a household matches whichever name is on the letter.
 function addrKey(lines){
+  lines = stackLines(lines);
   const pc = postcodeOf(lines), first = ((lines || [])[1] || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   return pc && first ? first + '|' + pc : '';
 }
@@ -86,6 +87,7 @@ function addrKey(lines){
 const LOCK_DAYS = 183;
 const normLine = s => String(s || '').toLowerCase().replace(/\bisle of man\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
 function houseKeys(lines){
+  lines = stackLines(lines);
   const addr = (lines || []).slice(1).map(x => String(x || '').trim()).filter(Boolean);
   if (!addr.length) return [];
   const txt = addr.join(', '), pc = postcodeOf(addr), keys = new Set();
@@ -112,7 +114,7 @@ function sentContacts(){
   if (raw !== CONTACTS.raw) {
     const log = getLog();
     CONTACTS.list = Object.entries(log).map(([ref, e]) => {
-      const lines = e.recipientLines || [];
+      const lines = stackLines(e.recipientLines || []);
       const name = e.name || lines[0] || '';
       const biz = ref.startsWith('ARCH-') || e.source === 'business';
       return { ref, e, name, lines, n: personNorm(name), a: addrKey(lines), h: biz ? [] : houseKeys(lines) };
