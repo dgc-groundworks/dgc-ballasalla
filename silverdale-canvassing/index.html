@@ -614,7 +614,8 @@ function archiveLead(i){
 function updateNavCounts(){
   const active = leads.filter(l => !l.alreadyProcessed);
   const counts = { approved: 0, pending: 0, business: 0, personal: 0 };
-  active.forEach(l => counts[leadFolder(l)]++);
+  // Folder badges count only what is still WAITING; anything sent to print is counted under Print, so the numbers add up.
+  active.forEach(l => { if (!l.include) counts[leadFolder(l)]++; });
   counts.print = active.filter(l => l.include).length;
   counts.archive = Object.values(getDismissed()).filter(e => !e.research).length;
   counts.research = Object.values(getDismissed()).filter(e => e.research).length;
@@ -2983,6 +2984,7 @@ function renderPrint(main, kind){
     <div class="row-actions">
       <button class="btn" id="printBtn">&#128438; Print (${batch.length} ${kind === 'letter' ? 'letters' : 'envelopes'})</button>
       <button class="btn" id="savePdfBtn">&#11015; Save letters &amp; envelopes as PDFs&hellip;</button>
+      <button class="btn-secondary" id="clearPrintBtn" title="Puts every letter back in its folder, waiting. Nothing is deleted or archived.">&#8617; Take all ${batch.length} off the print list</button>
       <button class="btn-secondary" id="markSentBtn" title="Files these as sent in the Archive and clears this page. Do it once the PDFs are saved and sent on.">&#10003; Saved: move these ${batch.length} to Archive</button>
       ${alignToggleHtml}
       <span id="printMsg" style="color:var(--muted);font-size:0.82rem"></span>
@@ -2994,6 +2996,12 @@ function renderPrint(main, kind){
   `;
   const okToSend = action => typeof confirmRepeats !== 'function' || confirmRepeats(batch, action);
   document.getElementById('printBtn').addEventListener('click', () => { if (okToSend('Print these')) window.print(); });
+  document.getElementById('clearPrintBtn').addEventListener('click', () => {
+    if (!confirm(`Take all ${batch.length} off the print list? They go back to waiting in their folders. Nothing is deleted or archived.`)) return;
+    batch.forEach(l => { l.include = false; });
+    saveLeadsToStorage();
+    render();
+  });
   const slippedBtn = document.getElementById('slippedOffBtn');
   if (slippedBtn) slippedBtn.addEventListener('click', () => { slippedThrough(batch).forEach(x => { x.l.include = false; }); saveLeadsToStorage(); render(); });
   document.getElementById('pdfArea').addEventListener('click', (e) => {
