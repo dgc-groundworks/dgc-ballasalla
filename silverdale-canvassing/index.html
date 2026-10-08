@@ -341,6 +341,7 @@ const STANDING_EXCLUDE = ['manx utilities', 'hartford homes', 'dandara', 'excel'
 const LS_LOG = 'silverdale_canvassing_processed';   // { ref: { date, name } }
 const LS_LEADS = 'silverdale_canvassing_leads';     // last-parsed batch, so a refresh doesn't lose work
 const LS_ENV_ALIGN = 'silverdale_canvassing_env_align';  // 'center' | 'left' — envelope address alignment
+const LS_COPY = 'silverdale_canvassing_copy';   // { approved|pending|business: [paragraphs] }: Ash's edited master wording (empty = the original)
 const LS_REGISTER_DISMISSED = 'silverdale_canvassing_register_dismissed'; // { ref: { date, name } } — "looked at it, not chasing this one" from a register pull, distinct from the sent log
 
 
@@ -413,7 +414,7 @@ function loadLeadsFromStorage(){ try { return JSON.parse(localStorage.getItem(LS
 // canvass_allowed read or change them, and every earlier version is kept in
 // canvass_state_history. This browser keeps its own copy too, so the app keeps
 // working if the connection drops and catches up when it's back.
-const CLOUD_IDS = { [LS_LEADS]: 'leads', [LS_LOG]: 'log', [LS_REGISTER_DISMISSED]: 'archive' };
+const CLOUD_IDS = { [LS_LEADS]: 'leads', [LS_LOG]: 'log', [LS_REGISTER_DISMISSED]: 'archive', [LS_COPY]: 'copy' };
 const cloud = { on: false, email: '', known: {}, pending: new Set(), timer: null, busy: false };
 const BUCKET = 'canvassing';   // private file store: register data and letter images
 
@@ -631,6 +632,7 @@ function downloadBackup(){
     leads: loadLeadsFromStorage(),
     log: getLog(),
     archive: getDismissed(),
+    copy: localJson(LS_COPY),
     envAlign: getEnvAlign(),
     exportedAt: new Date().toISOString()
   };
@@ -659,6 +661,7 @@ function restoreBackupFile(file){
     if (!confirm(`Restore this backup? It has ${leadCount} leads, ${logCount} logged as sent and ${archiveCount} archived. This replaces everything currently loaded in this browser.`)) return;
     saveLog(data.log && typeof data.log === 'object' ? data.log : {});
     if (data.archive && typeof data.archive === 'object') saveDismissed(data.archive);
+    if (data.copy && typeof data.copy === 'object') saveCopy(data.copy);
     leads = (Array.isArray(data.leads) ? data.leads : []).map(classify);
     saveLeadsToStorage();
     if (data.envAlign) setEnvAlign(data.envAlign);
@@ -2396,7 +2399,7 @@ function renderFolder(main, folder){
   const view = (state.folderView || {})[folder] || 'waiting';
   const viewBar = `<div class="fview-bar">${[['waiting', `Waiting to send (${waitingAll.length})`], ['print', `On the print list (${printAll.length})`],
     ['sent', `Printed &amp; sent (${sentItems.length})`], ...(isBiz ? [['visited', `Visited (${visitedItems.length})`]] : []), ['archived', `Not chasing (${archivedItems.length})`]]
-    .map(([k, t]) => `<button type="button" data-fview="${k}" class="${view === k ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+    .map(([k, t]) => `<button type="button" data-fview="${k}" class="${view === k ? 'on' : ''}">${t}</button>`).join('')}</div>${copyBarHtml(folder)}`;
   const tradeBar = !isBiz ? '' : (() => {
     const everyone = [...inFolder.map(x => x.l), ...Object.entries(logAll).filter(([r, e]) => contactCategory(r, e) === 'business' && !leads.some(l => l.ref === r)).map(([r, e]) => asLead(r, e))];
     const counts = {};
@@ -2420,6 +2423,7 @@ function renderFolder(main, folder){
   const compactRow = (ref, name, sub, side) => `<div class="lead-row"><div class="lr-main">${nameBtn(ref, name)}<div class="lr-meta">${sub}</div></div>
     <div class="lr-side" style="flex-direction:column;align-items:flex-end;gap:6px">${side}</div></div>`;
   function wireChrome(){
+    wireCopyBar(folder);
     main.querySelectorAll('[data-fview]').forEach(b => b.addEventListener('click', () => { state.folderView = { ...(state.folderView || {}), [folder]: b.dataset.fview }; render(); }));
     main.querySelectorAll('[data-trade]').forEach(b => b.addEventListener('click', () => { state.bizTrade = b.dataset.trade; render(); }));
     main.querySelectorAll('.f-visit').forEach(b => b.addEventListener('click', () => {
@@ -2586,7 +2590,7 @@ function renderFolder(main, folder){
       ${repeatsWaiting.length ? `<span style="color:#ef4444"><b>${repeatsWaiting.length}</b> already written to: left out of "Send all", send them one at a time if you really mean to</span>` : ''}
       ${sentCount ? `<span><b>${sentCount}</b> already sent (see Archive)</span>` : ''}
     </div>
-    <p class="hint">${COPY_NOTE[folder]}</p>
+    ${folder === 'personal' ? `<p class="hint">${COPY_NOTE[folder]}</p>` : ''}
     ${[...groups].map(([k, xs]) => `<h3 class="lead-section-hdr">${groupTitle(k)} &middot; ${xs.length}</h3><div class="lead-list">${byPerson(xs)}</div>`).join('')}
   `;
 
@@ -2876,7 +2880,60 @@ function renderArchive(main){
   });
 }
 
-function letterBody(){
+// ---- Master letter wording (Ash, 8 Oct 2026) ----
+// Three master letters (Approved, Pending, Businesses). The original wording is built in; an edit saved from the
+// "Letter wording" button replaces it for every new letter of that type, and is saved online with the list.
+// Letters already sent keep the wording they went out with (stored in the sent record).
+function getCopy(){ try { return JSON.parse(localStorage.getItem(LS_COPY) || '{}') || {}; } catch { return {}; } }
+function saveCopy(c){ try { localStorage.setItem(LS_COPY, JSON.stringify(c)); } catch {} cloudQueue(LS_COPY); }
+function masterCopy(kind){
+  const c = getCopy()[kind];
+  return Array.isArray(c) && c.length ? c.slice() : ({ approved: defaultLetterBody, pending: defaultPendingLetterBody, business: defaultBusinessLetterBody }[kind])();
+}
+function letterBody(){ return masterCopy('approved'); }
+function pendingLetterBody(){ return masterCopy('pending'); }
+function businessLetterBody(){ return masterCopy('business'); }
+function copyBarHtml(folder){
+  if (!['approved', 'pending', 'business'].includes(folder)) return '';
+  const edited = Array.isArray(getCopy()[folder]) && getCopy()[folder].length;
+  const open = state.copyEdit === folder;
+  const name = { approved: 'Approved ("Congratulations on your planning approval")', pending: 'Pending ("we noticed you have recently applied")', business: 'Businesses (architects and engineers introduction)' }[folder];
+  return `<div class="copy-bar">
+    <button type="button" class="btn-secondary" id="copyEditBtn">&#9998; Letter wording${edited ? ' (edited)' : ''}</button>
+    <span class="hint" style="margin:0">${open ? '' : `Master copy for this folder: ${name}.`}</span>
+    ${open ? `<div class="copy-editor">
+      <p class="hint" style="margin:6px 0">${name}. Leave a blank line between paragraphs. Every new letter of this type uses this wording, and it is saved online. Letters already sent keep the wording they went with.</p>
+      <textarea id="copyText" rows="16" style="width:100%">${esc(parasToText(masterCopy(folder)))}</textarea>
+      <div class="row-actions" style="margin-top:8px">
+        <button type="button" class="btn" id="copySaveBtn">Save this wording</button>
+        <button type="button" class="btn-secondary" id="copyResetBtn"${edited ? '' : ' disabled'}>Put back the original</button>
+        <button type="button" class="btn-secondary" id="copyCancelBtn">Close</button>
+        <span id="copyMsg" class="hint" style="margin:0"></span>
+      </div></div>` : ''}
+  </div>`;
+}
+function wireCopyBar(folder){
+  const edit = document.getElementById('copyEditBtn');
+  if (!edit) return;
+  edit.addEventListener('click', () => { state.copyEdit = state.copyEdit === folder ? null : folder; render(); });
+  const close = document.getElementById('copyCancelBtn');
+  if (close) close.addEventListener('click', () => { state.copyEdit = null; render(); });
+  const save = document.getElementById('copySaveBtn');
+  if (save) save.addEventListener('click', () => {
+    const paras = textToParas(document.getElementById('copyText').value);
+    if (!paras.length) { document.getElementById('copyMsg').textContent = 'The letter cannot be empty.'; return; }
+    const c = getCopy(); c[folder] = paras; saveCopy(c);
+    state.copyEdit = null; render();
+  });
+  const reset = document.getElementById('copyResetBtn');
+  if (reset) reset.addEventListener('click', () => {
+    if (!confirm('Put back the original wording for this letter?')) return;
+    const c = getCopy(); delete c[folder]; saveCopy(c);
+    state.copyEdit = null; render();
+  });
+}
+
+function defaultLetterBody(){
   return [
     "Congratulations on your recent planning approval. It is a real milestone - the point where a project stops being a drawing and starts becoming real. We would like to help you build it.",
     "Silverdale is an Isle of Man property development and design company. We take a project from approved plans through to finished build: managing the works, coordinating architects and engineers, holding cost and programme, and carrying the detail so you do not have to. A single home, a commercial scheme or an extension - we can run the whole build, or step in exactly where you need us.",
@@ -2887,7 +2944,7 @@ function letterBody(){
 // For architects, engineers and other local trades — a introduction as
 // a potential working partner, not a homeowner/developer sales pitch,
 // since these contacts haven't just had a planning application approved.
-function businessLetterBody(){
+function defaultBusinessLetterBody(){
   return [
     "We are writing to introduce Silverdale, a team based right here on the Isle of Man that works alongside architects and engineers to help bring projects from approved plans through to a finished build.",
     "Silverdale is an Isle of Man property development and design company. Our sister company, DGC, delivers groundworks, drainage and civils in-house, and is trusted by the Isle of Man Government bodies - the DOI, DEFA and Manx Utilities - and by the island's largest developers to manage that side of their projects.",
@@ -2899,7 +2956,7 @@ function businessLetterBody(){
 // approval to congratulate yet, so this opens differently and pitches
 // getting in touch before a builder/architect is locked in, rather than
 // "help you build it" as if the plans are already through.
-function pendingLetterBody(){
+function defaultPendingLetterBody(){
   return [
     "We are Silverdale, and we noticed you have recently applied for planning permission for your project. Whatever stage the application is at, it is an exciting time - the point where a project starts turning from an idea into something real.",
     "Silverdale is an Isle of Man property development and design company. We take a project from approved plans through to finished build: managing the works, coordinating architects and engineers, holding cost and programme, and carrying the detail so you do not have to. A single home, a commercial scheme or an extension - we can run the whole build, or step in exactly where you need us.",
