@@ -647,7 +647,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
   <!-- Site Diary tab -->
   <div id="tab-sitediary" class="panel">
-    <iframe data-src="site-diary.html?v=296" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Site Diary"></iframe>
+    <iframe data-src="site-diary.html?v=297" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Site Diary"></iframe>
   </div>
 
   <!-- Accident Report tab (7 Oct 2026): same fields as the DGC OS Site App form; one register for Planner and tablet reports -->
@@ -812,7 +812,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v3.04';
+const VERSION = 'v3.05';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -1583,6 +1583,7 @@ async function refresh() {
   renderTimeline(tlJobs());
   renderTable(orderRows(_jobs.filter(j => !j.archived)), 'jobs-body', false);
   renderTable(_jobs.filter(j => j.archived), 'archive-body', true);
+  if (_resInitDone) await resLoadAlloc().catch(() => false);
   if (_resInitDone && document.getElementById('tab-resources')?.classList.contains('active')) renderResourcePlanner();
   setTimeout(askIfComplete, 600);
   bindTableRowDrag();
@@ -1594,6 +1595,7 @@ function initRealtime() {
   _sb.channel('plan-jobs')
     .on('postgres_changes', { event:'*', schema:'public', table:'dgc_planner_jobs' }, () => refresh())
     .on('postgres_changes', { event:'*', schema:'public', table:'dgc_planner_board' }, () => refresh())
+    .on('postgres_changes', { event:'*', schema:'public', table:'dgc_resource_alloc' }, () => resLoadAlloc().then(ch => { if (ch && _resInitDone) renderResourcePlanner(); }))
     .subscribe();
   // Backstop: re-read when the tab comes back into view and every 2 minutes, so boxes
   // stay right if a live update is missed and so dates passing move jobs to Running.
@@ -2410,6 +2412,7 @@ async function initResourcePlanner() {
   if (_resInitDone) { renderResourcePlanner(); return; }
   _resInitDone = true;
   initResStaticButtons();
+  try { await resLoadAlloc(); } catch (e) { console.error(e); }
   try {
     const today = new Date().toISOString().slice(0, 10);
     const future = new Date(Date.now() + 180 * 24 * 3600000).toISOString().slice(0, 10);
@@ -2446,11 +2449,41 @@ async function initResourcePlanner() {
   renderResourcePlanner();
 }
 
+// Who's on which job lives in the database since v3.05 (table dgc_resource_alloc, row 'main'), so every
+// computer and DGC OS see the same board (Ash, 8 Oct 2026). The browser keeps a copy for offline use.
+// Shape: { "<job id>": { "<week start YYYY-MM-DD>": ["Name", ...], "pm": ["Name"] } }
+let _resAlloc = null, _resAllocTimer = null, _resAllocDirty = false;
+const _resClone = o => JSON.parse(JSON.stringify(o || {}));
 function resGetAlloc() {
+  if (_resAlloc) return _resClone(_resAlloc);
   try { return JSON.parse(localStorage.getItem('dgc_resource_alloc') || '{}'); } catch { return {}; }
 }
 function resSaveAlloc(data) {
-  try { localStorage.setItem('dgc_resource_alloc', JSON.stringify(data)); } catch {}
+  _resAlloc = _resClone(data);
+  try { localStorage.setItem('dgc_resource_alloc', JSON.stringify(_resAlloc)); } catch {}
+  _resAllocDirty = true;
+  clearTimeout(_resAllocTimer);
+  _resAllocTimer = setTimeout(resPushAlloc, 400);
+}
+async function resPushAlloc() {
+  if (!_sb || !_resAlloc) return;
+  const { error } = await _sb.from('dgc_resource_alloc').upsert({ id: 'main', data: _resAlloc, updated_at: new Date().toISOString() });
+  if (error) { console.error('Resource board not saved to the database', error); return; }
+  _resAllocDirty = false;
+}
+// Returns true if the board changed. The first time, a board that only exists in this browser is uploaded.
+async function resLoadAlloc() {
+  if (!_sb || _resAllocDirty) return false;
+  const { data, error } = await _sb.from('dgc_resource_alloc').select('data').eq('id', 'main').maybeSingle();
+  if (error) { console.error('Resource board: database not ready, using this browser\'s copy', error); return false; }
+  const remote = (data && data.data) || {};
+  let local = {}; try { local = JSON.parse(localStorage.getItem('dgc_resource_alloc') || '{}'); } catch {}
+  if (!Object.keys(remote).length && Object.keys(local).length) { _resAlloc = local; _resAllocDirty = true; await resPushAlloc(); return false; }
+  const before = JSON.stringify(_resAlloc || local), after = JSON.stringify(remote);
+  if (Object.keys(local).length && JSON.stringify(local) !== after && !_resAlloc) { try { localStorage.setItem('dgc_resource_alloc_backup_' + new Date().toISOString().slice(0, 10), JSON.stringify(local)); } catch {} }
+  _resAlloc = remote;
+  try { localStorage.setItem('dgc_resource_alloc', after); } catch {}
+  return before !== after;
 }
 
 function resWeeks(job) {

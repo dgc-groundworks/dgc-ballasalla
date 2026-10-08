@@ -239,12 +239,20 @@ async function loadPlannerJobs() {
   } catch {}
 }
 
+// Who's on which job: from the database (dgc_resource_alloc, since Planner v3.05), else this browser's copy
+let resAlloc = null;
+async function loadResAlloc() {
+  try {
+    const r = await fetch(REST + '/dgc_resource_alloc?id=eq.main&select=data', { headers: ah() });
+    if (r.ok) { const rows = await r.json(); if (rows[0] && rows[0].data && Object.keys(rows[0].data).length) resAlloc = rows[0].data; }
+  } catch {}
+}
 // D3: look up deployment board allocation for a given site + date
 function getWorkersFromDeployment(dateStr, siteName) {
   const job = plannerJobs.find(j => j.name === siteName);
   if (!job || !job.start_date) return '';
-  let alloc = {};
-  try { alloc = JSON.parse(localStorage.getItem('dgc_resource_alloc') || '{}'); } catch {}
+  let alloc = resAlloc || {};
+  if (!resAlloc) { try { alloc = JSON.parse(localStorage.getItem('dgc_resource_alloc') || '{}'); } catch {} }
   const jobAlloc = alloc[job.id];
   if (!jobAlloc) return '';
   const diaryDate = new Date(dateStr + 'T00:00:00');
@@ -753,7 +761,7 @@ function setStatus(msg, err = false) {
   setInterval(async () => { session = await ensureLoggedIn(); }, 45 * 60 * 1000);
 
   try {
-    await Promise.all([loadEntries(), loadPlannerJobs(), loadStaff()]);
+    await Promise.all([loadEntries(), loadPlannerJobs(), loadStaff(), loadResAlloc()]);
     renderList();
   } catch (err) {
     const msg = err.message.includes('does not exist') || err.message.includes('42P01')
