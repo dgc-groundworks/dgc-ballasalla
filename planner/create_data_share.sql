@@ -1,7 +1,8 @@
 -- DGC data share: lets Harry's DGC OS read the Job Planner's staff, vehicles, jobs and accidents,
 -- and add tablet accidents to the one accident register (Ash, 8 Oct 2026).
 -- Protected by its own key (only its hash is here). The key is in Directors Vault/_Logins/Logins & Keys.md.
--- Pay rates, card numbers, NI and bank details are never shared.
+-- The named functions below leave out pay, card numbers, NI and bank details (safe for tablets).
+-- dgc_share_table (at the end) gives Harry everything, for director use only (Ash, 9 Oct 2026).
 
 CREATE OR REPLACE FUNCTION public.dgc_share_key_ok(p_key text) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
@@ -102,5 +103,36 @@ BEGIN
     WHERE a.id = 'main');
 END $$;
 GRANT EXECUTE ON FUNCTION public.dgc_share_allocation(text) TO anon, authenticated;
+
+-- ── Everything in the Job Planner (Ash, 9 Oct 2026: "Everything on my Job Planner he should have access to, all the data") ──
+-- dgc_share_tables: every Job Planner table (name starts dgc_) with its row count.
+CREATE OR REPLACE FUNCTION public.dgc_share_tables(p_key text) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE t text; n bigint; out jsonb := '[]'::jsonb;
+BEGIN
+  IF NOT public.dgc_share_key_ok(p_key) THEN RAISE EXCEPTION 'not allowed'; END IF;
+  FOR t IN SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name LIKE 'dgc\_%' ORDER BY table_name LOOP
+    EXECUTE format('SELECT count(*) FROM public.%I', t) INTO n;
+    out := out || jsonb_build_object('table', t, 'rows', n);
+  END LOOP;
+  RETURN out;
+END $$;
+
+-- dgc_share_table: all rows of one Job Planner table (newest first where it has created_at), up to p_limit rows.
+CREATE OR REPLACE FUNCTION public.dgc_share_table(p_key text, p_table text, p_limit int DEFAULT 5000) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE r jsonb; has_created boolean;
+BEGIN
+  IF NOT public.dgc_share_key_ok(p_key) THEN RAISE EXCEPTION 'not allowed'; END IF;
+  IF p_table !~ '^dgc_[a-z0-9_]+$' OR NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name = p_table) THEN
+    RAISE EXCEPTION 'unknown table %', p_table;
+  END IF;
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = p_table AND column_name = 'created_at') INTO has_created;
+  EXECUTE format('SELECT coalesce(jsonb_agg(to_jsonb(t)), ''[]''::jsonb) FROM (SELECT * FROM public.%I %s LIMIT %s) t',
+                 p_table, CASE WHEN has_created THEN 'ORDER BY created_at DESC' ELSE '' END, greatest(1, least(coalesce(p_limit, 5000), 50000))) INTO r;
+  RETURN r;
+END $$;
+GRANT EXECUTE ON FUNCTION public.dgc_share_tables(text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.dgc_share_table(text, text, int) TO anon, authenticated;
 
 SELECT 'data share ready' AS status;
