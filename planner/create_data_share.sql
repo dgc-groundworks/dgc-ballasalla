@@ -39,7 +39,7 @@ BEGIN
   IF NOT public.dgc_share_key_ok(p_key) THEN RAISE EXCEPTION 'not allowed'; END IF;
   RETURN (SELECT coalesce(jsonb_agg(jsonb_build_object(
       'id', j->'id', 'name', j->'name', 'status', j->'status', 'start_date', j->'start_date',
-      'base_days', j->'base_days', 'day_overrides', j->'day_overrides', 'archived', j->'archived',
+      'base_days', j->'base_days', 'base_weeks', j->'base_weeks', 'on_timeline', j->'on_timeline', 'day_overrides', j->'day_overrides', 'archived', j->'archived',
       'board_col', j->'board_col', 'updated_at', j->'updated_at') ORDER BY j->>'start_date'), '[]'::jsonb)
     FROM (SELECT to_jsonb(p) AS j FROM public.dgc_planner_jobs p) x);
 END $$;
@@ -135,4 +135,5 @@ END $$;
 GRANT EXECUTE ON FUNCTION public.dgc_share_tables(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.dgc_share_table(text, text, int) TO anon, authenticated;
 
+NOTIFY pgrst, 'reload schema';
 SELECT 'data share ready' AS status;
