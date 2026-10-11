@@ -13,7 +13,7 @@
 <script src="market.js?v=13"></script>
 <script src="address.js?v=2"></script>
 <script src="contacts.js?v=10"></script>
-<script src="enquiries.js?v=3"></script>
+<script src="enquiries.js?v=4"></script>
 <script defer src="search.js?v=1"></script>
 <style>
 :root{--bg:#0f1117;--surf:#1a1d27;--surf2:#222636;--bord:#2e3347;--accent:#f59e0b;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444}
@@ -55,7 +55,9 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .lead-row{display:flex;align-items:flex-start;gap:16px;padding:14px 18px;border-bottom:1px solid var(--bord)}
 .lead-list .lead-row:last-child{border-bottom:none}
 .lead-row.flagged{background:rgba(110,140,190,.09)}
-.doc-value{display:inline-block;font-size:0.76rem;font-weight:700;color:#7cc4ea;border:1px solid rgba(124,196,234,.4);border-radius:999px;padding:2px 10px;margin-right:auto}
+.doc-value{display:inline-block;white-space:nowrap;flex:none;font-size:0.76rem;font-weight:700;color:#7cc4ea;border:1px solid rgba(124,196,234,.4);border-radius:999px;padding:2px 10px}
+.doc-addr-note{display:flex;align-items:flex-start;gap:10px;max-width:210mm;margin:6px auto 8px;padding:8px 12px;border:1px solid rgba(239,68,68,.45);border-left:4px solid #ef4444;border-radius:6px;background:rgba(239,68,68,.08);color:var(--text);font-size:0.8rem;font-weight:600;line-height:1.4}
+.doc-addr-note .addr-dot{margin-top:3px}
 .doc-value.none{color:var(--muted);border-color:var(--bord);font-weight:600}
 .addr-flag{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-size:0.78rem;font-weight:600}
 .addr-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.25);flex:none}
@@ -133,7 +135,7 @@ table.leads td{padding:8px 10px;border-bottom:1px solid var(--bord);vertical-ali
 .f-addr{font-size:0.78rem;color:var(--muted);margin-top:4px}
 .f-edit-panel{margin-top:10px;padding:10px 12px;border:1px solid var(--bord);border-radius:8px;background:var(--bg)}
 .f-edit-panel textarea{min-height:110px;font-family:inherit;font-size:0.85rem}
-.doc-copy-label{font-size:0.75rem;color:var(--muted);margin-right:auto;align-self:center}
+.doc-copy-label{font-size:0.75rem;color:var(--muted);margin-right:auto;align-self:center;white-space:nowrap}
 .doc-toolbar{gap:8px}
 .timing-panel{background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px 14px;font-size:0.82rem}
 .tp-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
@@ -226,7 +228,7 @@ table.tstats td,table.tstats th{padding:5px 8px}
 .align-toggle{display:inline-flex;gap:6px;margin-left:10px}
 .align-toggle button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .doc-wrap{max-width:820px;margin:0 auto}
-.doc-toolbar{display:flex;justify-content:flex-end;max-width:210mm;margin:0 auto}
+.doc-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;max-width:210mm;margin:0 auto}
 .doc-edit-btn{font-size:0.78rem;padding:5px 10px;border-radius:5px;border:1px solid var(--bord);background:var(--surf2);color:var(--text);cursor:pointer;font-family:inherit}
 .doc-edit-panel{max-width:210mm;margin:8px auto 20px;padding:12px 16px;border:1px solid var(--bord);border-radius:8px;background:var(--surf)}
 .doc-edit-panel label{display:block;font-size:0.78rem;color:var(--muted);margin:8px 0 3px;font-weight:700}
@@ -3257,10 +3259,10 @@ function docWrapHtml(l, idx, kind){
     <div class="doc-toolbar no-print">
       ${valueChipHtml(l)}
       <span class="doc-copy-label">${FOLDERS[leadFolder(l)]} letter</span>
-      ${(() => { const f = addrFlag(l); return f ? `<span class="addr-flag"><span class="addr-dot"></span>${esc(f.text)}</span>` : ''; })()}
       <button class="doc-edit-btn" type="button">&#9998; Edit this one</button>
       <button class="doc-edit-btn doc-remove-btn" type="button" title="Back to waiting in its folder. Send it later.">&#10005; Send later (take off the list)</button>
     </div>
+    ${(() => { const f = addrFlag(l); return f ? `<div class="doc-addr-note no-print"><span class="addr-dot"></span><span>${esc(f.text)}</span></div>` : ''; })()}
     ${kind === 'letter' && typeof contactFlagHtml === 'function' ? `<div class="no-print">${contactFlagHtml(l)}</div>` : ''}
     ${docHtml}
     <div class="doc-edit-panel no-print" hidden>
