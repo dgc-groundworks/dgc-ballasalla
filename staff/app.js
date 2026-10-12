@@ -299,10 +299,20 @@ async function renderWagesBroughtForward() {
   for (let i = 0; i < PERIOD_DAYS; i++) prevDates.push(isoFromVal(addDaysVal(prevPeriodStart, i)));
   const prevWeekStart = prevDates[0];
 
-  let approvals;
+  // Ash, 12 Oct 2026: un-approving a week to add missed hours (Dean) must
+  // not hide hours that came in after its pay had gone (Lee). So the cut-off
+  // is the FIRST time that week was approved, from the approval history,
+  // whether or not it is approved right now.
+  let approvals = [];
   try {
-    approvals = await sbGet('/dgc_payroll_approval?select=*&period_start=eq.' + prevWeekStart);
-  } catch (e) { return; }
+    const firsts = await sbGet('/dgc_payroll_approval_log?select=period_start,approved_at,by_who&action=eq.approved&period_start=eq.' + prevWeekStart + '&order=approved_at.asc&limit=1');
+    if (Array.isArray(firsts) && firsts.length) approvals = [{ period_start: firsts[0].period_start, approved_at: firsts[0].approved_at }];
+  } catch (e) { /* history table not there yet: fall back to the current approval */ }
+  if (!approvals.length) {
+    try {
+      approvals = await sbGet('/dgc_payroll_approval?select=*&period_start=eq.' + prevWeekStart);
+    } catch (e) { return; }
+  }
   if (!Array.isArray(approvals) || !approvals.length) return; // last week was never approved — nothing to flag yet
 
   const approvalByStart = {};
@@ -351,7 +361,7 @@ async function renderWagesBroughtForward() {
         <span class="advance-date">${fmtShort(r.work_date)}</span>
         <span class="advance-name">${name}</span>
         <span class="advance-type">${Number(r.hours).toFixed(1)}h</span>
-        <span class="advance-notes">Added ${when}, after that week was approved. ${whoFor(r)}. Check it before paying.</span>
+        <span class="advance-notes">Added ${when}, after that week's pay had gone through. ${whoFor(r)}. Check it before paying.</span>
       </div>
     </div>`;
   }).join('');
