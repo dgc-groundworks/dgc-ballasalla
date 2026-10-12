@@ -82,13 +82,23 @@ document.getElementById('acceptBtn').addEventListener('click', async () => {
   const err = document.getElementById('acceptErr');
   btn.disabled = true; btn.textContent = 'Checking…'; err.textContent = '';
   try {
-    const r = await fetch(SUPABASE_URL + '/auth/v1/verify', {
-      method: 'POST', headers: authHeaders(),
-      body: JSON.stringify({ type: linkType, token_hash: tokenHash }),
-    });
-    const data = await r.json().catch(() => ({}));
+    // Sign-in links for people who already have an account are "magiclink"
+    // links; newer Supabase versions want those checked as type "email".
+    // Try the link's own type first, then the other, before giving up.
+    // A failed check doesn't use the link up, so trying twice is safe.
+    const types = linkType === 'magiclink' ? ['magiclink', 'email'] : [linkType, 'email'];
+    let r, data = {}, lastMsg = '';
+    for (const type of types) {
+      r = await fetch(SUPABASE_URL + '/auth/v1/verify', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ type, token_hash: tokenHash }),
+      });
+      data = await r.json().catch(() => ({}));
+      if (r.ok && data.access_token) break;
+      lastMsg = data.msg || data.error_description || data.message || data.error || ('HTTP ' + r.status);
+    }
     if (!r.ok || !data.access_token) {
-      throw new Error('This link has expired or has already been used. Ask Ash for a new one, it only takes him a few seconds.');
+      throw new Error('This link has expired or has already been used. Ask Ash for a new one, it only takes him a few seconds. (' + lastMsg + ')');
     }
     joined = data;
     storeSession({
