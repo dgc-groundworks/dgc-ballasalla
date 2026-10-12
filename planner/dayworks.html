@@ -577,6 +577,25 @@ async function loadEntries() {
   const r = await fetch(REST + '?select=*&order=work_date.desc.nullslast', { headers: sbHeaders() });
   if (!r.ok) throw new Error(await r.text());
   entries = (await r.json()).map(rowToEntry);
+  await autoCorrectHours();
+}
+// Ash, 12 Oct 2026: when a sheet's written hours don't match its own times
+// (e.g. "8 to 3 = 7 h" with a 30 min lunch, which is 6.5 h), the app
+// corrects it to the times automatically and leaves a note to pass on to
+// Kal. Only for entries not yet sent and with no "bill different hours"
+// override, so nothing already filed with the client is ever changed.
+async function autoCorrectHours() {
+  const fix = entries.filter(e => !e.sentAt && !e.removedAt && e.start && e.finish && e.hours != null
+    && (e.billedHours === null || e.billedHours === undefined)
+    && calcHours(e.start, e.finish, e.lunch) != null
+    && Math.abs(calcHours(e.start, e.finish, e.lunch) - e.hours) > 0.01);
+  for (const e of fix) {
+    const calc = calcHours(e.start, e.finish, e.lunch);
+    const lunch = e.lunch == null ? defaultLunchMins(e.start, e.finish) : e.lunch;
+    const note = `Hours corrected automatically from ${e.hours} h (written on the sheet) to ${calc} h: ${e.start} to ${e.finish} less ${lunch} min lunch. Mention it to Kal when sending.`;
+    try { await saveEntry(e.id, Object.assign({}, e, { hours: calc, flagged: true, note })); }
+    catch (err) { console.error('Auto-correct failed for', e.id, err); }
+  }
 }
 // dgc_dayworks_queries holds messages the client submits from the public
 // site ("Query these hours") — read here so PMs can see and chase them
