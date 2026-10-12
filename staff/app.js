@@ -201,7 +201,7 @@ async function loadAll() {
   hourRows.forEach(h => activeIds.add(h.staff_id));
   leaveRows.forEach(b => activeIds.add(b.staff_id));
   advRows.forEach(a => activeIds.add(a.staff_id));
-  staff = staffRows.filter(s => (s.active || activeIds.has(s.id)) && !EXCLUDED_FROM_HOURS.has(s.name));
+  staff = staffRows.filter(s => (s.active || activeIds.has(s.id)) && !EXCLUDED_FROM_HOURS.has(s.name) && !/^test\b/i.test(s.name)); // test logins never show (Ash, 12 Oct 2026)
 
   hoursCache = {};
   // Load manual entries first
