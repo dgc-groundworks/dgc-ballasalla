@@ -337,7 +337,7 @@ async function renderWagesBroughtForward() {
   const whoFor = r => {
     const name = (staffById[r.staff_id] && staffById[r.staff_id].name) || '';
     const sub = tsSubs.find(t => t.staff_name === name && t.work_date === r.work_date && Math.abs(new Date(t.submitted_at) - new Date(r.created_at)) < 120000);
-    if (sub) return `${name} sent it himself from the Timesheet app${sub.site ? ' (' + sub.site + ', ' + (sub.start_time || '') + ' to ' + (sub.finish_time || '') + ')' : ''}`;
+    if (sub) return `${name} sent it from their own Timesheet app${sub.site ? ' (' + sub.site + ', ' + (sub.start_time || '') + ' to ' + (sub.finish_time || '') + ')' : ''}`;
     if (r.created_by) return r.created_by.startsWith('Timesheet app') ? `Sent from the ${r.created_by}` : `Typed in by ${r.created_by}`;
     return 'Who added it was not recorded (before 12 Oct 2026)';
   };
