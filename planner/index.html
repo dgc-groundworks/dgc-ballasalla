@@ -566,8 +566,8 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
   <div id="upd-banner" onclick="applyUpdate()">New version available — tap to update</div>
 
   <div class="hdr">
-    <div class="logo">
-      <img src="../dgc-logo-white.png" class="logo-svg" alt="DGC" style="height:32px;width:auto">
+    <div class="logo" role="button" tabindex="0" title="Home" style="cursor:pointer" onclick="plannerGoHome()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();plannerGoHome()}">
+      <img src="../dgc-logo-white.png" class="logo-svg" alt="DGC, go to Home" style="height:32px;width:auto">
     </div>
     <div class="hdr-r">
       <button id="undo-btn" class="undo-btn" onclick="undoLast()" disabled title="Nothing to undo yet">&#8630; Undo</button>
@@ -812,7 +812,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v3.12';
+const VERSION = 'v3.13';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -3905,6 +3905,17 @@ function tlViewOnlyBlocked() {
   if (ev === 'dragstart' || ev === 'dblclick') e.preventDefault();
   e.stopPropagation();
 }, true));
+// Ash, 13 Oct 2026: the DGC logo is Home. Inside the Silverdale app it closes
+// the Planner and goes back to the app's home page; on its own it goes back
+// to the timeline.
+function plannerGoHome() {
+  if (window.parent !== window) {
+    try { if (typeof window.parent.closeApp === 'function') { window.parent.closeApp(); return; } } catch (e) { /* different site: ask instead */ }
+    try { window.parent.postMessage({ type: 'pl-home' }, '*'); return; } catch (e) {}
+  }
+  const b = document.querySelector('.nav button');
+  if (b) showTab('timeline', b);
+}
 function showSignedIn(s) {
   document.body.classList.toggle('tl-viewonly', isTlViewOnly());
   const em = _sessEmail(s);
