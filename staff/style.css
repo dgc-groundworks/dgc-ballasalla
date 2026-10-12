@@ -538,3 +538,7 @@ th.today-col, .hours-cell.today-col {
 
 .sync-note { font-size: 0.78rem; color: var(--muted); text-align: center; margin: 18px 0 0; }
 .sync-note a { color: var(--accent); }
+
+/* Weekend cells: faint until used (12 Oct 2026) */
+.hours-cell.weekend-cell{opacity:.55}
+.hours-cell.weekend-cell:focus,.hours-cell.weekend-cell:hover{opacity:1}

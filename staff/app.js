@@ -451,7 +451,14 @@ function renderHours() {
           body += `<td class="${todayCls}"><div class="hours-cell-wrap"><input class="hours-cell" type="number" step="0.5" min="0" data-date="${date}" value="${c.value}">${noteBtn}</div></td>`;
         }
       } else if (c.kind === 'weekend') {
-        body += `<td class="${todayCls}"></td>`;
+        // Ash, 12 Oct 2026: weekend work (e.g. Dean's Sunday) must be
+        // typeable once the week is unlocked, not just shown when a
+        // worker's own timesheet already filled it.
+        if (isLocked || excl) {
+          body += `<td class="${todayCls}"></td>`;
+        } else {
+          body += `<td class="${todayCls}"><div class="hours-cell-wrap"><input class="hours-cell weekend-cell" type="number" step="0.5" min="0" data-date="${date}" value="" title="Weekend: only fill in if they worked">${noteBtn}</div></td>`;
+        }
       } else if (c.kind === 'blank') {
         if (salaryHrs) {
           if (!excl) dayTotals[i] += salaryHrs;
