@@ -179,7 +179,7 @@ async function loadAll() {
     sbGet('/dgc_payroll_approval?select=*&period_start=eq.' + from).catch(() => []),
     ensureLoggedIn().then(sess => {
       const token = sess ? sess.access_token : SUPABASE_KEY;
-      return fetch(REST + '/dgc_timesheets?select=staff_name,work_date,hours&work_date=gte.' + from + '&work_date=lte.' + to,
+      return fetch(REST + '/dgc_timesheets?select=staff_name,work_date,hours&order=submitted_at.asc&work_date=gte.' + from + '&work_date=lte.' + to,
         { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token } })
         .then(r => r.ok ? r.json() : []).catch(() => []);
     }).catch(() => []),

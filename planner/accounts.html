@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accounts</title>
+<link rel="icon" href="dgc-icon.png">
+<script src="theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+/* Accounts (Ash, 12 Oct 2026, night): the week's staff hours, a wage, income tax and NI estimate, salaries and the
+   Excel export. Runs on the ORIGINAL Job Planner database (Ash: "point the accounts at the original planner"), so the
+   hours are exactly the ones the Timesheet app writes and the Staff screen shows. Hours show as they come in, marked
+   UNAPPROVED, and turn APPROVED once a project manager approves the week on the Staff screen (or here).
+   Data only through the public.acc_* functions (dgc-ballasalla/staff/accounts.sql, kept out of the repository);
+   the raw pay tables stay Planner-admin only. Ported from silverdale-app/planner/accounts.html. */
+:root { --bg:#14171c; --panel:#1d222b; --panel2:#262c37; --border:#333a47; --text:#e8ebf0; --muted:#9aa4b2; --accent:#e8b84b; --accent-dark:#b5852a;
+  --danger:#e5534b; --ok:#3fb950; --warn:#d29922; --info:#58a6ff; --wk:#11151b; }
+[data-theme="light"] { --bg:#f0f4f8; --panel:#ffffff; --panel2:#e4ecf4; --border:#b8ccd8; --text:#1a2b3c; --muted:#5c7a94; --accent:#d97706; --accent-dark:#b45309;
+  --danger:#dc2626; --ok:#15803d; --warn:#b45309; --info:#1d4ed8; --wk:#eef2f6; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow-x: hidden; }
+main { max-width: 1280px; margin: 0 auto; padding: 14px 16px 60px; }
+h1 { font-size: 1.25rem; margin: 0; }
+h2 { font-size: 1rem; margin: 0 0 8px; }
+h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); margin: 0 0 8px; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.push { margin-left: auto; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 12px; }
+.muted { color: var(--muted); }
+.small { font-size: 0.82rem; }
+button { font: inherit; }
+.btn { background: var(--panel2); color: var(--text); border: 1px solid var(--border); padding: 7px 13px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.primary { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }
+.btn.go { background: #16a34a; color: #fff; border-color: #16a34a; }
+.btn.sm { padding: 4px 9px; font-size: 0.8rem; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { background: var(--panel2); color: var(--muted); border: 0; padding: 6px 11px; cursor: pointer; font-weight: 600; font-size: .82rem; }
+.seg button.on { background: var(--accent); color: #1a1a1a; }
+input, select, textarea { background: var(--panel2); border: 1px solid var(--border); color: var(--text); padding: 6px 8px; border-radius: 7px; font: inherit; }
+label.f { display: flex; flex-direction: column; gap: 3px; font-size: .78rem; color: var(--muted); }
+.formgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px 10px; align-items: end; }
+.status { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); margin-top: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.status.ok { border-color: color-mix(in srgb, var(--ok) 60%, var(--border)); background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
+.status.wait { border-color: color-mix(in srgb, var(--warn) 70%, var(--border)); background: color-mix(in srgb, var(--warn) 12%, var(--panel)); }
+.status b.big { font-size: 1.05rem; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .72rem; font-weight: 700; letter-spacing: .02em; border: 1px solid currentColor; white-space: nowrap; }
+.pill.est { color: var(--info); }
+.pill.draft { color: var(--warn); }
+.pill.ok { color: var(--ok); }
+.pill.unv { color: var(--danger); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 10px; }
+.kpi { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.kpi .k { font-size: .75rem; color: var(--muted); }
+.kpi .v { font-size: 1.35rem; font-weight: 800; margin-top: 2px; }
+.kpi .s { font-size: .74rem; color: var(--muted); margin-top: 2px; }
+.draftmark .v::after { content: " UNAPPROVED"; font-size: .65rem; color: var(--warn); font-weight: 800; vertical-align: super; }
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.t { border-collapse: collapse; width: 100%; font-size: .8rem; }
+table.t th, table.t td { border-bottom: 1px solid var(--border); padding: 5px 6px; text-align: right; white-space: nowrap; }
+table.t th { background: var(--panel2); color: var(--muted); font-weight: 600; position: sticky; top: 0; }
+table.t td.l, table.t th.l { text-align: left; }
+table.t td.c, table.t th.c { text-align: center; }
+table.t tr.tot td { font-weight: 800; background: var(--panel2); border-top: 2px solid var(--border); }
+table.t td.name { position: sticky; left: 0; background: var(--panel); font-weight: 600; text-align: left; }
+table.t tr.tot td.name { background: var(--panel2); }
+td.wk { background: var(--wk); }
+td.lv { color: var(--ok); font-weight: 700; }
+td.miss { color: var(--danger); }
+td.flag { box-shadow: inset 0 0 0 2px var(--warn); }
+td.chg { box-shadow: inset 0 0 0 2px var(--danger); }
+.tick { color: var(--ok); font-weight: 800; }
+tr.person { cursor: pointer; }
+tr.person:hover td { background: var(--panel2); }
+tr.detail td { background: var(--bg); text-align: left; white-space: normal; }
+.dl { display: grid; grid-template-columns: 110px 1fr; gap: 3px 10px; font-size: .8rem; }
+.anom { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed var(--border); font-size: .84rem; }
+.anom .who { font-weight: 700; min-width: 150px; }
+.sev-warn { color: var(--warn); }
+.sev-bad { color: var(--danger); }
+.sev-info { color: var(--muted); }
+details > summary { cursor: pointer; font-weight: 700; }
+.msg { margin-top: 8px; min-height: 1.2em; font-size: .85rem; }
+.msg.err { color: var(--danger); }
+.msg.ok { color: var(--ok); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--panel2); border: 1px solid var(--border); border-radius: 99px; padding: 3px 10px; font-size: .78rem; cursor: pointer; color: var(--text); }
+.hidden { display: none !important; }
+.confirm { margin-top: 10px; padding: 10px; border: 1px dashed var(--warn); border-radius: 8px; }
+.fcgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
+.fcw { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.fcw h3 { margin: 10px 0 4px; font-size: .7rem; }
+.fch { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.fc4 { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; font-size: .82rem; }
+.fc4 span:nth-child(odd) { color: var(--muted); }
+.fc4 span:nth-child(even) { text-align: right; font-variant-numeric: tabular-nums; }
+.fc4 .b { font-weight: 800; }
+@media (max-width: 640px) { main { padding: 10px 12px 50px; } .anom { flex-direction: column; gap: 0; } .anom .who { min-width: 0; } }
+</style>
+</head>
+<body>
+<div id="plBackBar" hidden style="position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border)">
+  <a href="./" title="Back to the Job Planner" style="display:flex;align-items:center"><img src="dgc-icon.png" alt="DGC" height="26"></a>
+  <span style="font-weight:600">Accounts</span>
+  <a href="./" style="margin-left:auto;color:var(--text);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px">&larr; Back to the Job Planner</a>
+</div>
+<script>/* opened on its own (not inside the Job Planner): show a way back (Ash, 12 Oct 2026) */
+try { if (window.top === window) document.getElementById("plBackBar").hidden = false; } catch (e) {}</script>
+
+<main id="app"><p class="muted">Loading Accounts...</p></main>
+
+<script src="../staff/config.js"></script>
+<script src="../staff/auth.js?v=5"></script>
+<script src="ts-popup.js?v=1"></script>
+<script>
+"use strict";
+/* ============================== settings ============================== */
+const ACC_VERSION = "Accounts 2.0 (12 Oct 2026, original Job Planner)";
+/* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
+const BANK_HOLIDAYS = new Set([
+  '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
+  '2026-01-01','2026-04-03','2026-04-06','2026-05-04','2026-06-05','2026-07-06','2026-08-31','2026-12-25','2026-12-28',
+  '2027-01-01','2027-03-26','2027-03-29','2027-05-03','2027-06-04','2027-07-05','2027-08-30','2027-12-27','2027-12-28',
+]);
+const SALARIED = new Map([['Andy Wynne-Smythe', 8], ['Andrew Wynne-Smythe', 8]]);
+const EXCLUDED_FROM_HOURS = new Set(['John McLoughlin', 'John Mcloughlin', 'Andy Wynne-Smythe', 'Andrew Wynne-Smythe']);
+const LONG_DAY = 10, VERY_LONG_DAY = 12, LONG_WEEK = 55;
+const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+const TEST = LOCAL && new URLSearchParams(location.search).get('test') === '1';
+const REST = SUPABASE_URL + '/rest/v1';
+
+/* ============================== small helpers ============================== */
+const $ = s => document.querySelector(s);
+const esc = s => (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = v => { const n = Number(v); return isFinite(n) ? n : 0; };
+const r2 = v => Math.round(v * 100) / 100;
+const gbp = v => '£' + r2(num(v)).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const hrs = v => { const n = r2(num(v)); return (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, '')); };
+function valFromIso(iso) { const [y, m, d] = iso.split('-').map(Number); return Date.UTC(y, m - 1, d); }
+function isoFromVal(t) { return new Date(t).toISOString().slice(0, 10); }
+const addDays = (iso, n) => isoFromVal(valFromIso(iso) + n * 86400000);
+const dow = iso => new Date(valFromIso(iso)).getUTCDay();
+const isWeekday = iso => { const d = dow(iso); return d >= 1 && d <= 5; };
+function todayIso() { const d = new Date(); return isoFromVal(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); }
+function mondayOf(iso) { const d = dow(iso); return addDays(iso, -((d + 6) % 7)); }
+const dayName = iso => new Date(valFromIso(iso)).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+const fmtDay = iso => { const d = new Date(valFromIso(iso)); return d.getUTCDate() + ' ' + d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }); };
+const fmtLong = iso => new Date(valFromIso(iso)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const fmtWhen = ts => ts ? new Date(ts).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+const weekLabel = s => fmtDay(s) + ' to ' + fmtDay(addDays(s, 6)) + ' ' + addDays(s, 6).slice(0, 4);
+const norm = s => String(s || '').trim().toLowerCase();
+const isTest = name => /^test\b/i.test(name || '');
+
+/* ============================== data access ============================== */
+let FIXTURE = null; /* localhost ?test=1 only: canned data, nothing is sent anywhere */
+async function rpc(name, args) {
+  if (TEST) return testRpc(name, args || {});
+  const sess = await ensureLoggedIn();
+  if (!sess) throw Object.assign(new Error('Please sign in again.'), { code: 'auth' });
+  const r = await fetch(REST + '/rpc/' + name, { method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + sess.access_token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args || {}) });
+  const txt = await r.text();
+  let body = null; try { body = txt ? JSON.parse(txt) : null; } catch (e) {}
+  if (!r.ok) throw Object.assign(new Error((body && body.message || txt || 'Request failed').replace(/^Accounts: /, '')), { code: body && body.code });
+  return body;
+}
+async function testRpc(name, a) {
+  if (!FIXTURE) FIXTURE = await (await fetch('accounts-fixture.json', { cache: 'no-store' })).json();
+  await new Promise(r => setTimeout(r, 30));
+  const me = FIXTURE.me;
+  if (name === 'acc_me') return me;
+  if (name === 'acc_week') { const w = FIXTURE.weeks[a.p_start]; if (!me.hours) throw new Error('not allowed for this login'); return w ? JSON.parse(JSON.stringify(w)) : { ...JSON.parse(JSON.stringify(Object.values(FIXTURE.weeks)[0])), periodStart: a.p_start, periodEnd: addDays(a.p_start, 6), hours: [], timesheets: [], leave: [], extras: [], approval: null, approvalLog: [], dayworks: [], exports: [] }; }
+  if (name === 'acc_approve') { if (!me.approve) throw new Error('only the approvers can approve hours'); const w = FIXTURE.weeks[a.p_start]; const ap = { by: me.email, at: new Date().toISOString() }; if (w) { w.approval = ap; w.approvalLog.push({ action: 'approved', by: me.email, at: ap.at }); } return ap; }
+  if (name === 'acc_log_export') { const w = FIXTURE.weeks[a.p_start]; if (w) w.exports.unshift({ kind: a.p_kind, by: me.email, at: new Date().toISOString(), approved: !!w.approval }); return null; }
+  if (name === 'acc_salary_save') { if (!me.money) throw new Error('not allowed'); const p = a.p; const row = { ...p, id: p.id || ('t' + Date.now()), annual_salary: p.annual_salary === '' ? null : p.annual_salary, monthly_amount: p.monthly_amount === '' ? null : p.monthly_amount, pay_day: p.pay_day === '' ? null : Number(p.pay_day), active: p.active !== false };
+    for (const w of Object.values(FIXTURE.weeks)) { const i = w.salaries.findIndex(s => s.id === row.id); if (i >= 0) w.salaries[i] = row; else w.salaries.push(row); } return row; }
+  if (name === 'acc_person_set') { for (const w of Object.values(FIXTURE.weeks)) { w.settings = w.settings.filter(s => s.person_key !== a.p_key); w.settings.push({ person_key: a.p_key, allowance: a.p_allowance, ni_category: a.p_ni, note: a.p_note }); } return null; }
+  if (name === 'acc_rate_set') { for (const w of Object.values(FIXTURE.weeks)) { const x = w.rates.find(r => r.taxYear === a.p_year && r.key === a.p_key); if (x) Object.assign(x, { value: a.p_value, checkedOn: a.p_checked, verified: a.p_verified }); } return null; }
+  if (name === 'acc_day_sources') return (FIXTURE.daySources || {})[a.p_name + '|' + a.p_date] || { name: a.p_name, date: a.p_date, timesheets: [], dayworks: [], grid: [], sameSheet: [] };
+  if (name === 'acc_approver_set') { if (!me.director) throw new Error('only a director can change the approvers'); for (const w of Object.values(FIXTURE.weeks)) { const x = w.approvers.find(p => p.email === a.p_email); if (x) x.active = a.p_active; else w.approvers.push({ email: a.p_email, name: a.p_name, active: a.p_active }); } return null; }
+  throw new Error('unknown test call ' + name);
+}
+
+/* ============================== state ============================== */
+const S = { me: null, start: null, W: null, view: null, open: new Set(), approveAsk: false, msg: '', msgKind: '', editRate: null, editSalary: null, editTax: null, busy: false };
+function pickStartFromHash() {
+  const h = location.hash.slice(1);
+  const m = /week=(\d{4}-\d{2}-\d{2})/.exec(h);
+  if (m) return mondayOf(m[1]);
+  if (/approve/.test(h)) return addDays(mondayOf(todayIso()), -7);
+  return null;
+}
+
+/* ============================== the rates ============================== */
+function taxYearOf(iso) { const y = Number(iso.slice(0, 4)); return iso >= y + '-04-06' ? y + '/' + String(y + 1).slice(2) : (y - 1) + '/' + String(y).slice(2); }
+function ratesFor(iso) {
+  const all = (S.W && S.W.rates) || [];
+  const want = taxYearOf(iso);
+  const years = [...new Set(all.map(r => r.taxYear))].sort().reverse();
+  const year = years.includes(want) ? want : years[0];
+  const R = { year, wanted: want, missingYear: year !== want, rows: all.filter(r => r.taxYear === year) };
+  R.rows.forEach(r => { R[r.key] = num(r.value); });
+  R.unverified = R.rows.filter(r => !r.verified);
+  return R;
+}
+/* Isle of Man income tax on a year's pay, single-person allowance unless the person's own allowance is set */
+function annualTax(R, annual, allowance) {
+  let allow = allowance == null ? R.it_allowance : num(allowance);
+  if (annual > R.it_taper_from) allow = Math.max(0, allow - (annual - R.it_taper_from) / 2);
+  const taxable = Math.max(0, annual - allow);
+  return Math.min(taxable, R.it_lower_band) * R.it_lower_rate / 100 + Math.max(0, taxable - R.it_lower_band) * R.it_higher_rate / 100;
+}
+/* Class 1 NI for one pay period ("week" or "month") */
+function niFor(R, gross, period, cat) {
+  const pt = period === 'month' ? R.ni_pt_month : R.ni_pt_week, st = period === 'month' ? R.ni_st_month : R.ni_st_week, uel = period === 'month' ? R.ni_uel_month : R.ni_uel_week;
+  const ee = cat === 'over_pension_age' || gross <= pt ? 0 : (Math.min(gross, uel) - pt) * R.ni_ee_main / 100 + Math.max(0, gross - uel) * R.ni_ee_additional / 100;
+  const er = Math.max(0, gross - st) * R.ni_er / 100;
+  return { ee, er };
+}
+
+/* ============================== the week, worked out ============================== */
+function buildWeek(W) {
+  const start = W.periodStart, dates = [...Array(7)].map((_, i) => addDays(start, i));
+  const money = !!(W.me && W.me.money && S.me && S.me.money), today = todayIso();
+  const staffById = {}; W.staff.forEach(s => staffById[s.id] = s);
+  const staffByName = {}; W.staff.forEach(s => staffByName[norm(s.name)] = s.id);
+  const H = {}; W.hours.forEach(h => H[h.staffId + '_' + h.date] = { ...h });
+  const TS = {}; W.timesheets.forEach(t => { const sid = staffByName[norm(t.name)]; if (sid) (TS[sid + '_' + t.date] = TS[sid + '_' + t.date] || []).push(t); });
+  /* worker timesheets override as the Staff screen does: no entry, or the default 8, takes the timesheet's figure */
+  const discrepancies = [];
+  W.timesheets.forEach(t => {
+    const sid = staffByName[norm(t.name)], sub = num(t.hours);
+    if (!sid || !(sub > 0)) return;
+    const k = sid + '_' + t.date, ex = H[k];
+    if (ex && ex.id) {
+      const adm = Number(ex.hours);
+      if (adm === sub) return;
+      if (adm === 8) H[k] = { ...ex, hours: sub, fromTimesheet: true };
+      else discrepancies.push({ staffId: sid, date: t.date, manual: adm, submitted: sub });
+    } else H[k] = { ...(ex || {}), hours: sub, fromTimesheet: true };
+  });
+  const leaveFor = (sid, d) => W.leave.find(l => l.staffId === sid && d >= l.from && d <= l.to);
+  const extras = W.extras || [];
+  const sumExtra = (sid, type) => extras.filter(a => a.staffId === sid && a.type === type).reduce((s, a) => s + num(a.amount), 0);
+  function cellFor(sid, d) {
+    const h = H[sid + '_' + d];
+    if (h && h.hours !== null && h.hours !== undefined) return { kind: 'hours', value: num(h.hours) };
+    if (!isWeekday(d)) return { kind: 'weekend' };
+    if (BANK_HOLIDAYS.has(d)) return { kind: 'BH' };
+    const l = leaveFor(sid, d);
+    if (l) return { kind: l.type === 'Holiday' ? 'H' : 'U' };
+    return { kind: 'blank' };
+  }
+  const active = new Set();
+  W.hours.forEach(h => active.add(h.staffId)); W.leave.forEach(l => active.add(l.staffId)); extras.forEach(a => active.add(a.staffId));
+  const people = W.staff.filter(s => (s.active || active.has(s.id)) && !EXCLUDED_FROM_HOURS.has(s.name) && !isTest(s.name));
+  const sent = new Set((W.sentNames || []).map(norm));
+  const approvedAt = W.approval && W.approval.at;
+  const R = ratesFor(start);
+  const settings = {}; (W.settings || []).forEach(p => settings[p.person_key] = p);
+  const anomalies = [];
+  const flag = (p, sev, text, date) => anomalies.push({ staffId: p ? p.id : null, name: p ? p.name : '', sev, text, date: date || '' });
+
+  const rows = people.map(s => {
+    const salaryHrs = SALARIED.get(s.name) || 0;
+    const days = dates.map(d => {
+      const c = cellFor(s.id, d), h = H[s.id + '_' + d], lv = leaveFor(s.id, d), ts = TS[s.id + '_' + d] || [];
+      const dw = (W.dayworks || []).filter(x => norm(x.name) === norm(s.name) && x.date === d);
+      let paid = 0, worked = 0;
+      if (c.kind === 'hours') { paid = worked = c.value; }
+      else if (c.kind === 'BH' || c.kind === 'H') paid = 8;
+      else if (c.kind === 'blank' && salaryHrs) paid = salaryHrs;
+      return { date: d, ...c, paid, worked, entry: h || null, leave: lv || null, timesheets: ts, dayworks: dw, flags: [] };
+    });
+    const ot = sumExtra(s.id, 'Overtime');
+    const worked = days.reduce((a, x) => a + x.worked, 0), leavePaid = days.reduce((a, x) => a + (x.kind === 'BH' || x.kind === 'H' ? 8 : 0), 0);
+    const total = days.reduce((a, x) => a + x.paid, 0) + ot;
+    const row = { s, days, ot, worked, leavePaid, total, sent: sent.has(norm(s.name)) };
+
+    /* ---- anomalies ---- */
+    const off = s.status === 'Off Work';
+    const startD = s.startDate || '0000', leftD = s.dateLeft || '9999';
+    if (off && !worked) flag(s, 'info', 'Marked "Off Work' + (s.offWorkType ? ': ' + s.offWorkType : '') + '" in the Planner: no hours expected this week.');
+    days.forEach(x => {
+      const d = x.date, label = dayName(d) + ' ' + fmtDay(d);
+      if (x.kind === 'hours' && x.value > 0 && x.leave) { x.flags.push('leave'); flag(s, 'warn', 'Hours logged on a day marked as ' + (x.leave.type === 'Holiday' ? 'paid holiday' : 'unpaid leave') + ' (' + label + ', ' + hrs(x.value) + 'h). Treated as working: hours win over leave. Check the leave record.', d); }
+      if (x.kind === 'hours' && x.value > 0 && BANK_HOLIDAYS.has(d)) { x.flags.push('bh'); flag(s, 'info', 'Worked the bank holiday (' + label + ', ' + hrs(x.value) + 'h). Paid as hours worked, not as the bank holiday.', d); }
+      if (x.kind === 'hours' && x.value > LONG_DAY) { x.flags.push('long'); flag(s, x.value > VERY_LONG_DAY ? 'bad' : 'warn', 'Long day: ' + hrs(x.value) + 'h on ' + label + '.', d); }
+      if (x.kind === 'hours' && x.value > 0 && !isWeekday(d)) { x.flags.push('weekend'); flag(s, 'info', 'Weekend work: ' + hrs(x.value) + 'h on ' + label + '.', d); }
+      if (x.kind === 'hours' && x.value === 0 && isWeekday(d) && !x.leave && !BANK_HOLIDAYS.has(d)) flag(s, 'info', 'Nil hours entered for ' + label + (x.entry && x.entry.note ? ' (note: ' + x.entry.note + ')' : '') + '.', d);
+      if (x.kind === 'blank' && !salaryHrs && !off && s.active !== false && d <= today && d >= startD && d <= leftD) { x.flags.push('missing'); flag(s, 'warn', 'No hours for ' + label + ' (not on leave, not a bank holiday).', d); }
+      const e = x.entry, changedAt = e && (e.updatedAt || e.createdAt);
+      if (approvedAt && e && changedAt && changedAt > approvedAt) { x.flags.push('changed'); flag(s, 'bad', 'Changed after the week was approved: ' + label + ' now ' + (e.hours == null ? 'nil' : hrs(e.hours) + 'h') + ', by ' + (e.updatedBy || e.createdBy || 'unknown') + ' on ' + fmtWhen(changedAt) + '.', d); }
+      if (discrepancies.some(q => q.staffId === s.id && q.date === d)) x.flags.push('twice');
+      const dwH = x.dayworks.reduce((a, y) => a + num(y.billedHours != null ? y.billedHours : y.hours), 0);
+      if (x.dayworks.length && dwH > x.worked + 0.01) { x.flags.push('dayworks'); flag(s, 'warn', 'Dayworks sheet says ' + hrs(dwH) + 'h on ' + label + ' but only ' + hrs(x.worked) + 'h are on the pay hours.', d); }
+    });
+    discrepancies.filter(q => q.staffId === s.id).forEach(q => flag(s, 'warn', 'Entered twice on ' + dayName(q.date) + ' ' + fmtDay(q.date) + ': the Staff grid says ' + hrs(q.manual) + 'h, their own timesheet says ' + hrs(q.submitted) + 'h. Using ' + hrs(q.manual) + 'h (the grid).', q.date));
+    if (worked > LONG_WEEK) flag(s, 'warn', 'Long week: ' + hrs(worked) + 'h worked.');
+    if (money && total > 0 && !num(s.rate)) flag(s, 'bad', 'No pay rate in the Planner, so no pay can be worked out.');
+
+    /* ---- money (estimate) ---- */
+    if (money) {
+      const rate = num(s.rate);
+      const set = settings['staff:' + s.id] || {};
+      /* a "normal week" for the tax estimate (Ash, 20 Sep 2026: average out a day off): the weekday average x 5, plus weekend and overtime */
+      let daysPresent = 0, wdHours = 0, extra = 0;
+      days.forEach(x => { if (isWeekday(x.date)) { if (x.kind === 'hours' || x.kind === 'H' || x.kind === 'BH') { daysPresent++; wdHours += x.paid; } } else extra += x.worked; });
+      const normal = (daysPresent ? (wdHours / daysPresent) * 5 : 0) + extra + ot;
+      const bonus = sumExtra(s.id, 'Bonus'), advances = sumExtra(s.id, 'Advance');
+      const base = total * rate, gross = base + bonus;
+      const effRate = normal * rate > 0 ? annualTax(R, normal * rate * 52, set.allowance) / (normal * rate * 52) : 0;
+      const tax = gross * effRate;
+      const ni = niFor(R, gross, 'week', set.ni_category);
+      Object.assign(row, { rate, base, bonus, advances, gross, tax, eeNI: ni.ee, erNI: ni.er, net: gross - tax - ni.ee, toPay: gross - tax - ni.ee - advances, cost: gross + ni.er, custom: !!(settings['staff:' + s.id]), set });
+    }
+    return row;
+  });
+
+  /* dayworks for someone not on the staff list, or with no pay hours at all that day */
+  (W.dayworks || []).forEach(x => {
+    const sid = staffByName[norm(x.name)];
+    if (!sid) flag({ id: null, name: x.name }, 'info', 'Dayworks sheet for ' + x.name + ' on ' + dayName(x.date) + ' ' + fmtDay(x.date) + ' (' + x.site + '): not on the staff list.', x.date);
+  });
+  const sevOrder = { bad: 0, warn: 1, info: 2 };
+  anomalies.sort((a, b) => sevOrder[a.sev] - sevOrder[b.sev] || a.name.localeCompare(b.name) || a.date.localeCompare(b.date));
+  const T = { worked: 0, leavePaid: 0, ot: 0, total: 0, gross: 0, tax: 0, eeNI: 0, erNI: 0, net: 0, advances: 0, toPay: 0, cost: 0, bonus: 0 };
+  rows.forEach(r => Object.keys(T).forEach(k => T[k] += num(r[k])));
+  const dayTotals = dates.map((d, i) => rows.reduce((a, r) => a + r.days[i].paid, 0));
+  return { start, dates, rows, anomalies, T, dayTotals, R, money, discrepancies, approved: !!W.approval };
+}
+
+/* ============================== salaries ============================== */
+function payDateIn(y, m, payDay) { /* m 0-based. Empty pay day = last working day. A weekend pay day moves to the Friday before. */
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  let d = new Date(Date.UTC(y, m, payDay ? Math.min(payDay, last) : last));
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d = new Date(d.getTime() - 86400000);
+  return isoFromVal(d.getTime());
+}
+function nextPayDate(payDay, fromIso) {
+  const [y, m] = fromIso.split('-').map(Number);
+  let p = payDateIn(y, m - 1, payDay);
+  if (p < fromIso) p = payDateIn(m === 12 ? y + 1 : y, m === 12 ? 0 : m, payDay);
+  return p;
+}
+function salaryRows(view) {
+  const W = S.W, today = todayIso(), R = ratesFor(today);
+  const settings = {}; (W.settings || []).forEach(p => settings[p.person_key] = p);
+  const tyStart = taxYearOf(today).slice(0, 4) + '-04-06';
+  return (W.salaries || []).filter(s => s.active !== false && (view === 'dgc' || s.company === view)).map(s => {
+    const monthly = s.monthly_amount != null && s.monthly_amount !== '' ? num(s.monthly_amount) : (s.annual_salary != null && s.annual_salary !== '' ? num(s.annual_salary) / 12 : 0);
+    const set = settings['salary:' + s.id] || {};
+    const tax = annualTax(R, monthly * 12, set.allowance) / 12;
+    const ni = niFor(R, monthly, 'month', set.ni_category);
+    const next = nextPayDate(s.pay_day, today);
+    const days = Math.round((valFromIso(next) - valFromIso(today)) / 86400000);
+    /* months paid so far this tax year (6 April on), from the pay day and the start date */
+    let paid = 0; const from = s.start_date && s.start_date > tyStart ? s.start_date : tyStart;
+    for (let y = Number(tyStart.slice(0, 4)), m = 3; ; m++) { if (m > 11) { m = 0; y++; } const p = payDateIn(y, m, s.pay_day); if (p > today) break; if (p >= from) paid++; if (paid > 13) break; }
+    return { s, monthly, annual: monthly * 12, tax, eeNI: ni.ee, erNI: ni.er, net: monthly - tax - ni.ee, cost: monthly + ni.er, next, days, paid, paidSoFar: paid * monthly, set, custom: !!settings['salary:' + s.id], noAmount: !monthly };
+  }).sort((a, b) => a.next.localeCompare(b.next) || a.s.name.localeCompare(b.s.name));
+}
+
+/* ============================== average pay and the look-ahead ============================== */
+/* Ash, 12 Oct 2026, night: an "Average pay per week" box under "Pay this week", from the last few approved weeks of
+   hourly staff pay, and the next 4 weeks: hourly pay (this week's real hours where they exist, the average for the rest)
+   plus any salary pay days that fall in each week. Everything here is an ESTIMATE, on the Isle of Man rates below. */
+const FC_WEEKS = 8, FC_LOOK_BACK = 12, FC_FIRST_MONDAY = '2026-09-14'; /* weeks before 14 Sep 2026 were on the old Saturday cycle */
+const FC_KEYS = ['gross', 'net', 'tax', 'eeNI', 'erNI', 'cost', 'total'];
+async function loadForecast() {
+  if (S.fc) return;
+  S.fc = { status: 'loading' };
+  try {
+    const thisMon = mondayOf(todayIso());
+    const cands = [];
+    for (let w = addDays(thisMon, -7); w >= FC_FIRST_MONDAY && cands.length < FC_LOOK_BACK; w = addDays(w, -7)) cands.push(w);
+    const got = await Promise.all(cands.concat([thisMon]).map(w => (S.W && S.W.periodStart === w) ? Promise.resolve(S.W) : rpc('acc_week', { p_start: w }).catch(() => null)));
+    const cur = got.pop();
+    const past = got.filter(Boolean);
+    let basis = past.filter(w => w.approval).slice(0, FC_WEEKS), draft = false;
+    if (!basis.length) { basis = past.filter(w => (w.hours || []).some(x => x.hours != null)).slice(0, FC_WEEKS); draft = true; }
+    const per = basis.map(w => buildWeek(w).T);
+    const avg = {}; FC_KEYS.forEach(k => avg[k] = per.length ? per.reduce((a, t) => a + num(t[k]), 0) / per.length : 0);
+    S.fc = { status: 'done', avg, basis: basis.map(w => w.periodStart), draft, thisMon, cur };
+  } catch (e) { S.fc = { status: 'error', msg: e.message }; }
+  render();
+}
+/* pay days of every active salary that fall between two dates (inclusive) */
+function salariesBetween(from, to) {
+  const out = [];
+  salaryRows('dgc').filter(x => !x.noAmount).forEach(x => {
+    const seen = new Set();
+    [from, to].forEach(iso => { const [y, m] = iso.split('-').map(Number); const p = payDateIn(y, m - 1, x.s.pay_day); if (p >= from && p <= to && !seen.has(p)) { seen.add(p); out.push({ ...x, payDate: p }); } });
+  });
+  return out.sort((a, b) => a.payDate.localeCompare(b.payDate) || a.s.name.localeCompare(b.s.name));
+}
+function forecastHTML(est) {
+  const F = S.fc;
+  let h = `<div class="card"><div class="bar"><h2 style="margin:0">Average pay per week</h2>${est}<span class="push small muted">hourly staff</span></div>`;
+  if (!F || F.status === 'loading') return h + '<p class="muted small">Working out the average from the last approved weeks...</p></div>';
+  if (F.status === 'error') return h + `<p class="small sev-bad">Couldn't work out the average: ${esc(F.msg)}</p></div>`;
+  const A = F.avg, n = F.basis.length;
+  if (!n) return h + '<p class="muted">No approved weeks yet to average.</p></div>';
+  h += `<div class="cards">
+      <div class="kpi"><div class="k">Net pay to staff</div><div class="v">${gbp(A.net)}</div><div class="s">after tax and NI; ${gbp(A.gross)} before</div></div>
+      <div class="kpi"><div class="k">Tax and NI to pay away</div><div class="v">${gbp(A.tax + A.eeNI + A.erNI)}</div><div class="s">income tax ${gbp(A.tax)}, employee NI ${gbp(A.eeNI)}, employer NI ${gbp(A.erNI)}</div></div>
+      <div class="kpi"><div class="k">Grand total cost</div><div class="v">${gbp(A.cost)}</div><div class="s">gross pay plus employer NI</div></div>
+      <div class="kpi"><div class="k">Hours paid</div><div class="v">${hrs(A.total)}h</div><div class="s">a week, on average</div></div></div>
+    <p class="small muted">The average of the last ${n} ${F.draft ? 'weeks with hours (none approved yet, so these are UNAPPROVED figures)' : 'approved week' + (n > 1 ? 's' : '')}: ${F.basis.slice().reverse().map(w => esc(fmtDay(w))).join(', ')}. Up to ${FC_WEEKS} approved weeks are used${n < FC_WEEKS ? `; only ${n} ${n > 1 ? 'are' : 'is'} approved on the Monday weeks so far (they started on 14 Sep 2026)` : ''}. Salaries are separate, below.</p></div>`;
+
+  /* ---- the next 4 weeks ---- */
+  const names = ['This week', 'Next week', 'The week after', 'The week after that'];
+  const curB = F.cur ? buildWeek(F.cur) : null;
+  const weeks = names.map((label, i) => {
+    const mon = addDays(F.thisMon, i * 7), sun = addDays(mon, 6);
+    let hourly = { ...A }, how = 'the average week';
+    if (i === 0 && curB) {
+      const wd = curB.dates.map((d, j) => ({ d, j })).filter(o => isWeekday(o.d));
+      const missing = wd.filter(o => !(curB.dayTotals[o.j] > 0)).length, got = wd.length - missing;
+      const weekendHrs = curB.dates.some((d, j) => !isWeekday(d) && curB.dayTotals[j] > 0);
+      if (got || weekendHrs) {
+        hourly = {}; FC_KEYS.forEach(k => hourly[k] = num(curB.T[k]) + A[k] * missing / 5);
+        how = missing ? `real hours for ${got} day${got === 1 ? '' : 's'} so far, the average for the other ${missing}` : 'the real hours entered';
+      }
+    }
+    const sal = salariesBetween(mon, sun);
+    const S2 = { gross: 0, net: 0, tax: 0, eeNI: 0, erNI: 0, cost: 0 };
+    sal.forEach(x => { S2.gross += x.monthly; S2.net += x.net; S2.tax += x.tax; S2.eeNI += x.eeNI; S2.erNI += x.erNI; S2.cost += x.cost; });
+    const tot = {}; ['gross', 'net', 'tax', 'eeNI', 'erNI', 'cost'].forEach(k => tot[k] = num(hourly[k]) + S2[k]);
+    return { label, mon, sun, hourly, how, sal, S2, tot };
+  });
+  const four = (o, strong) => `<div class="fc4"><span>Before tax and NI</span><span>${gbp(o.gross)}</span><span>After tax and NI</span><span${strong ? ' class="b"' : ''}>${gbp(o.net)}</span><span>Tax and NI to pay away</span><span>${gbp(o.tax + o.eeNI + o.erNI)}</span><span>Total cost</span><span${strong ? ' class="b"' : ''}>${gbp(o.cost)}</span></div>`;
+  h += `<div class="card"><div class="bar"><h2 style="margin:0">The next 4 weeks</h2>${est}<span class="push small muted">hourly staff and salaries</span></div><div class="fcgrid">${weeks.map(w => `<div class="fcw">
+      <div class="fch"><b>${esc(w.label)}</b><span class="small muted">${esc(fmtDay(w.mon))} to ${esc(fmtDay(w.sun))}</span></div>
+      <h3>Hourly staff <span class="pill est">ESTIMATE</span></h3>${four(w.hourly)}<div class="small muted">From ${esc(w.how)}, about ${hrs(w.hourly.total)}h.</div>
+      <h3>Salaries <span class="pill est">ESTIMATE</span></h3>${w.sal.length ? four(w.S2) + `<div class="small muted">${w.sal.map(x => esc(x.s.name) + ' (' + esc(companyName(x.s.company)) + ', ' + esc(dayName(x.payDate) + ' ' + fmtDay(x.payDate)) + ')').join('; ')}</div>` : '<div class="small muted">No salary pay day this week.</div>'}
+      <h3>Week total <span class="pill est">ESTIMATE</span></h3>${four(w.tot, true)}</div>`).join('')}</div>
+    <p class="small muted">Estimate only. Hourly pay uses the average week above (this week uses the real hours where they've been entered). Salaries come from the salary list (every company), on each person's pay day. Tax and NI use the Isle of Man rates below.${(S.W.salaries || []).some(x => x.active !== false) ? '' : ' No salaries have been entered yet, so none are included.'}</p></div>`;
+  return h;
+}
+
+/* ============================== render ============================== */
+function render() {
+  const W = S.W, me = S.me;
+  if (!W) return;
+  const B = buildWeek(W); S.B = B;
+  const view = S.view;
+  const approved = B.approved, a = W.approval;
+  const canExport = approved || me.approve || me.director;
+  const nowMon = mondayOf(todayIso()), notOver = addDays(B.start, 6) >= todayIso();
+  const est = '<span class="pill est" title="Worked out by this page from the rates below. Not a payslip.">ESTIMATE</span>';
+  const draft = approved ? '' : ' <span class="pill draft">UNAPPROVED</span>';
+  let h = '';
+
+  h += `<div class="bar"><h1>Accounts</h1><span class="muted small">${esc(ACC_VERSION)}${TEST ? ' &middot; TEST DATA' : ''}</span>
+    <span class="push"></span>
+    <div class="seg" role="group" aria-label="Which company">${[['dgc', 'DGC office (everything)'], ['silverdale', 'Silverdale only']].map(([k, l]) => `<button type="button" data-view="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <button class="btn sm" type="button" data-act="theme">Light / dark</button></div>`;
+  h += `<div class="bar" style="margin-top:10px"><button class="btn" type="button" data-act="prev" aria-label="Previous week">&lsaquo;</button>
+    <h2 style="margin:0">Week ${esc(weekLabel(B.start))}</h2>
+    <button class="btn" type="button" data-act="next" aria-label="Next week">&rsaquo;</button>
+    <button class="btn sm" type="button" data-act="last">Last week</button><button class="btn sm" type="button" data-act="this">This week</button>
+    ${(W.unapprovedWeeks || []).filter(w => w !== B.start).length ? `<span class="small muted">Also waiting for approval:</span><span class="chips">${W.unapprovedWeeks.filter(w => w !== B.start).map(w => `<button class="chip" type="button" data-week="${w}">${esc(weekLabel(w))}</button>`).join('')}</span>` : ''}</div>`;
+
+  /* ---- approval status ---- */
+  if (view === 'dgc') {
+    if (approved) {
+      h += `<div class="status ok"><b class="big">Approved</b><span>by ${esc(nameOf(a.by))} on ${esc(fmtWhen(a.at))}. These hours have gone to accounts.</span>
+        ${W.approvalLog.length > 1 ? `<details class="small" style="flex-basis:100%"><summary>Approval history</summary>${W.approvalLog.map(g => `<div>${esc(g.action === 'approved' ? 'Approved' : 'Unapproved (opened again)')} by ${esc(nameOf(g.by))}, ${esc(fmtWhen(g.at))}</div>`).join('')}</details>` : ''}
+        <span class="small muted" style="flex-basis:100%">To change hours now, an approver opens the week again on the Job Planner's Staff screen. Anything changed after approval is flagged in red below.</span></div>`;
+    } else {
+      h += `<div class="status wait"><b class="big">Waiting for approval</b><span>${me.approve ? 'Check the hours and anything flagged below, then approve them. Accounts only treat them as final once approved.' : esc(((W.approvers || []).filter(p => p.active).map(p => p.name.split(' ')[0]).join(' or ') || 'An approver') + ' still need to approve these hours. The figures below are a draft and may change.')}</span>
+        ${notOver ? `<span class="small" style="flex-basis:100%">This week isn't over yet (it ends ${esc(fmtLong(addDays(B.start, 6)))}).</span>` : ''}
+        ${me.approve ? (S.approveAsk
+          ? `<div class="confirm" style="flex-basis:100%"><b>Approve ${esc(weekLabel(B.start))}?</b> ${B.rows.length} people, ${hrs(B.T.total)} paid hours${B.anomalies.filter(x => x.sev !== 'info').length ? `, <span class="sev-warn">${B.anomalies.filter(x => x.sev !== 'info').length} things flagged</span>` : ''}.<div class="bar" style="margin-top:8px"><button class="btn go" type="button" data-act="approve-yes">Yes, approve the hours</button><button class="btn" type="button" data-act="approve-no">Cancel</button></div></div>`
+          : `<button class="btn go" type="button" data-act="approve" id="approveBtn">Approve the hours</button>`) : ''}
+        <span class="small muted" style="flex-basis:100%">Approvers: ${esc((W.approvers || []).filter(p => p.active).map(p => p.name).join(' or ') || 'none set')}.</span></div>`;
+    }
+  }
+  if (S.msg) h += `<div class="msg ${S.msgKind}">${esc(S.msg)}</div>`;
+
+  /* ---- money totals ---- */
+  const sal = B.money ? salaryRows(view) : [];
+  if (B.money && view === 'dgc') {
+    h += `<div class="card"><div class="bar"><h2 style="margin:0">Pay this week</h2>${est}${draft}<span class="push small muted">Tax year ${esc(B.R.year)}${B.R.missingYear ? ` <span class="pill unv">no ${esc(B.R.wanted)} rates yet: using ${esc(B.R.year)}</span>` : ''}</span></div>
+      <div class="cards">
+        <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Net pay to staff</div><div class="v">${gbp(B.T.net)}</div><div class="s">what they receive${B.T.advances ? `; ${gbp(B.T.advances)} already paid as advances, so ${gbp(B.T.toPay)} left to pay` : ''}</div></div>
+        <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Tax and NI to pay away</div><div class="v">${gbp(B.T.tax + B.T.eeNI + B.T.erNI)}</div><div class="s">income tax ${gbp(B.T.tax)}, employee NI ${gbp(B.T.eeNI)}, employer NI ${gbp(B.T.erNI)}</div></div>
+        <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Grand total cost</div><div class="v">${gbp(B.T.cost)}</div><div class="s">gross pay ${gbp(B.T.gross)} plus employer NI</div></div>
+        <div class="kpi"><div class="k">Hours paid</div><div class="v">${hrs(B.T.total)}h</div><div class="s">${hrs(B.T.worked)}h worked, ${hrs(B.T.leavePaid)}h paid leave and bank holiday, ${hrs(B.T.ot)}h overtime; ${B.rows.length} people</div></div>
+      </div>
+      ${B.R.unverified.length ? `<p class="small sev-warn">[UNVERIFIED] ${B.R.unverified.map(r => esc(r.label)).join('; ')}. See Rates below.</p>` : ''}
+      <p class="small muted">Estimate only, not a payslip. Isle of Man rates for ${esc(B.R.year)} from gov.im (see Rates). Everyone is on the standard single-person allowance unless accounts set their own. Income tax uses a normal week (a day off is averaged out) so a short week doesn't drop anyone into a lower band; NI is worked out on this week's pay. Advances already paid are taken off what's left to pay.</p></div>`;
+  }
+
+  /* ---- average pay per week and the next 4 weeks (Ash, 12 Oct 2026, night) ---- */
+  if (B.money && view === 'dgc') { h += forecastHTML(est); if (!S.fc) setTimeout(loadForecast, 0); }
+
+  /* ---- hours grid ---- */
+  if (view === 'dgc') {
+    h += `<div class="card"><div class="bar"><h2 style="margin:0">Hours</h2>${draft}<span class="push small muted">Click a name for the daily detail. <span class="tick">&#10003;</span> = they pressed Send on the Timesheet app.</span></div><div class="scroll"><table class="t" id="hoursTable"><thead><tr><th class="l">Name</th>${B.dates.map(d => `<th class="c">${dayName(d)}<br>${fmtDay(d)}</th>`).join('')}<th>Worked</th><th>Leave/BH</th><th>OT</th><th>Total</th></tr></thead><tbody>`;
+    B.rows.forEach(r => {
+      const open = S.open.has(r.s.id);
+      h += `<tr class="person" data-person="${r.s.id}" aria-expanded="${open}"><td class="name">${esc(r.s.name)}${r.sent ? ' <span class="tick" title="Pressed Send on the Timesheet app">&#10003;</span>' : ''}${r.s.status === 'Off Work' ? ' <span class="muted small">(off work)</span>' : ''}</td>`;
+      r.days.forEach(x => {
+        const cls = [!isWeekday(x.date) ? 'wk' : '', x.kind === 'H' || x.kind === 'BH' ? 'lv' : '', x.flags.includes('missing') ? 'miss' : '', x.flags.some(f => ['leave', 'long', 'dayworks', 'twice'].includes(f)) ? 'flag' : '', x.flags.includes('changed') ? 'chg' : ''].filter(Boolean).join(' ');
+        const txt = x.kind === 'hours' ? hrs(x.value) : x.kind === 'H' ? 'H' : x.kind === 'BH' ? 'BH' : x.kind === 'U' ? 'U' : x.flags.includes('missing') ? '?' : '';
+        /* amber or red edge: a "See" button opens the timesheet pop-up (Ash, 12 Oct 2026) */
+        const see = /\b(flag|chg)\b/.test(cls) ? seeBtn(r.s.name, x.date, '') : '';
+        h += `<td class="c ${cls}" title="${esc(cellTitle(x))}">${txt}${see}</td>`;
+      });
+      h += `<td>${hrs(r.worked)}</td><td>${r.leavePaid ? hrs(r.leavePaid) : ''}</td><td>${r.ot ? hrs(r.ot) : ''}</td><td><b>${hrs(r.total)}</b></td></tr>`;
+      if (open) h += `<tr class="detail"><td colspan="12">${detailHTML(r)}</td></tr>`;
+    });
+    h += `<tr class="tot"><td class="name">Totals</td>${B.dayTotals.map(t => `<td class="c">${t ? hrs(t) : ''}</td>`).join('')}<td>${hrs(B.T.worked)}</td><td>${hrs(B.T.leavePaid)}</td><td>${hrs(B.T.ot)}</td><td>${hrs(B.T.total)}</td></tr></tbody></table></div>
+      <p class="small muted">H = paid holiday (8h), BH = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Amber edge = check it; red edge = changed after approval. See = the worker's timesheet, the photo of the paper sheet and the grid side by side. John and Andy are salaried and kept off the hours grid, as on the Staff screen.</p></div>`;
+  }
+
+  /* ---- anomalies ---- */
+  if (view === 'dgc') {
+    const n = B.anomalies.filter(x => x.sev !== 'info').length;
+    h += `<div class="card"><div class="bar"><h2 style="margin:0">Things to check</h2><span class="pill ${n ? 'draft' : 'ok'}">${n ? n + ' flagged' : 'nothing flagged'}</span></div>
+      ${B.anomalies.length ? B.anomalies.map(x => `<div class="anom"><span class="who">${esc(x.name || 'General')}</span><span class="sev-${x.sev}">${esc(x.text)}${x.name && x.date ? seeBtn(x.name, x.date, 'lg') : ''}</span></div>`).join('') : '<p class="muted">Nothing unusual this week.</p>'}</div>`;
+  }
+
+  /* ---- pay per person ---- */
+  if (B.money && view === 'dgc') {
+    h += `<div class="card"><div class="bar"><h2 style="margin:0">Pay per person</h2>${est}${draft}</div><div class="scroll"><table class="t"><thead><tr><th class="l">Name</th><th>Hours</th><th>Rate</th><th>Gross</th><th>Income tax</th><th>Employee NI</th><th>Net pay</th><th>Advances</th><th>Left to pay</th><th>Employer NI</th><th>Total cost</th><th class="l">Tax settings</th></tr></thead><tbody>`;
+    B.rows.forEach(r => {
+      h += `<tr><td class="name">${esc(r.s.name)}</td><td>${hrs(r.total)}</td><td>${r.rate ? gbp(r.rate) : '<span class="sev-bad">none</span>'}</td><td>${gbp(r.gross)}${r.bonus ? `<div class="small muted">incl. bonus ${gbp(r.bonus)}</div>` : ''}</td><td>${gbp(r.tax)}</td><td>${gbp(r.eeNI)}</td><td><b>${gbp(r.net)}</b></td><td>${r.advances ? gbp(r.advances) : ''}</td><td>${gbp(r.toPay)}</td><td>${gbp(r.erNI)}</td><td>${gbp(r.cost)}</td>
+        <td class="l">${taxCell('staff:' + r.s.id, r.set, r.custom)}</td></tr>`;
+    });
+    h += `<tr class="tot"><td class="name">Totals</td><td>${hrs(B.T.total)}</td><td></td><td>${gbp(B.T.gross)}</td><td>${gbp(B.T.tax)}</td><td>${gbp(B.T.eeNI)}</td><td>${gbp(B.T.net)}</td><td>${gbp(B.T.advances)}</td><td>${gbp(B.T.toPay)}</td><td>${gbp(B.T.erNI)}</td><td>${gbp(B.T.cost)}</td><td></td></tr></tbody></table></div></div>`;
+  }
+
+  /* ---- salaries ---- */
+  if (B.money) h += salariesHTML(sal, view, est);
+  else if (view === 'silverdale' || !B.money) h += `<div class="card"><h2>Salaries and pay</h2><p class="muted">Your login doesn't have "Can see money" switched on, so pay figures aren't shown. Ash or Harry can switch it on in the Silverdale app (Apps, Who can see money).</p></div>`;
+
+  /* ---- dayworks ---- */
+  if (view === 'dgc') {
+    const dw = W.dayworks || [];
+    h += `<div class="card"><h2>Dayworks and subcontractor sheets this week</h2>${dw.length ? `<div class="scroll"><table class="t"><thead><tr><th class="l">Name</th><th class="l">Day</th><th class="l">Site</th><th class="c">Start to finish</th><th>Hours</th><th>Pay hours that day</th><th class="l">Sent to the client</th><th class="l">Photo</th></tr></thead><tbody>${dw.map(x => {
+      const row = B.rows.find(r => norm(r.s.name) === norm(x.name)), day = row && row.days.find(d => d.date === x.date), billed = x.billedHours != null ? x.billedHours : x.hours;
+      const mismatch = day && num(billed) > day.worked + 0.01;
+      return `<tr><td class="l">${esc(x.name)}</td><td class="l">${esc(dayName(x.date) + ' ' + fmtDay(x.date))}</td><td class="l">${esc(x.site || '')}</td><td class="c">${esc((x.start || '') + (x.finish ? ' to ' + x.finish : ''))}</td><td>${hrs(billed)}${x.billedHours != null && num(x.billedHours) !== num(x.hours) ? ` <span class="small muted">(sheet ${hrs(x.hours)})</span>` : ''}</td><td class="${mismatch ? 'sev-warn' : ''}">${day ? hrs(day.worked) : '<span class="muted">not on staff list</span>'}</td><td class="l">${x.sentAt ? 'Yes, ' + esc(fmtWhen(x.sentAt)) : '<span class="muted">Not yet</span>'}</td><td class="l">${seeBtn(x.name, x.date, '')}</td></tr>`;
+    }).join('')}<tr class="tot"><td class="l">Total</td><td></td><td></td><td></td><td>${hrs(dw.reduce((a, x) => a + num(x.billedHours != null ? x.billedHours : x.hours), 0))}</td><td></td><td></td><td></td></tr></tbody></table></div>` : '<p class="muted">No dayworks sheets entered for this week.</p>'}
+      <p class="small muted">From the Job Planner's Dayworks screen (sheets charged to the client). These hours are part of the pay hours above, not extra pay.</p></div>`;
+  }
+
+  /* ---- export ---- */
+  if (view === 'dgc') {
+    h += `<div class="card"><div class="bar"><h2 style="margin:0">Export</h2>${approved ? '<span class="pill ok">APPROVED</span>' : draft}</div>
+      ${canExport ? `<div class="bar" style="margin-top:6px"><button class="btn primary" type="button" data-act="excel" id="excelBtn">${esc(excelLabel())}</button><button class="btn" type="button" data-act="excel-change" id="excelChange"${S.handleName ? '' : ' hidden'}>Change save location</button><button class="btn" type="button" data-act="csv">Download CSV</button></div>
+        <p class="small muted">${approved ? 'The Excel file has the hours, the daily detail, what was flagged, the pay estimate, dayworks, salaries and the rates used.' : 'Not approved yet: the file is marked UNAPPROVED on every sheet.'} In Chrome or Edge each week remembers its own file and saves over it; pick a OneDrive folder and everyone sees it.</p>`
+        : '<p class="muted">The export opens once the hours are approved.</p>'}
+      ${(W.exports || []).length ? `<details class="small"><summary>Exported ${W.exports.length} time${W.exports.length > 1 ? 's' : ''}</summary>${W.exports.map(e => `<div>${esc(e.kind === 'csv' ? 'CSV' : 'Excel')} by ${esc(nameOf(e.by))}, ${esc(fmtWhen(e.at))}${e.approved ? '' : ' (draft)'}</div>`).join('')}</details>` : ''}</div>`;
+  }
+
+  /* ---- rates ---- */
+  h += ratesHTML(B);
+  /* ---- approvers ---- */
+  h += `<div class="card"><details${S.editApprovers ? ' open' : ''}><summary>Who can approve hours</summary>
+    <p class="small muted">Only these people can approve a week. ${me.director ? 'Directors can change the list.' : 'Ash or Harry can change the list.'}</p>
+    ${(W.approvers || []).map(p => `<div class="bar small" style="padding:3px 0"><b>${esc(p.name)}</b><span class="muted">${esc(p.email)}</span>${p.active ? '<span class="pill ok">can approve</span>' : '<span class="pill">switched off</span>'}${me.director ? `<button class="btn sm" type="button" data-approver="${esc(p.email)}" data-on="${p.active ? '0' : '1'}">${p.active ? 'Switch off' : 'Switch on'}</button>` : ''}</div>`).join('')}
+    ${me.director ? `<div class="formgrid" style="margin-top:8px"><label class="f">Name<input id="apName" autocomplete="off"></label><label class="f">Email<input id="apEmail" type="email" autocomplete="off"></label><button class="btn" type="button" data-act="approver-add">Add approver</button></div>` : ''}</details></div>`;
+
+  h += `<p class="small muted" style="margin-top:14px">${esc(ACC_VERSION)}. Signed in as ${esc(me.name || me.email)}${me.approve ? ' (approver)' : ''}. Pay data is read through Accounts only; the Planner's own tables stay locked.</p>`;
+  $('#app').innerHTML = h;
+  if (S.focusApprove) { S.focusApprove = false; const b = $('#approveBtn') || $('.status'); if (b) { b.scrollIntoView({ block: 'center' }); if (b.focus) b.focus(); } }
+}
+/* ---- "See the timesheet" pop-up (planner/ts-popup.js) ---- */
+function seeBtn(name, date, size) {
+  return ` <button class="ts-see${size ? ' ' + size : ''}" type="button" data-ts-name="${esc(name)}" data-ts-date="${esc(date)}" aria-label="See the timesheet for ${esc(name)} on ${esc(dayName(date) + ' ' + fmtDay(date))}">See${size ? ' the timesheet' : ''}</button>`;
+}
+function gridInfo(name, date) {
+  const B = S.B, r = B && B.rows.find(x => norm(x.s.name) === norm(name)), x = r && r.days.find(y => y.date === date);
+  if (!x) return { text: 'Not on the Hours grid', detail: 'This name isn\'t on the staff list (or is kept off the hours grid).' };
+  const q = B.discrepancies.find(y => y.staffId === r.s.id && y.date === date);
+  const text = x.kind === 'hours' ? hrs(x.value) + 'h' : x.kind === 'H' ? 'Paid holiday (8h)' : x.kind === 'BH' ? 'Bank holiday (8h)' : x.kind === 'U' ? 'Unpaid leave' : x.kind === 'weekend' ? 'Nothing (weekend)' : 'No hours';
+  const detail = q ? 'Entered twice: the grid says ' + hrs(q.manual) + 'h and their timesheet says ' + hrs(q.submitted) + 'h. Pay uses the grid figure.'
+    : x.entry && x.entry.fromTimesheet ? 'Taken from their Timesheet app entry.'
+    : x.entry && x.entry.id ? 'Typed on the Staff grid.' : x.leave ? (x.leave.type === 'Holiday' ? 'Paid holiday booked.' : 'Unpaid leave booked.') : '';
+  return { text, detail, hours: x.kind === 'hours' ? x.value : null };
+}
+function openTimesheet(name, date) {
+  if (!window.TsPopup) return;
+  TsPopup.open({ name, date, grid: gridInfo(name, date), fetch: (n, d) => rpc('acc_day_sources', { p_name: n, p_date: d }) });
+}
+function nameOf(email) {
+  const e = norm(email); const p = ((S.W && S.W.approvers) || []).find(x => norm(x.email) === e);
+  return p ? p.name : (email || 'unknown');
+}
+function cellTitle(x) {
+  const bits = [dayName(x.date) + ' ' + fmtDay(x.date)];
+  if (x.kind === 'hours') bits.push(hrs(x.value) + 'h');
+  if (x.leave) bits.push(x.leave.type === 'Holiday' ? 'Paid holiday booked' : 'Unpaid leave booked');
+  if (BANK_HOLIDAYS.has(x.date)) bits.push('Bank holiday');
+  x.timesheets.forEach(t => bits.push((t.site || '') + ' ' + (t.start || '') + '-' + (t.finish || '')));
+  if (x.entry && x.entry.note) bits.push('Note: ' + x.entry.note);
+  return bits.join(' | ');
+}
+function detailHTML(r) {
+  return `<div class="dl">${r.days.map(x => {
+    const parts = [];
+    if (x.kind === 'hours') parts.push(`<b>${hrs(x.value)}h</b>`);
+    else if (x.kind === 'H') parts.push('<b>Paid holiday (8h)</b>');
+    else if (x.kind === 'BH') parts.push('<b>Bank holiday (8h)</b>');
+    else if (x.kind === 'U') parts.push('Unpaid leave');
+    else if (x.flags.includes('missing')) parts.push('<span class="sev-bad">No hours</span>');
+    else parts.push('<span class="muted">-</span>');
+    if (x.leave && x.kind === 'hours') parts.push(`<span class="sev-warn">${x.leave.type === 'Holiday' ? 'Holiday' : 'Unpaid leave'} booked, but hours logged: treated as working</span>`);
+    x.timesheets.forEach(t => parts.push(`Timesheet: ${esc(t.site || 'no site')}, ${esc(t.start || '?')} to ${esc(t.finish || '?')}${t.lunch ? ', ' + t.lunch + ' min lunch' : ''}, ${hrs(t.hours)}h, sent ${esc(fmtWhen(t.submittedAt))}`));
+    if (x.entry && x.entry.id) parts.push(`<span class="muted">On the Staff grid: ${x.entry.updatedBy ? 'last changed by ' + esc(x.entry.updatedBy) + ' ' + esc(fmtWhen(x.entry.updatedAt)) : x.entry.createdBy ? 'added by ' + esc(x.entry.createdBy) : ''}</span>`);
+    if (x.entry && x.entry.note) parts.push(`Note: ${esc(x.entry.note)}`);
+    x.dayworks.forEach(d => parts.push(`Dayworks: ${esc(d.site || '')} ${hrs(d.billedHours != null ? d.billedHours : d.hours)}h`));
+    if (x.timesheets.length || x.dayworks.length || x.flags.length) parts.push(seeBtn(r.s.name, x.date, ''));
+    return `<span>${dayName(x.date)} ${fmtDay(x.date)}</span><span>${parts.join(' &middot; ')}</span>`;
+  }).join('')}${r.ot ? `<span>Overtime</span><span>${hrs(r.ot)}h logged as overtime on the Staff screen</span>` : ''}${r.sent ? '' : '<span>Timesheet app</span><span class="muted">Hasn\'t pressed Send for this period</span>'}</div>`;
+}
+function taxCell(key, set, custom) {
+  if (S.editTax === key) {
+    return `<div class="bar small"><label class="f">Yearly allowance (£)<input id="txAllow" type="number" min="0" step="1" value="${set.allowance != null ? esc(set.allowance) : ''}" placeholder="${esc(ratesFor(todayIso()).it_allowance)} standard" style="width:130px"></label>
+      <label class="f">NI<select id="txNi"><option value="standard"${set.ni_category !== 'over_pension_age' ? ' selected' : ''}>Standard</option><option value="over_pension_age"${set.ni_category === 'over_pension_age' ? ' selected' : ''}>Over pension age (no employee NI)</option></select></label>
+      <label class="f">Note<input id="txNote" value="${esc(set.note || '')}" style="width:140px"></label><button class="btn sm primary" type="button" data-taxsave="${esc(key)}">Save</button><button class="btn sm" type="button" data-act="tax-cancel">Cancel</button></div>`;
+  }
+  const words = custom ? [set.allowance != null ? 'Allowance ' + gbp(set.allowance).replace('.00', '') : 'Standard allowance', set.ni_category === 'over_pension_age' ? 'no employee NI' : ''].filter(Boolean).join(', ') : 'Standard single allowance (assumed)';
+  return `<span class="small ${custom ? '' : 'muted'}">${esc(words)}</span> <button class="btn sm" type="button" data-taxedit="${esc(key)}">Change</button>`;
+}
+function salariesHTML(sal, view, est) {
+  const W = S.W, today = todayIso();
+  const salariedInPlanner = W.staff.filter(s => EXCLUDED_FROM_HOURS.has(s.name) && s.active && !(W.salaries || []).some(x => x.staff_id === s.id || norm(x.name) === norm(s.name)));
+  const nextDate = sal.length ? sal.filter(x => !x.noAmount).map(x => x.next).sort()[0] : null;
+  const run = nextDate ? sal.filter(x => x.next === nextDate) : [];
+  const sum = (xs, k) => xs.reduce((a, x) => a + num(x[k]), 0);
+  const E = S.editSalary;
+  let h = `<div class="card"><div class="bar"><h2 style="margin:0">Salaried and office staff</h2>${est}<span class="push small muted">${view === 'dgc' ? 'DGC office view: every company\'s salaries, Silverdale included' : 'Silverdale only'}</span></div>`;
+  if (nextDate) {
+    const days = Math.round((valFromIso(nextDate) - valFromIso(today)) / 86400000);
+    h += `<div class="cards"><div class="kpi"><div class="k">Next salary run</div><div class="v">${esc(fmtLong(nextDate))}</div><div class="s">${days === 0 ? 'today' : days < 7 ? 'in ' + days + ' day' + (days > 1 ? 's' : '') : 'in ' + Math.floor(days / 7) + ' week' + (Math.floor(days / 7) > 1 ? 's' : '') + (days % 7 ? ' and ' + (days % 7) + ' day' + (days % 7 > 1 ? 's' : '') : '')}; ${run.length} ${run.length > 1 ? 'people' : 'person'}</div></div>
+      <div class="kpi"><div class="k">Net pay on that run</div><div class="v">${gbp(sum(run, 'net'))}</div><div class="s">gross ${gbp(sum(run, 'monthly'))}</div></div>
+      <div class="kpi"><div class="k">Tax and NI to pay away (that run)</div><div class="v">${gbp(sum(run, 'tax') + sum(run, 'eeNI') + sum(run, 'erNI'))}</div><div class="s">the same every month</div></div>
+      <div class="kpi"><div class="k">Cost of that run</div><div class="v">${gbp(sum(run, 'cost'))}</div><div class="s">all salaries a month: ${gbp(sum(sal, 'cost'))}</div></div></div>`;
+  }
+  if (sal.length) {
+    h += `<div class="scroll" style="margin-top:10px"><table class="t"><thead><tr><th class="l">Name</th><th class="l">Company</th><th>A year</th><th>A month (gross)</th><th>Income tax</th><th>Employee NI</th><th>Net a month</th><th>Employer NI</th><th>Cost a month</th><th class="l">Next pay day</th><th class="l">Where we're up to</th><th class="l">Tax settings</th><th></th></tr></thead><tbody>${sal.map(x => `<tr>
+      <td class="name">${esc(x.s.name)}${x.s.job_title ? `<div class="small muted">${esc(x.s.job_title)}</div>` : ''}</td><td class="l">${esc(companyName(x.s.company))}</td>
+      ${x.noAmount ? '<td colspan="7" class="l sev-warn">No salary entered yet</td>' : `<td>${gbp(x.annual)}</td><td>${gbp(x.monthly)}</td><td>${gbp(x.tax)}</td><td>${gbp(x.eeNI)}</td><td><b>${gbp(x.net)}</b></td><td>${gbp(x.erNI)}</td><td>${gbp(x.cost)}</td>`}
+      <td class="l">${esc(fmtLong(x.next))}<div class="small muted">${x.days === 0 ? 'today' : x.days < 7 ? 'in ' + x.days + ' days' : 'in ' + (x.days / 7).toFixed(1).replace('.0', '') + ' weeks'}${x.s.pay_day ? ', the ' + ordinal(x.s.pay_day) : ', last working day'}</div></td>
+      <td class="l">${x.paid} of 12 this tax year${x.noAmount ? '' : `<div class="small muted">${gbp(x.paidSoFar)} gross so far</div>`}</td>
+      <td class="l">${taxCell('salary:' + x.s.id, x.set, x.custom)}</td><td><button class="btn sm" type="button" data-saledit="${esc(x.s.id)}">Edit</button></td></tr>`).join('')}
+      <tr class="tot"><td class="name">Totals</td><td></td><td>${gbp(sum(sal, 'annual'))}</td><td>${gbp(sum(sal, 'monthly'))}</td><td>${gbp(sum(sal, 'tax'))}</td><td>${gbp(sum(sal, 'eeNI'))}</td><td>${gbp(sum(sal, 'net'))}</td><td>${gbp(sum(sal, 'erNI'))}</td><td>${gbp(sum(sal, 'cost'))}</td><td colspan="4"></td></tr></tbody></table></div>`;
+  } else h += `<p class="muted" style="margin-top:8px">No salaries entered yet. Add each salaried or office person below (the Planner doesn't hold salaries).</p>`;
+  if (salariedInPlanner.length && view === 'dgc') h += `<p class="small sev-warn">Salaried in the Planner but no salary here yet: ${salariedInPlanner.map(s => `<button class="chip" type="button" data-saladd="${esc(s.id)}">${esc(s.name)}: add</button>`).join(' ')}</p>`;
+  h += `<p class="small muted">David Smith is paid weekly on his hours until he moves to salary, so he stays in the hours above.</p>`;
+  const cur = E && E !== 'new' && !String(E).startsWith('staff:') ? (W.salaries || []).find(s => s.id === E) : null;
+  const pre = E && String(E).startsWith('staff:') ? W.staff.find(s => s.id === E.slice(6)) : null;
+  if (E) {
+    const v = cur || { name: pre ? pre.name : '', company: pre ? 'dgc' : (S.view === 'silverdale' ? 'silverdale' : 'dgc'), staff_id: pre ? pre.id : '', job_title: pre ? pre.role : '' };
+    h += `<div class="confirm"><b>${cur ? 'Change ' + esc(cur.name) : 'Add a salaried person'}</b><div class="formgrid" style="margin-top:8px">
+      <label class="f">Name<input id="slName" value="${esc(v.name || '')}"></label>
+      <label class="f">Company<select id="slCo">${[['dgc', 'DGC'], ['silverdale', 'Silverdale'], ['mds', 'Manx Drain Solutions']].map(([k, l]) => `<option value="${k}"${v.company === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="f">Job<input id="slJob" value="${esc(v.job_title || '')}"></label>
+      <label class="f">Salary a year (£)<input id="slYear" type="number" min="0" step="1" value="${v.annual_salary != null ? esc(v.annual_salary) : ''}"></label>
+      <label class="f">Or a set amount a month (£)<input id="slMonth" type="number" min="0" step="0.01" value="${v.monthly_amount != null ? esc(v.monthly_amount) : ''}"></label>
+      <label class="f">Pay day (day of the month; empty = last working day)<input id="slDay" type="number" min="1" max="31" value="${v.pay_day != null ? esc(v.pay_day) : ''}"></label>
+      <label class="f">Started<input id="slStart" type="date" value="${esc(v.start_date || '')}"></label>
+      <label class="f">Note<input id="slNote" value="${esc(v.note || '')}"></label></div>
+      <input type="hidden" id="slStaff" value="${esc(v.staff_id || '')}"><input type="hidden" id="slId" value="${esc(cur ? cur.id : '')}">
+      <div class="bar" style="margin-top:8px"><button class="btn primary" type="button" data-act="sal-save">Save</button><button class="btn" type="button" data-act="sal-cancel">Cancel</button>${cur ? `<button class="btn" type="button" data-act="sal-off">No longer paid (keeps the record)</button>` : ''}</div></div>`;
+  } else h += `<div class="bar" style="margin-top:8px"><button class="btn" type="button" data-act="sal-new">Add a salaried person</button></div>`;
+  const off = (W.salaries || []).filter(s => s.active === false);
+  if (off.length) h += `<details class="small" style="margin-top:6px"><summary>No longer paid (${off.length})</summary>${off.map(s => `<div class="bar" style="padding:2px 0">${esc(s.name)} <span class="muted">${esc(companyName(s.company))}</span><button class="btn sm" type="button" data-salon="${esc(s.id)}">Pay again</button></div>`).join('')}</details>`;
+  return h + '</div>';
+}
+const companyName = c => ({ dgc: 'DGC', silverdale: 'Silverdale', mds: 'Manx Drain Solutions' }[c] || c);
+const ordinal = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
+function ratesHTML(B) {
+  const R = B.R, me = S.me;
+  return `<div class="card"><details${S.editRate ? ' open' : ''}><summary>Rates used (Isle of Man, ${esc(R.year)}) ${R.unverified.length ? `<span class="pill unv">${R.unverified.length} [UNVERIFIED]</span>` : '<span class="pill ok">all checked</span>'}</summary>
+    <p class="small muted">From gov.im, the Isle of Man Government's own pages. Never UK rates. ${me.money ? 'Accounts can correct a rate here; each change records who and when.' : ''}</p>
+    <div class="scroll"><table class="t"><thead><tr><th class="l">What</th><th>Rate</th><th class="l">Source</th><th class="l">Checked</th><th class="l"></th></tr></thead><tbody>${R.rows.map(r => {
+      const k = r.taxYear + '|' + r.key;
+      if (S.editRate === k) return `<tr><td class="l">${esc(r.label)}</td><td><input id="rtVal" type="number" step="0.01" min="0" value="${esc(r.value)}" style="width:100px"> ${esc(r.unit)}</td><td class="l" colspan="2"><input id="rtDate" type="date" value="${esc(r.checkedOn || todayIso())}"> <label class="small"><input id="rtOk" type="checkbox"${r.verified ? ' checked' : ''}> checked on gov.im</label></td><td class="l"><button class="btn sm primary" type="button" data-ratesave="${esc(k)}">Save</button> <button class="btn sm" type="button" data-act="rate-cancel">Cancel</button></td></tr>`;
+      return `<tr><td class="l">${esc(r.label)}${r.note ? `<div class="small muted" style="white-space:normal">${esc(r.note)}</div>` : ''}</td><td>${r.unit === '%' ? esc(r.value) + '%' : gbp(r.value).replace('.00', '') + ' <span class="muted small">' + esc(r.unit.replace('£ ', '')) + '</span>'}</td>
+        <td class="l">${r.source ? `<a href="${esc(r.source)}" target="_blank" rel="noopener" style="color:var(--info)">gov.im</a>` : ''}</td>
+        <td class="l">${esc(r.checkedOn ? fmtLong(r.checkedOn) : '')} ${r.verified ? '' : '<span class="pill unv">[UNVERIFIED]</span>'}${r.updatedBy ? `<div class="small muted">changed by ${esc(r.updatedBy)}</div>` : ''}</td>
+        <td class="l">${me.money ? `<button class="btn sm" type="button" data-rateedit="${esc(k)}">Change</button>` : ''}</td></tr>`;
+    }).join('')}</tbody></table></div></details></div>`;
+}
+
+/* ============================== Excel and CSV ============================== */
+const FS_SUPPORTED = 'showSaveFilePicker' in window;
+const HANDLE_DB = 'dgc-staff-tracker', HANDLE_STORE = 'handles', HANDLE_KEY = 'exportFile'; /* the same store as the Staff screen used, so saved week files carry over */
+function openHandleDB() { return new Promise((res, rej) => { const q = indexedDB.open(HANDLE_DB, 1); q.onupgradeneeded = () => q.result.createObjectStore(HANDLE_STORE); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+async function getHandle(key) { try { const db = await openHandleDB(); return await new Promise((res, rej) => { const q = db.transaction(HANDLE_STORE, 'readonly').objectStore(HANDLE_STORE).get(key); q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error); }); } catch (e) { return null; } }
+async function putHandle(h, key) { try { const db = await openHandleDB(); db.transaction(HANDLE_STORE, 'readwrite').objectStore(HANDLE_STORE).put(h, key); } catch (e) {} }
+async function dropHandle(key) { try { const db = await openHandleDB(); db.transaction(HANDLE_STORE, 'readwrite').objectStore(HANDLE_STORE).delete(key); } catch (e) {} }
+const weekKey = () => 'week:' + (S.start || '');
+function excelLabel() { return S.handleName ? 'Save to ' + S.handleName : 'Export to Excel'; }
+async function refreshHandle() { if (!FS_SUPPORTED) return; const h = await getHandle(weekKey()); S.handleName = h ? h.name : ''; const b = $('#excelBtn'); if (b) b.textContent = excelLabel(); const c = $('#excelChange'); if (c) c.hidden = !h; }
+
+async function buildWorkbook() {
+  const B = S.B, W = S.W, me = S.me, approved = B.approved;
+  const wb = new ExcelJS.Workbook(); wb.creator = 'Silverdale OS Accounts';
+  const BG = 'FF0D1117', SURF = 'FF161B22', SURF2 = 'FF1C2128', TEXT_C = 'FFE6EDF3', MUTED = 'FF8B949E', FAINT = 'FF484F58';
+  const H_BG = 'FF0D2B1D', H_FG = 'FF3FB950', NUM_FG = 'FF58A6FF', TOT_FG = 'FFE6883C', OT_FG = 'FFBC8CFF', MONEY_FG = 'FFD4A72C', NET_FG = 'FF4AC26B', TAX_FG = 'FFF85149', WARN_FG = 'FFD29922', TEAM_BG = 'FF21262D', WKND_BG = 'FF0A0F15';
+  const fl = c => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: c } });
+  const fo = (c, bold = false, italic = false, sz = 10) => ({ color: { argb: c }, bold, italic, size: sz, name: 'Calibri' });
+  const thinBot = { bottom: { style: 'thin', color: { argb: 'FF30363D' } } };
+  const status = approved ? `APPROVED by ${nameOf(W.approval.by)} on ${fmtWhen(W.approval.at)}` : 'UNAPPROVED: these hours may still change';
+  const label = weekLabel(B.start);
+  const money = B.money;
+  const days = B.dates.map(d => dayName(d) + ' ' + fmtDay(d));
+  const moneyCols = money ? ['Rate', 'Gross', 'Income tax (est.)', 'Employee NI (est.)', 'Net pay (est.)', 'Advances', 'Left to pay (est.)', 'Employer NI (est.)', 'Total cost (est.)'] : [];
+  const header = ['Name', ...days, 'Worked', 'Leave/BH', 'OT', 'Total hours', ...moneyCols];
+  const LAST = header.length;
+
+  /* Sheet 1: hours and pay, in the Staff screen's dark style */
+  const ws = wb.addWorksheet((approved ? '' : 'UNAPPROVED ') + 'Hours and pay');
+  ws.views = [{ showGridLines: false }];
+  ws.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true, margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } };
+  const band = (text, font, bg, height) => { const r = ws.addRow(new Array(LAST).fill(null)); r.height = height; ws.mergeCells(r.number, 1, r.number, LAST); const c = r.getCell(1); c.value = text; c.font = font; c.fill = fl(bg); c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true }; return r; };
+  band('STAFF HOURS  ' + label, fo(TEXT_C, true, false, 16), BG, 34);
+  band('Drainage & Groundwork Contractors Ltd  ·  ' + status, fo(approved ? H_FG : WARN_FG, true, false, 11), BG, 22);
+  band('H = paid holiday (8h)  ·  BH = bank holiday (8h)  ·  U = unpaid leave  ·  ' + (money ? `Money columns are an ESTIMATE using Isle of Man ${B.R.year} rates (gov.im): standard single allowance unless set per person; income tax on a normal week, NI on this week's pay. Not a payslip.` : 'Pay figures not included for this login.'), fo(MUTED, false, false, 8), SURF, 30);
+  const hr = ws.addRow(header); hr.height = 22;
+  hr.eachCell({ includeEmpty: true }, (c, i) => { c.fill = fl(BG); c.font = fo(i === 1 ? TEXT_C : MUTED, true, false, 9); c.alignment = { horizontal: i === 1 ? 'left' : 'center', vertical: 'middle', wrapText: true }; c.border = { bottom: { style: 'medium', color: { argb: 'FF30363D' } } }; });
+  const firstMoney = 13; /* column number of Rate: Name, 7 days, Worked, Leave/BH, OT, Total come first */
+  B.rows.forEach((r, idx) => {
+    const dayVals = r.days.map(x => x.kind === 'hours' ? x.value : (x.kind === 'H' || x.kind === 'BH' || x.kind === 'U') ? x.kind : null);
+    const mv = money ? [r.rate || null, r2(r.gross), r2(r.tax), r2(r.eeNI), r2(r.net), r.advances ? r2(r.advances) : null, r2(r.toPay), r2(r.erNI), r2(r.cost)] : [];
+    const row = ws.addRow([r.s.name, ...dayVals, r.worked, r.leavePaid || null, r.ot || null, r.total, ...mv]); row.height = 20;
+    const rbg = idx % 2 ? SURF : SURF2;
+    row.eachCell({ includeEmpty: true }, (c, i) => {
+      const isDay = i >= 2 && i <= 8, wk = isDay && !isWeekday(B.dates[i - 2]);
+      c.fill = fl(wk ? WKND_BG : rbg); c.border = thinBot; c.alignment = { horizontal: i === 1 ? 'left' : 'center', vertical: 'middle' };
+      if (i === 1) c.font = fo(TEXT_C, false, false, 10);
+      else if (isDay) { const x = r.days[i - 2]; c.font = (c.value === 'H' || c.value === 'BH') ? fo(H_FG, true) : x.flags.length ? fo(WARN_FG, true) : fo(NUM_FG, true); if (c.value === 'H' || c.value === 'BH') c.fill = fl(H_BG); }
+      else if (i === 11) c.font = fo(OT_FG, true);
+      else if (i === 12) c.font = fo(TOT_FG, true, false, 11);
+      else if (i >= firstMoney) { c.numFmt = '"£"#,##0.00'; c.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 }; c.font = fo(i === firstMoney + 4 ? NET_FG : (i === firstMoney + 2 || i === firstMoney + 3 || i === firstMoney + 7) ? TAX_FG : MONEY_FG, i === firstMoney + 4); }
+      else c.font = fo(MUTED);
+    });
+  });
+  const tot = ['TOTALS', ...B.dayTotals.map(t => t || null), B.T.worked, B.T.leavePaid || null, B.T.ot || null, B.T.total,
+    ...(money ? [null, r2(B.T.gross), r2(B.T.tax), r2(B.T.eeNI), r2(B.T.net), r2(B.T.advances), r2(B.T.toPay), r2(B.T.erNI), r2(B.T.cost)] : [])];
+  const tr = ws.addRow(tot); tr.height = 26;
+  tr.eachCell({ includeEmpty: true }, (c, i) => { c.fill = fl(TEAM_BG); c.font = fo(TEXT_C, true, false, 11); c.alignment = { horizontal: i === 1 ? 'left' : i >= firstMoney ? 'right' : 'center', vertical: 'middle' }; if (i >= firstMoney) c.numFmt = '"£"#,##0.00'; });
+  if (money) {
+    ws.addRow([]);
+    [['Net pay to staff (est.)', B.T.net], ['Of which already paid as advances', B.T.advances], ['Left to pay this week (est.)', B.T.toPay], ['Tax and NI to pay away (est.)', B.T.tax + B.T.eeNI + B.T.erNI], ['Grand total cost (est.)', B.T.cost]].forEach(([k, v]) => {
+      const r = ws.addRow([k, ...new Array(11).fill(null), r2(v)]); ws.mergeCells(r.number, 1, r.number, 12);
+      r.getCell(1).font = fo(TEXT_C, true); r.getCell(1).fill = fl(SURF); r.getCell(13).numFmt = '"£"#,##0.00'; r.getCell(13).font = fo(MONEY_FG, true, false, 12); r.getCell(13).fill = fl(SURF);
+    });
+  }
+  ws.getColumn(1).width = 26; for (let i = 2; i <= 8; i++) ws.getColumn(i).width = 9; for (let i = 9; i <= 12; i++) ws.getColumn(i).width = 9; for (let i = 13; i <= LAST; i++) ws.getColumn(i).width = 13;
+  try {
+    const resp = await fetch('../staff/dgc_logo_white.png');
+    if (resp.ok) { const b64 = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).replace(/^data:[^;]+;base64,/, '')); fr.onerror = rej; resp.blob().then(b => fr.readAsDataURL(b)); }); const id = wb.addImage({ base64: b64, extension: 'png' }); ws.addImage(id, { tl: { col: LAST - 2, row: 0.15 }, ext: { width: 110, height: 38 }, editAs: 'oneCell' }); }
+  } catch (e) {}
+
+  /* plain sheets */
+  const plain = (name, head, rows, moneyColsIdx) => {
+    const s = wb.addWorksheet(name); s.addRow([status]).font = { bold: true, color: { argb: approved ? 'FF15803D' : 'FFB45309' } };
+    const hrw = s.addRow(head); hrw.font = { bold: true }; hrw.eachCell(c => { c.fill = fl('FFE4ECF4'); });
+    rows.forEach(r => s.addRow(r)); (moneyColsIdx || []).forEach(i => s.getColumn(i).numFmt = '"£"#,##0.00');
+    s.columns.forEach((c, i) => c.width = i === 0 ? 24 : 16); return s;
+  };
+  plain('Daily detail', ['Name', 'Date', 'Day', 'Paid hours', 'What', 'Site (timesheet)', 'Start', 'Finish', 'Lunch (min)', 'Note', 'Flags'],
+    B.rows.flatMap(r => r.days.map(x => { const t = x.timesheets[0] || {}; return [r.s.name, x.date, dayName(x.date), x.paid, x.kind === 'hours' ? 'Worked' : x.kind === 'H' ? 'Paid holiday' : x.kind === 'BH' ? 'Bank holiday' : x.kind === 'U' ? 'Unpaid leave' : x.kind === 'weekend' ? '' : 'No hours', t.site || '', t.start || '', t.finish || '', t.lunch || '', (x.entry && x.entry.note) || '', x.flags.join(', ')]; })));
+  plain('Things to check', ['Name', 'Date', 'How serious', 'What'], B.anomalies.map(a => [a.name, a.date, a.sev === 'bad' ? 'Must check' : a.sev === 'warn' ? 'Check' : 'For info', a.text]));
+  plain('Dayworks', ['Name', 'Date', 'Site', 'Start', 'Finish', 'Hours on the sheet', 'Hours billed', 'Sent to the client'], (W.dayworks || []).map(x => [x.name, x.date, x.site, x.start, x.finish, num(x.hours), x.billedHours != null ? num(x.billedHours) : num(x.hours), x.sentAt ? fmtWhen(x.sentAt) : 'Not yet']));
+  if (money) {
+    const sal = salaryRows('dgc');
+    plain('Salaries', ['Name', 'Company', 'Job', 'A year', 'A month (gross)', 'Income tax (est.)', 'Employee NI (est.)', 'Net a month (est.)', 'Employer NI (est.)', 'Cost a month (est.)', 'Next pay day', 'Paid this tax year'],
+      sal.map(x => [x.s.name, companyName(x.s.company), x.s.job_title || '', r2(x.annual), r2(x.monthly), r2(x.tax), r2(x.eeNI), r2(x.net), r2(x.erNI), r2(x.cost), x.next, x.paid + ' of 12']), [4, 5, 6, 7, 8, 9, 10]);
+  }
+  plain('Rates used', ['Tax year', 'What', 'Value', 'Unit', 'Checked on', 'Checked on gov.im', 'Source'], B.R.rows.map(r => [r.taxYear, r.label, num(r.value), r.unit, r.checkedOn || '', r.verified ? 'Yes' : 'No [UNVERIFIED]', r.source || '']));
+  return wb.xlsx.writeBuffer();
+}
+async function doExcel() {
+  if (S.busy) return; S.busy = true;
+  const btn = $('#excelBtn'); if (btn) btn.disabled = true;
+  const name = `Staff Hours ${S.start} to ${addDays(S.start, 6)}${S.B.approved ? '' : ' UNAPPROVED'}.xlsx`;
+  const type = { description: 'Excel Workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } };
+  try {
+    let handle = null;
+    if (FS_SUPPORTED && S.B.approved) {
+      handle = await getHandle(weekKey());
+      if (handle) { let p = await handle.queryPermission({ mode: 'readwrite' }); if (p !== 'granted') p = await handle.requestPermission({ mode: 'readwrite' }); if (p !== 'granted') handle = null; }
+      if (!handle) {
+        const last = await getHandle(HANDLE_KEY);
+        try { handle = await window.showSaveFilePicker({ suggestedName: name, types: [type], ...(last ? { startIn: last } : {}) }); }
+        catch (e) { if (e.name === 'AbortError') throw e; handle = await window.showSaveFilePicker({ suggestedName: name, types: [type] }); }
+        await putHandle(handle, weekKey()); await putHandle(handle, HANDLE_KEY);
+      }
+    }
+    say('Building the Excel file...', '');
+    const blob = new Blob([await buildWorkbook()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    if (handle) { const w = await handle.createWritable(); await w.write(blob); await w.close(); say('Saved to ' + handle.name + ' at ' + new Date().toLocaleTimeString('en-GB') + '.', 'ok'); }
+    else { downloadBlob(blob, name); say('Downloaded ' + name + '.', 'ok'); }
+    await rpc('acc_log_export', { p_start: S.start, p_kind: 'excel' }).catch(() => {});
+    await reload(true);
+  } catch (e) { if (e.name !== 'AbortError') say('Export failed: ' + e.message, 'err'); else say('', ''); }
+  finally { S.busy = false; await refreshHandle(); const b = $('#excelBtn'); if (b) b.disabled = false; }
+}
+function downloadBlob(blob, name) { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
+async function doCsv() {
+  const B = S.B, q = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head = ['Week', 'Status', 'Name', ...B.dates, 'Worked', 'Leave/BH', 'OT', 'Total hours', ...(B.money ? ['Rate', 'Gross', 'Income tax est', 'Employee NI est', 'Net pay est', 'Advances', 'Left to pay est', 'Employer NI est', 'Total cost est'] : [])];
+  const st = B.approved ? 'Approved' : 'UNAPPROVED';
+  const lines = [head.map(q).join(',')].concat(B.rows.map(r => [S.start, st, r.s.name, ...r.days.map(x => x.kind === 'hours' ? x.value : (x.kind === 'H' || x.kind === 'BH' || x.kind === 'U') ? x.kind : ''), r.worked, r.leavePaid, r.ot, r.total,
+    ...(B.money ? [r.rate, r2(r.gross), r2(r.tax), r2(r.eeNI), r2(r.net), r2(r.advances), r2(r.toPay), r2(r.erNI), r2(r.cost)] : [])].map(q).join(',')));
+  const name = `Staff Hours ${S.start} to ${addDays(S.start, 6)}${B.approved ? '' : ' UNAPPROVED'}.csv`;
+  downloadBlob(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' }), name);
+  say('Downloaded ' + name + '.', 'ok');
+  await rpc('acc_log_export', { p_start: S.start, p_kind: 'csv' }).catch(() => {});
+  await reload(true);
+}
+
+/* ============================== actions ============================== */
+function say(m, k) { S.msg = m; S.msgKind = k || ''; const el = document.querySelector('.msg'); if (el) { el.textContent = m; el.className = 'msg ' + (k || ''); } else render(); }
+async function goWeek(start) { S.start = start; S.approveAsk = false; S.open.clear(); S.msg = ''; history.replaceState(null, '', '#week=' + start); await reload(); await refreshHandle(); }
+async function reload(keepMsg) {
+  try { S.W = await rpc('acc_week', { p_start: S.start }); if (!keepMsg) S.msg = ''; render(); }
+  catch (e) { $('#app').innerHTML = `<div class="card"><h2>Couldn't load the week</h2><p>${esc(e.message)}</p><button class="btn" type="button" data-act="retry">Try again</button></div>`; }
+}
+async function saveSalary(patch) {
+  try { await rpc('acc_salary_save', { p: patch }); S.editSalary = null; say('Saved.', 'ok'); await reload(true); }
+  catch (e) { say('Not saved: ' + e.message, 'err'); }
+}
+document.addEventListener('click', async ev => {
+  const t = ev.target.closest('button, tr.person'); if (!t) return;
+  const d = t.dataset;
+  if (d.tsName) { ev.stopPropagation(); openTimesheet(d.tsName, d.tsDate); return; }
+  if (t.matches('tr.person')) { const id = d.person; S.open.has(id) ? S.open.delete(id) : S.open.add(id); render(); return; }
+  if (d.view) { S.view = d.view; try { localStorage.setItem('acc_view', d.view); } catch (e) {} render(); return; }
+  if (d.week) return goWeek(d.week);
+  if (d.taxedit) { S.editTax = d.taxedit; render(); return; }
+  if (d.taxsave) {
+    const allow = $('#txAllow').value.trim();
+    try { await rpc('acc_person_set', { p_key: d.taxsave, p_allowance: allow === '' ? null : Number(allow), p_ni: $('#txNi').value, p_note: $('#txNote').value }); S.editTax = null; say('Tax settings saved.', 'ok'); await reload(true); }
+    catch (e) { say('Not saved: ' + e.message, 'err'); } return;
+  }
+  if (d.rateedit) { S.editRate = d.rateedit; render(); return; }
+  if (d.ratesave) {
+    const [year, key] = d.ratesave.split('|');
+    try { await rpc('acc_rate_set', { p_year: year, p_key: key, p_value: Number($('#rtVal').value), p_source: null, p_checked: $('#rtDate').value || null, p_verified: $('#rtOk').checked, p_note: null }); S.editRate = null; say('Rate saved.', 'ok'); await reload(true); }
+    catch (e) { say('Not saved: ' + e.message, 'err'); } return;
+  }
+  if (d.saledit) { S.editSalary = d.saledit; render(); return; }
+  if (d.saladd) { S.editSalary = 'staff:' + d.saladd; render(); return; }
+  if (d.salon) { const s = S.W.salaries.find(x => x.id === d.salon); if (s) await saveSalary({ ...s, active: true }); return; }
+  if (d.approver) {
+    const p = S.W.approvers.find(x => x.email === d.approver);
+    try { await rpc('acc_approver_set', { p_email: p.email, p_name: p.name, p_active: d.on === '1' }); say('Approvers updated.', 'ok'); await reload(true); } catch (e) { say('Not saved: ' + e.message, 'err'); } return;
+  }
+  switch (d.act) {
+    case 'prev': return goWeek(addDays(S.start, -7));
+    case 'next': return goWeek(addDays(S.start, 7));
+    case 'last': return goWeek(addDays(mondayOf(todayIso()), -7));
+    case 'this': return goWeek(mondayOf(todayIso()));
+    case 'retry': return reload();
+    case 'theme': if (typeof toggleTheme === 'function') toggleTheme(); return;
+    case 'approve': S.approveAsk = true; render(); return;
+    case 'approve-no': S.approveAsk = false; render(); return;
+    case 'approve-yes':
+      t.disabled = true;
+      try { const r = await rpc('acc_approve', { p_start: S.start }); S.approveAsk = false; S.fc = null; await reload(true); say(r && r.already ? 'This week was already approved.' : 'Approved. Accounts can now pay these hours.', 'ok');
+        try { if (window.parent !== window) window.parent.postMessage({ type: 'acc-approved', periodStart: S.start }, location.origin); } catch (e) {} }
+      catch (e) { t.disabled = false; say('Not approved: ' + e.message, 'err'); }
+      return;
+    case 'excel': return doExcel();
+    case 'excel-change': await dropHandle(weekKey()); await refreshHandle(); return;
+    case 'csv': return doCsv();
+    case 'tax-cancel': S.editTax = null; render(); return;
+    case 'rate-cancel': S.editRate = null; render(); return;
+    case 'sal-new': S.editSalary = 'new'; render(); return;
+    case 'sal-cancel': S.editSalary = null; render(); return;
+    case 'sal-save': return saveSalary({ id: $('#slId').value, name: $('#slName').value, company: $('#slCo').value, job_title: $('#slJob').value, annual_salary: $('#slYear').value, monthly_amount: $('#slMonth').value, pay_day: $('#slDay').value, start_date: $('#slStart').value, note: $('#slNote').value, staff_id: $('#slStaff').value, active: true });
+    case 'sal-off': { const s = S.W.salaries.find(x => x.id === $('#slId').value); if (s) return saveSalary({ ...s, active: false }); return; }
+    case 'approver-add': {
+      const email = $('#apEmail').value.trim(), name = $('#apName').value.trim();
+      try { await rpc('acc_approver_set', { p_email: email, p_name: name, p_active: true }); S.editApprovers = true; say('Approver added.', 'ok'); await reload(true); } catch (e) { say('Not added: ' + e.message, 'err'); } return;
+    }
+  }
+});
+window.addEventListener('hashchange', () => { const s = pickStartFromHash(); if (s && s !== S.start) { S.focusApprove = /approve/.test(location.hash); goWeek(s); } });
+
+/* ============================== start ============================== */
+(async function boot() {
+  if (!TEST) {
+    const sess = await ensureLoggedIn();
+    if (!sess) {
+      const waitLogin = showLoginForm($('#app'), 'Accounts');
+      const h = $('#app h2'); if (h) h.textContent = 'Accounts: please sign in';
+      await waitLogin;
+    }
+  }
+  try { S.me = await rpc('acc_me'); }
+  catch (e) { $('#app').innerHTML = `<div class="card"><h2>Accounts</h2><p>${esc(e.message)}</p></div>`; return; }
+  if (!S.me || !S.me.hours) {
+    $('#app').innerHTML = `<div class="card"><h2>Accounts</h2><p>This login (${esc((S.me && S.me.email) || 'not signed in')}) can't open Accounts.</p><p class="muted">Accounts is for the directors, the hours approvers, and people with the Accounts app and "Can see money" both switched on. Ask Ash or Harry if you need it.</p><button class="btn" type="button" onclick="logout()">Sign out</button></div>`;
+    return;
+  }
+  let v = null; try { v = localStorage.getItem('acc_view'); } catch (e) {}
+  S.view = v === 'silverdale' || v === 'dgc' ? v : (S.me.ws === 'silverdale' ? 'silverdale' : 'dgc');
+  const fromHash = pickStartFromHash();
+  S.focusApprove = /approve/.test(location.hash);
+  /* default: last week (the one being paid), unless asked for another */
+  S.start = fromHash || addDays(mondayOf(todayIso()), -7);
+  await reload(); await refreshHandle();
+})();
+</script>
+</body>
+</html>

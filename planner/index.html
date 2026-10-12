@@ -587,6 +587,13 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
     <button onclick="showTab('accidents',this)">Accident Report</button>
     <button onclick="showTab('resources',this)">Deployment</button>
     <button onclick="showTab('daywork',this)">Day work</button>
+    <button id="nav-accounts" onclick="showTab('accounts',this)" hidden>Accounts</button>
+  </div>
+  <style>#acc-remind[hidden], .nav button[hidden] { display: none !important; }</style>
+  <div id="acc-remind" role="status" hidden style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 12px 0;padding:10px 14px;border:1px solid #d29922;border-radius:8px;background:rgba(210,153,34,.12);font-size:13px">
+    <b>Approve the hours</b><span id="acc-remind-text"></span>
+    <button type="button" class="undo-btn" onclick="accOpen(true)">Open Accounts</button>
+    <button type="button" class="undo-btn" onclick="accSnooze()">Remind me in an hour</button>
   </div>
 
   <!-- Timeline tab -->
@@ -629,7 +636,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
       <button onclick="showSV('stholidays',this)">Holidays <span style="font-size:0.68rem;font-weight:700;background:rgba(245,158,11,.2);color:#f59e0b;border:1px solid rgba(245,158,11,.35);border-radius:4px;padding:1px 5px;vertical-align:middle;letter-spacing:.02em">Under Construction</span></button>
     </div>
     <div id="sv-sthours" class="sv active">
-      <iframe src="../staff/?v=312" style="width:100%;height:calc(100vh - 150px);border:none;display:block" title="Staff Hours"></iframe>
+      <iframe src="../staff/?v=313" style="width:100%;height:calc(100vh - 150px);border:none;display:block" title="Staff Hours"></iframe>
     </div>
     <div id="sv-sttimesheets" class="sv">
       <iframe data-src="../staff/timesheets.html?v=296" style="width:100%;height:calc(100vh - 150px);border:none;display:block" title="Timesheets"></iframe>
@@ -683,6 +690,11 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
   <!-- Day work tab -->
   <div id="tab-daywork" class="panel">
     <iframe data-src="dayworks.html?v=311" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Dayworks"></iframe>
+  </div>
+
+  <!-- Accounts tab (Ash, 12 Oct 2026): the week's hours as they come in, UNAPPROVED until a PM approves the week -->
+  <div id="tab-accounts" class="panel">
+    <iframe data-src="accounts.html?v=1" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Accounts"></iframe>
   </div>
 
   <!-- Archive tab -->
@@ -812,7 +824,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v3.13';
+const VERSION = 'v3.14';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -3921,7 +3933,50 @@ function showSignedIn(s) {
   const em = _sessEmail(s);
   const b = document.getElementById('usr-badge'); if (b) { b.textContent = em; b.title = 'Signed in as ' + em; }
   const o = document.getElementById('signout-btn'); if (o) o.style.display = '';
+  accCheck(s);
 }
+// Accounts (Ash, 12 Oct 2026): the tab shows for the directors, the hours
+// approvers and accounts (public.acc_me in staff/accounts.sql decides). The
+// approvers (Ash and John) also get "Approve the hours" from Monday until last
+// week is approved, with "Remind me in an hour".
+const ACC_SNOOZE_KEY = 'dgc_acc_snooze_until';
+async function _accRpc(name, s) {
+  const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + name, { method: 'POST', headers: { ...authedHeaders(s), 'Content-Type': 'application/json' }, body: '{}' });
+  return r.ok ? r.json() : null;
+}
+async function accCheck(s) {
+  if (!s) return;
+  try {
+    const me = await _accRpc('acc_me', s);
+    const nav = document.getElementById('nav-accounts');
+    if (nav) nav.hidden = !(me && me.hours);
+    if (!(me && me.approve)) return;
+    const st = await _accRpc('acc_reminder_state', s);
+    const box = document.getElementById('acc-remind');
+    let snooze = 0; try { snooze = Number(localStorage.getItem(ACC_SNOOZE_KEY)) || 0; } catch (e) {}
+    if (!st || st.approved || !(st.hours > 0) || Date.now() < snooze) { box.hidden = true; return; }
+    const fmt = iso => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    document.getElementById('acc-remind-text').textContent = 'Last week (' + fmt(st.periodStart) + ' to ' + fmt(st.periodEnd) + '): ' + st.people + ' people, ' + Math.round(st.hours * 100) / 100 + ' hours, not approved yet.';
+    box.hidden = false;
+  } catch (e) { /* no Accounts for this login, or offline */ }
+}
+function accSnooze() {
+  try { localStorage.setItem(ACC_SNOOZE_KEY, String(Date.now() + 3600000)); } catch (e) {}
+  document.getElementById('acc-remind').hidden = true;
+  setTimeout(() => accCheck(getStoredSession()), 3600000 + 1000);
+}
+function accOpen(approve) {
+  const nav = document.getElementById('nav-accounts'); if (!nav) return;
+  nav.hidden = false; showTab('accounts', nav);
+  const f = document.querySelector('#tab-accounts iframe');
+  if (approve && f && f.contentWindow) { try { f.contentWindow.location.hash = 'approve'; } catch (e) {} }
+}
+// Approved in Accounts: refresh the Staff screen and clear the reminder
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data || e.data.type !== 'acc-approved') return;
+  document.getElementById('acc-remind').hidden = true;
+  const f = document.querySelector('#sv-sthours iframe'); if (f && f.src) f.src = f.src;
+});
 async function signOut() {
   const s = getStoredSession();
   if (!confirm('Sign out of the Job Planner on this device?' + (s ? '\n\nSigned in as ' + _sessEmail(s) : ''))) return;
