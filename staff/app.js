@@ -315,12 +315,32 @@ async function renderWagesBroughtForward() {
   let lateRows;
   try {
     const results = await Promise.all(ranges.map(r =>
-      sbGet('/dgc_staff_hours?select=staff_id,work_date,hours,created_at&work_date=gte.' + r.from + '&work_date=lte.' + r.to)
+      sbGet('/dgc_staff_hours?select=staff_id,work_date,hours,created_at,created_by&work_date=gte.' + r.from + '&work_date=lte.' + r.to)
+        .catch(() => sbGet('/dgc_staff_hours?select=staff_id,work_date,hours,created_at&work_date=gte.' + r.from + '&work_date=lte.' + r.to))
         .then(rows => rows.filter(row => row.created_at && row.created_at > r.approvedAt))
     ));
     lateRows = results.flat();
   } catch (e) { return; }
   if (!lateRows.length) return;
+
+  // Ash, 12 Oct 2026: "whoever changes the hours has to log who wrote it
+  // down". New rows carry created_by (set by the database). Older rows
+  // don't, so match them to the worker's own Timesheet app submission.
+  let tsSubs = [];
+  try {
+    const sess = await ensureLoggedIn();
+    const token = sess ? sess.access_token : SUPABASE_KEY;
+    const from = ranges[0].from, to = ranges[ranges.length - 1].to;
+    tsSubs = await fetch(REST + '/dgc_timesheets?select=staff_name,work_date,hours,site,start_time,finish_time,submitted_at&work_date=gte.' + from + '&work_date=lte.' + to,
+      { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token } }).then(x => x.ok ? x.json() : []);
+  } catch (e) { tsSubs = []; }
+  const whoFor = r => {
+    const name = (staffById[r.staff_id] && staffById[r.staff_id].name) || '';
+    const sub = tsSubs.find(t => t.staff_name === name && t.work_date === r.work_date && Math.abs(new Date(t.submitted_at) - new Date(r.created_at)) < 120000);
+    if (sub) return `${name} sent it himself from the Timesheet app${sub.site ? ' (' + sub.site + ', ' + (sub.start_time || '') + ' to ' + (sub.finish_time || '') + ')' : ''}`;
+    if (r.created_by) return r.created_by.startsWith('Timesheet app') ? `Sent from the ${r.created_by}` : `Typed in by ${r.created_by}`;
+    return 'Who added it was not recorded (before 12 Oct 2026)';
+  };
 
   lateRows.sort((a, b) => a.work_date < b.work_date ? -1 : 1);
   list.innerHTML = lateRows.map(r => {
@@ -331,7 +351,7 @@ async function renderWagesBroughtForward() {
         <span class="advance-date">${fmtShort(r.work_date)}</span>
         <span class="advance-name">${name}</span>
         <span class="advance-type">${Number(r.hours).toFixed(1)}h</span>
-        <span class="advance-notes">Added ${when}, after that week was approved</span>
+        <span class="advance-notes">Added ${when}, after that week was approved. ${whoFor(r)}. Check it before paying.</span>
       </div>
     </div>`;
   }).join('');
