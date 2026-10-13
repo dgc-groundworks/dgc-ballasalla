@@ -53,6 +53,8 @@ label.f { display: flex; flex-direction: column; gap: 3px; font-size: .78rem; co
 .status b.big { font-size: 1.05rem; }
 .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .72rem; font-weight: 700; letter-spacing: .02em; border: 1px solid currentColor; white-space: nowrap; }
 .pill.est { color: var(--info); }
+.salrun, .salavg { margin-top: 10px; padding: 8px 12px; border: 1px solid var(--border); border-left: 3px solid var(--info); border-radius: 8px; font-size: .9rem; }
+.salrun div, .salavg span { display: block; margin-top: 3px; }
 .pill.draft { color: var(--warn); }
 .pill.ok { color: var(--ok); }
 .pill.unv { color: var(--danger); }
@@ -146,7 +148,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.2 (13 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.3 (13 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -214,11 +216,13 @@ async function testRpc(name, a) {
   if (name === 'acc_correction_add') { if (!me.director) throw new Error('only a director can record a correction'); const p = a.p, w = FIXTURE.weeks[p.start]; if (!w || !w.approval) throw new Error('this week is not approved yet, so change the hours on the Staff screen instead'); FIXTURE.corrections = FIXTURE.corrections || []; if (FIXTURE.corrections.some(c => c.staffId === p.staffId && c.date === p.date && !c.cancelledAt)) throw new Error('there is already a correction for that day'); const st = w.staff.find(x => x.id === p.staffId); let pw = addDays(p.start, 7); if (pw < mondayOf(todayIso())) pw = mondayOf(todayIso()); while (FIXTURE.weeks[pw] && FIXTURE.weeks[pw].approval) pw = addDays(pw, 7); const row = { id: Date.now(), periodStart: p.start, staffId: p.staffId, name: st ? st.name : '?', date: p.date, oldHours: Number(p.oldHours), newHours: Number(p.newHours), rate: st ? st.rate : null, reason: p.reason, evidence: p.evidence || null, payWeek: p.payWeek || pw, by: me.email, at: new Date().toISOString() }; FIXTURE.corrections.push(row); return row; }
   if (name === 'acc_correction_cancel') { const c = (FIXTURE.corrections || []).find(x => String(x.id) === String(a.p_id)); if (c) Object.assign(c, { cancelledBy: me.email, cancelledAt: new Date().toISOString(), cancelReason: a.p_reason }); return c; }
   if (name === 'acc_approve_checked') { FIXTURE.checks = FIXTURE.checks || []; FIXTURE.checks.push({ periodStart: a.p_start, by: me.email, at: new Date().toISOString(), items: a.p_items }); return testRpc('acc_approve', a); }
+  if (name === 'acc_settings_get') return JSON.parse(JSON.stringify(FIXTURE.appSettings || {}));
+  if (name === 'acc_setting_set') { if (!me.director) throw new Error('only a director can change this'); FIXTURE.appSettings = FIXTURE.appSettings || {}; FIXTURE.appSettings[a.p_key] = { ...a.p_value, _by: me.email, _at: new Date().toISOString() }; return a.p_value; }
   throw new Error('unknown test call ' + name);
 }
 
 /* ============================== state ============================== */
-const S = { me: null, start: null, W: null, view: null, open: new Set(), approveAsk: false, msg: '', msgKind: '', editRate: null, editSalary: null, editTax: null, busy: false, corr: null, gateOk: false };
+const S = { me: null, start: null, W: null, view: null, open: new Set(), approveAsk: false, msg: '', msgKind: '', editRate: null, editSalary: null, editTax: null, busy: false, corr: null, gateOk: false, paySet: { weekday: 2, rule: 'nearest' }, editPaySet: false };
 if (TEST) window.__accS = S; /* localhost ?test=1 only: lets the test page read the sums */
 function pickStartFromHash() {
   const h = location.hash.slice(1);
@@ -388,11 +392,25 @@ function buildWeek(W) {
 }
 
 /* ============================== salaries ============================== */
-function payDateIn(y, m, payDay) { /* m 0-based. Empty pay day = last working day. A weekend pay day moves to the Friday before. */
+/* Ash, 13 Oct 2026: the salaried staff "come up at the end of the month in that pay run ... on the Tuesday with the
+   staff closest to the end of the month, or every 4 weeks ... figure out what the right process is".
+   The process chosen: a salary is a yearly amount paid in 12 equal calendar-month payments (never every 4 weeks, which
+   is 13 a year), on the person's own monthly pay day (the 28th for DGC's monthly payroll and India's contract; a weekend
+   or bank holiday moves it to the working day before). For the cash view, each month's salary is shown in the weekly
+   pay run nearest that pay day. The weekly run is paid on a Tuesday for the Monday to Sunday week before it. Directors
+   can change the weekday and the rule (acc_settings 'salary_run'; S.paySet). The real pay day is shown on every line. */
+const PAY_RULES = {
+  nearest: 'the weekly pay run nearest the monthly pay day',
+  on_or_before: 'the last weekly pay run on or before the monthly pay day',
+  pay_date_week: 'the week the monthly pay day falls in',
+};
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const FIGURES = { payslip: 'Payslip', contract: 'Contract', unconfirmed: 'Figure not confirmed', estimate: 'Estimate' };
+function payDateIn(y, m, payDay) { /* m 0-based. Empty pay day = last working day. A weekend or bank holiday pay day moves to the working day before. */
   const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-  let d = new Date(Date.UTC(y, m, payDay ? Math.min(payDay, last) : last));
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d = new Date(d.getTime() - 86400000);
-  return isoFromVal(d.getTime());
+  let d = isoFromVal(Date.UTC(y, m, payDay ? Math.min(payDay, last) : last));
+  while (!isWeekday(d) || BANK_HOLIDAYS.has(d)) d = addDays(d, -1);
+  return d;
 }
 function nextPayDate(payDay, fromIso) {
   const [y, m] = fromIso.split('-').map(Number);
@@ -400,23 +418,86 @@ function nextPayDate(payDay, fromIso) {
   if (p < fromIso) p = payDateIn(m === 12 ? y + 1 : y, m === 12 ? 0 : m, payDay);
   return p;
 }
+const payWeekday = () => { const w = Number((S.paySet || {}).weekday); return w >= 1 && w <= 5 ? w : 2; };
+const payRule = () => { const r = (S.paySet || {}).rule; return PAY_RULES[r] ? r : 'nearest'; };
+/* the weekly pay run a monthly pay day is shown in: runDate (the weekly pay day) and week (the Monday of the week it pays) */
+function salaryRun(payDate) {
+  const wd = payWeekday(), rule = payRule();
+  if (rule === 'pay_date_week') { const week = mondayOf(payDate); return { week, runDate: addDays(week, 6 + wd) }; }
+  const before = addDays(payDate, -((dow(payDate) - wd + 7) % 7)), after = addDays(before, 7);
+  const runDate = rule === 'on_or_before' || valFromIso(payDate) - valFromIso(before) <= valFromIso(after) - valFromIso(payDate) ? before : after;
+  return { runDate, week: mondayOf(addDays(runDate, -7)) };
+}
+const hasVal = v => v != null && v !== '';
+/* a full month's gross on a given date: the agreed change (next_annual_salary from next_from) wins once it starts */
+function salaryFullMonth(s, iso) {
+  if (hasVal(s.next_annual_salary) && s.next_from && iso >= s.next_from) return num(s.next_annual_salary) / 12;
+  if (hasVal(s.monthly_amount)) return num(s.monthly_amount);
+  return hasVal(s.annual_salary) ? num(s.annual_salary) / 12 : 0;
+}
+/* one monthly payment paid on payDate. The first month is part pay when someone starts after the 1st (calendar days,
+   the contracts say salary "accrues from day to day"). Where a real payslip is held for this amount, its tax and NI are
+   used; otherwise tax and NI are estimated on the Isle of Man rates. */
+function salaryPay(s, payDate, set) {
+  const R = ratesFor(payDate), full = salaryFullMonth(s, payDate);
+  if (!(full > 0)) return { gross: 0, tax: 0, eeNI: 0, erNI: 0, net: 0, cost: 0, actual: false, part: null };
+  let gross = full, part = null;
+  if (s.start_date && s.start_date.slice(0, 7) === payDate.slice(0, 7)) {
+    const [y, m, d] = s.start_date.split('-').map(Number), dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    if (d > 1) { part = { days: dim - d + 1, of: dim }; gross = r2(full * part.days / dim); }
+  }
+  const ps = s.payslip && s.figure_status === 'payslip' && !part && Math.abs(num(s.payslip.gross) - gross) < 0.005 ? s.payslip : null;
+  if (ps) return { gross, tax: num(ps.tax), eeNI: num(ps.ee_ni), erNI: num(ps.er_ni), net: num(ps.net), cost: gross + num(ps.er_ni), actual: true, part };
+  const tax = annualTax(R, full * 12, set.allowance) / 12 * (gross / full);
+  const ni = niFor(R, gross, 'month', set.ni_category);
+  return { gross, tax, eeNI: ni.ee, erNI: ni.er, net: gross - tax - ni.ee, cost: gross + ni.er, actual: false, part };
+}
 function salaryRows(view) {
-  const W = S.W, today = todayIso(), R = ratesFor(today);
+  const W = S.W, today = todayIso();
   const settings = {}; (W.settings || []).forEach(p => settings[p.person_key] = p);
   const tyStart = taxYearOf(today).slice(0, 4) + '-04-06';
   return (W.salaries || []).filter(s => s.active !== false && (view === 'dgc' || s.company === view)).map(s => {
-    const monthly = s.monthly_amount != null && s.monthly_amount !== '' ? num(s.monthly_amount) : (s.annual_salary != null && s.annual_salary !== '' ? num(s.annual_salary) / 12 : 0);
     const set = settings['salary:' + s.id] || {};
-    const tax = annualTax(R, monthly * 12, set.allowance) / 12;
-    const ni = niFor(R, monthly, 'month', set.ni_category);
-    const next = nextPayDate(s.pay_day, today);
+    let next = nextPayDate(s.pay_day, today);
+    if (s.start_date && next < s.start_date) { next = nextPayDate(s.pay_day, s.start_date); }
+    const M = salaryPay({ ...s, start_date: null }, next, set);   /* a normal full month */
+    const N = salaryPay(s, next, set);                              /* the next payment (part pay in a first month) */
+    const run = salaryRun(next);
     const days = Math.round((valFromIso(next) - valFromIso(today)) / 86400000);
     /* months paid so far this tax year (6 April on), from the pay day and the start date */
-    let paid = 0; const from = s.start_date && s.start_date > tyStart ? s.start_date : tyStart;
-    for (let y = Number(tyStart.slice(0, 4)), m = 3; ; m++) { if (m > 11) { m = 0; y++; } const p = payDateIn(y, m, s.pay_day); if (p > today) break; if (p >= from) paid++; if (paid > 13) break; }
-    return { s, monthly, annual: monthly * 12, tax, eeNI: ni.ee, erNI: ni.er, net: monthly - tax - ni.ee, cost: monthly + ni.er, next, days, paid, paidSoFar: paid * monthly, set, custom: !!settings['salary:' + s.id], noAmount: !monthly };
+    let paid = 0, paidSoFar = 0; const from = s.start_date && s.start_date > tyStart ? s.start_date : tyStart;
+    for (let y = Number(tyStart.slice(0, 4)), m = 3; ; m++) { if (m > 11) { m = 0; y++; } const p = payDateIn(y, m, s.pay_day); if (p > today) break; if (p >= from) { paid++; paidSoFar += salaryPay(s, p, set).gross; } if (paid > 13) break; }
+    const monthly = M.gross;
+    return { s, monthly, annual: Math.round(monthly * 12), /* a monthly figure x 12, to the pound (4,583.33 x 12 = 55,000) */ tax: M.tax, eeNI: M.eeNI, erNI: M.erNI, net: M.net, cost: M.cost, actual: M.actual, nextPay: N, run, next, days, paid, paidSoFar, set, custom: !!settings['salary:' + s.id], noAmount: !monthly };
   }).sort((a, b) => a.next.localeCompare(b.next) || a.s.name.localeCompare(b.s.name));
 }
+/* the salary payments shown in the weekly pay runs for the weeks from..to (Mondays), with each payment's own figures */
+function salariesBetween(from, to) {
+  const out = [];
+  salaryRows('dgc').filter(x => !x.noAmount).forEach(x => {
+    const seen = new Set();
+    [from, to].forEach(iso => {
+      const [y, m] = iso.split('-').map(Number);
+      for (let i = -1; i <= 1; i++) {
+        const mm = m - 1 + i, p = payDateIn(y + Math.floor(mm / 12), ((mm % 12) + 12) % 12, x.s.pay_day);
+        if (seen.has(p)) continue; seen.add(p);
+        if (x.s.start_date && p < x.s.start_date) continue;
+        const run = salaryRun(p);
+        if (run.week < from || run.week > to) continue;
+        const pay = salaryPay(x.s, p, x.set);
+        if (pay.gross > 0) out.push({ ...x, payDate: p, runDate: run.runDate, week: run.week, pay });
+      }
+    });
+  });
+  return out.sort((a, b) => a.payDate.localeCompare(b.payDate) || a.s.name.localeCompare(b.s.name));
+}
+const sumPay = (xs, k) => xs.reduce((a, x) => a + num(x.pay[k]), 0);
+/* "paid Wed 28 Oct, in the Tue 27 Oct pay run" */
+function salRunWords(xs) {
+  const pays = [...new Set(xs.map(x => dayName(x.payDate) + ' ' + fmtDay(x.payDate)))], runs = [...new Set(xs.map(x => dayName(x.runDate) + ' ' + fmtDay(x.runDate)))];
+  return 'paid ' + pays.join(' and ') + ', in the ' + runs.join(' and ') + ' pay run' + (runs.length > 1 ? 's' : '');
+}
+const figWord = x => x.pay && x.pay.actual ? 'payslip figures' : x.s.figure_status === 'unconfirmed' ? 'figure not confirmed' : x.s.figure_status === 'contract' ? 'contract salary, tax and NI estimated' : 'estimate';
 
 /* ============================== average pay and the look-ahead ============================== */
 /* Ash, 12 Oct 2026, night: an "Average pay per week" box under "Pay this week", from the last few approved weeks of
@@ -442,14 +523,14 @@ async function loadForecast() {
   } catch (e) { S.fc = { status: 'error', msg: e.message }; }
   render();
 }
-/* pay days of every active salary that fall between two dates (inclusive) */
-function salariesBetween(from, to) {
-  const out = [];
-  salaryRows('dgc').filter(x => !x.noAmount).forEach(x => {
-    const seen = new Set();
-    [from, to].forEach(iso => { const [y, m] = iso.split('-').map(Number); const p = payDateIn(y, m - 1, x.s.pay_day); if (p >= from && p <= to && !seen.has(p)) { seen.add(p); out.push({ ...x, payDate: p }); } });
-  });
-  return out.sort((a, b) => a.payDate.localeCompare(b.payDate) || a.s.name.localeCompare(b.s.name));
+/* the salaried staff as an average week: a normal month's salaries x 12 / 52 (Ash, 13 Oct 2026) */
+function salAvgHTML(A) {
+  const xs = salaryRows('dgc').filter(x => !x.noAmount);
+  if (!xs.length) return '';
+  const k = 12 / 52, sm = f => xs.reduce((a, x) => a + num(x[f]), 0) * k;
+  const net = sm('net'), tni = (sm('tax') + sm('eeNI') + sm('erNI')), cost = sm('cost');
+  return `<div class="salavg"><b>With the salaried staff (${xs.length}):</b> money to staff <b>${gbp(num(A.net) + net)}</b>, tax and NI to pay <b>${gbp(num(A.tax) + num(A.eeNI) + num(A.erNI) + tni)}</b>, total cost <b>${gbp(num(A.cost) + cost)}</b> an average week.
+    <span class="muted">The salaries part is ${gbp(net)}, ${gbp(tni)} and ${gbp(cost)} a week: a normal month's salaries x 12 / 52. They are really paid once a month, in one weekly pay run (see below).</span></div>`;
 }
 function forecastHTML(est) {
   /* Ash, 13 Oct 2026: "key information at the top", "two numbers for each of the next 4 weeks", plus salaries in the
@@ -469,6 +550,7 @@ function forecastHTML(est) {
       <div class="kpi"><div class="k">Total cost</div><div class="v">${gbp(A.cost)}</div><div class="s">the two added together</div></div>
       <div class="kpi"><div class="k">Hours paid</div><div class="v">${hrs(A.total)}h</div><div class="s">a week</div></div></div>
     <p class="small muted">Based on the average of the last ${n} ${F.draft ? 'weeks with hours. None are approved yet, so these are UNAPPROVED figures' : 'approved week' + (n > 1 ? 's' : '')} (${F.basis.slice().reverse().map(w => esc(fmtDay(w))).join(', ')}). Salaries are added in the next 4 weeks below.</p>
+    ${salAvgHTML(A)}
     ${open ? `<div class="fc4 fcb"><span>Gross pay</span><span>${gbp(A.gross)}</span><span>Income tax</span><span>${gbp(A.tax)}</span><span>Employee NI</span><span>${gbp(A.eeNI)}</span><span>Employer NI</span><span>${gbp(A.erNI)}</span></div>
       <p class="small muted">Money to staff is gross pay less income tax and employee NI. Tax and NI to pay is income tax plus employee and employer NI. Total cost is gross pay plus employer NI. Up to ${FC_WEEKS} approved weeks are used${n < FC_WEEKS ? `; only ${n} ${n > 1 ? 'are' : 'is'} approved on the Monday weeks so far (they started on 14 Sep 2026)` : ''}.</p>` : ''}
     ${toggle}</div>`;
@@ -491,27 +573,26 @@ function forecastHTML(est) {
     }
     const sal = salariesBetween(mon, sun);
     const S2 = { gross: 0, net: 0, tax: 0, eeNI: 0, erNI: 0, cost: 0 };
-    sal.forEach(x => { S2.gross += x.monthly; S2.net += x.net; S2.tax += x.tax; S2.eeNI += x.eeNI; S2.erNI += x.erNI; S2.cost += x.cost; });
+    sal.forEach(x => { S2.gross += x.pay.gross; S2.net += x.pay.net; S2.tax += x.pay.tax; S2.eeNI += x.pay.eeNI; S2.erNI += x.pay.erNI; S2.cost += x.pay.cost; });
     const tot = {}; ['gross', 'net', 'tax', 'eeNI', 'erNI', 'cost'].forEach(k => tot[k] = num(hourly[k]) + S2[k]);
     return { label, mon, sun, hourly, how, partly, sal, S2, tot };
   });
   const all = { gross: 0, net: 0, tax: 0, eeNI: 0, erNI: 0, cost: 0 };
   weeks.forEach(w => Object.keys(all).forEach(k => all[k] += w.tot[k]));
   const cells = o => `<td>${gbp(o.net)}</td><td>${gbp(taxNI(o))}</td><td>${gbp(o.cost)}</td>` + (open ? `<td>${gbp(o.gross)}</td><td>${gbp(o.tax)}</td><td>${gbp(o.eeNI)}</td><td>${gbp(o.erNI)}</td>` : '');
-  const payDays = w => [...new Set(w.sal.map(x => x.payDate))].map(p => dayName(p) + ' ' + fmtDay(p)).join(' and ');
   let rows = '';
   weeks.forEach(w => {
     const head = `<b>${esc(w.label)}</b> <span class="small muted">${esc(fmtDay(w.mon))} to ${esc(fmtDay(w.sun))}</span><div class="small ${w.partly ? 'fcp' : 'muted'}">${w.partly ? 'Partly actual' : 'Estimate'}</div>`
       + (open ? `<div class="small muted">Hourly staff from ${esc(w.how)}, about ${hrs(w.hourly.total)}h.</div>` : '');
     if (!w.sal.length) { rows += `<tr class="wt"><td class="l">${head}</td>${cells(w.tot)}</tr>`; return; }
     rows += `<tr class="in"><td class="l">${head}${open ? '' : '<div class="small muted">Hourly staff</div>'}</td>${cells(w.hourly)}</tr>`
-      + `<tr class="in sal"><td class="l">+ salaries <span class="small muted">(paid ${esc(payDays(w))})</span>${open ? `<div class="small muted">${w.sal.map(x => esc(x.s.name) + ' (' + esc(companyName(x.s.company)) + ', ' + esc(dayName(x.payDate) + ' ' + fmtDay(x.payDate)) + ')').join('; ')}</div>` : ''}</td>${cells(w.S2)}</tr>`
+      + `<tr class="in sal"><td class="l">+ salaries <span class="small muted">(${esc(salRunWords(w.sal))})</span>${open ? `<div class="small muted">${w.sal.map(x => esc(x.s.name) + ' (' + esc(companyName(x.s.company)) + ', ' + esc(figWord(x)) + (x.pay.part ? ', part month' : '') + ')').join('; ')}</div>` : ''}</td>${cells(w.S2)}</tr>`
       + `<tr class="wt"><td class="l">Week total, with salaries</td>${cells(w.tot)}</tr>`;
   });
   h += `<div class="card"><div class="bar"><h2 style="margin:0">The next 4 weeks</h2>${est}<span class="push small muted">hourly staff and salaries</span></div>
     <div class="scroll"><table class="t fct${open ? ' open' : ''}"><thead><tr><th class="l">Week</th><th>Money to staff</th><th>Tax and NI to pay</th><th>Total cost</th>${open ? '<th>Gross pay</th><th>Income tax</th><th>Employee NI</th><th>Employer NI</th>' : ''}</tr></thead>
     <tbody>${rows}<tr class="tot"><td class="l">4-week total</td>${cells(all)}</tr></tbody></table></div>
-    <p class="small muted">These are estimates, not payslips, worked out on the Isle of Man tax and NI rates (see Rates below). Estimate rows use the average week above. Partly actual means this week's real hours so far, with the average for the days still to come. Salaries come from the salary list (every company) and are added in the week of each person's pay day.${(S.W.salaries || []).some(x => x.active !== false) ? '' : ' No salaries have been entered yet, so none are included.'}</p>
+    <p class="small muted">These are estimates, not payslips, worked out on the Isle of Man tax and NI rates (see Rates below). Estimate rows use the average week above. Partly actual means this week's real hours so far, with the average for the days still to come. Salaries come from the salary list (every company): each person is paid once a month, and the payment is shown in ${esc(PAY_RULES[payRule()])} (${esc(WEEKDAYS[payWeekday()])}s; see How salaries are paid, under Salaried staff).${(S.W.salaries || []).some(x => x.active !== false) ? '' : ' No salaries have been entered yet, so none are included.'}</p>
     ${toggle}</div>`;
   return h;
 }
@@ -571,6 +652,7 @@ function render() {
         <div class="kpi"><div class="k">Hours paid</div><div class="v">${hrs(B.T.total)}h</div><div class="s">${hrs(B.T.worked)}h worked, ${hrs(B.T.leavePaid)}h paid leave and bank holiday, ${hrs(B.T.ot)}h overtime; ${B.rows.length} people</div></div>
         ${B.adjAll.length ? `<div class="kpi" style="border-color:var(--info)"><div class="k">Corrections from earlier weeks</div><div class="v" style="color:var(--info)">${B.T.adjGross >= 0 ? '+' : ''}${gbp(B.T.adjGross)}</div><div class="s">${B.T.adjHours >= 0 ? '+' : ''}${hrs(B.T.adjHours)}h on ${B.adjAll.length} line${B.adjAll.length === 1 ? '' : 's'}, gross, already in the figures here. See Corrections below.</div></div>` : ''}
       </div>
+      ${salThisRunHTML(B)}
       ${B.R.unverified.length ? `<p class="small sev-warn">[UNVERIFIED] ${B.R.unverified.map(r => esc(r.label)).join('; ')}. See Rates below.</p>` : ''}
       <p class="small muted">Estimate only, not a payslip. Isle of Man rates for ${esc(B.R.year)} from gov.im (see Rates). Everyone is on the standard single-person allowance unless accounts set their own. Income tax uses a normal week (a day off is averaged out) so a short week doesn't drop anyone into a lower band; NI is worked out on this week's pay. Advances already paid are taken off what's left to pay.</p></div>`;
   }
@@ -823,36 +905,66 @@ function taxCell(key, set, custom) {
   const words = custom ? [set.allowance != null ? 'Allowance ' + gbp(set.allowance).replace('.00', '') : 'Standard allowance', set.ni_category === 'over_pension_age' ? 'no employee NI' : ''].filter(Boolean).join(', ') : 'Standard single allowance (assumed)';
   return `<span class="small ${custom ? '' : 'muted'}">${esc(words)}</span> <button class="btn sm" type="button" data-taxedit="${esc(key)}">Change</button>`;
 }
+/* the salaries shown in this week's pay run (the weekly pay day after this week), and the run's total with them */
+function salThisRunHTML(B) {
+  const xs = salariesBetween(B.start, B.start);
+  if (!xs.length) return '';
+  const tni = sumPay(xs, 'tax') + sumPay(xs, 'eeNI') + sumPay(xs, 'erNI');
+  return `<div class="salrun" id="salThisRun"><b>Salaries in this pay run</b> <span class="small muted">(${esc(salRunWords(xs))})</span>: ${xs.map(x => esc(x.s.name) + (x.pay.part ? ' (part month)' : '') + (x.s.figure_status === 'unconfirmed' ? ' (figure not confirmed)' : '')).join(', ')}.
+    <div>Money to staff <b>${gbp(sumPay(xs, 'net'))}</b>, tax and NI to pay <b>${gbp(tni)}</b>, total cost <b>${gbp(sumPay(xs, 'cost'))}</b>.</div>
+    <div><b>The whole pay run, hourly and salaried:</b> money to staff <b>${gbp(B.T.net + sumPay(xs, 'net'))}</b>, tax and NI to pay <b>${gbp(B.T.tax + B.T.eeNI + B.T.erNI + tni)}</b>, total cost <b>${gbp(B.T.cost + sumPay(xs, 'cost'))}</b>.</div></div>`;
+}
 function salariesHTML(sal, view, est) {
-  const W = S.W, today = todayIso();
+  /* Ash, 13 Oct 2026: "these are our salary staff. I want that to show in the app and the Accounts section." Each line
+     says where its figure came from: a real payslip, a contract, or a figure not confirmed yet. */
+  const W = S.W, today = todayIso(), me = S.me;
   const salariedInPlanner = W.staff.filter(s => EXCLUDED_FROM_HOURS.has(s.name) && s.active && !(W.salaries || []).some(x => x.staff_id === s.id || norm(x.name) === norm(s.name)));
-  const nextDate = sal.length ? sal.filter(x => !x.noAmount).map(x => x.next).sort()[0] : null;
-  const run = nextDate ? sal.filter(x => x.next === nextDate) : [];
+  const live = sal.filter(x => !x.noAmount);
+  const nextDate = live.length ? live.map(x => x.next).sort()[0] : null;
+  const run = nextDate ? live.filter(x => x.next === nextDate) : [];
   const sum = (xs, k) => xs.reduce((a, x) => a + num(x[k]), 0);
   const E = S.editSalary;
-  let h = `<div class="card"><div class="bar"><h2 style="margin:0">Salaried and office staff</h2>${est}<span class="push small muted">${view === 'dgc' ? 'DGC office view: every company\'s salaries, Silverdale included' : 'Silverdale only'}</span></div>`;
+  let h = `<div class="card" id="salariedCard"><div class="bar"><h2 style="margin:0">Salaried staff</h2>${est}<span class="push small muted">${view === 'dgc' ? 'DGC office view: every company\'s salaries, Silverdale included' : 'Silverdale only'}</span></div>`;
   if (nextDate) {
     const days = Math.round((valFromIso(nextDate) - valFromIso(today)) / 86400000);
-    h += `<div class="cards"><div class="kpi"><div class="k">Next salary run</div><div class="v">${esc(fmtLong(nextDate))}</div><div class="s">${days === 0 ? 'today' : days < 7 ? 'in ' + days + ' day' + (days > 1 ? 's' : '') : 'in ' + Math.floor(days / 7) + ' week' + (Math.floor(days / 7) > 1 ? 's' : '') + (days % 7 ? ' and ' + (days % 7) + ' day' + (days % 7 > 1 ? 's' : '') : '')}; ${run.length} ${run.length > 1 ? 'people' : 'person'}</div></div>
-      <div class="kpi"><div class="k">Net pay on that run</div><div class="v">${gbp(sum(run, 'net'))}</div><div class="s">gross ${gbp(sum(run, 'monthly'))}</div></div>
-      <div class="kpi"><div class="k">Tax and NI to pay away (that run)</div><div class="v">${gbp(sum(run, 'tax') + sum(run, 'eeNI') + sum(run, 'erNI'))}</div><div class="s">the same every month</div></div>
-      <div class="kpi"><div class="k">Cost of that run</div><div class="v">${gbp(sum(run, 'cost'))}</div><div class="s">all salaries a month: ${gbp(sum(sal, 'cost'))}</div></div></div>`;
+    const r0 = run[0].run;
+    h += `<div class="cards"><div class="kpi"><div class="k">Next salary pay day</div><div class="v">${esc(fmtLong(nextDate))}</div><div class="s">${days === 0 ? 'today' : days < 7 ? 'in ' + days + ' day' + (days > 1 ? 's' : '') : 'in ' + Math.floor(days / 7) + ' week' + (Math.floor(days / 7) > 1 ? 's' : '') + (days % 7 ? ' and ' + (days % 7) + ' day' + (days % 7 > 1 ? 's' : '') : '')}; ${run.length} ${run.length > 1 ? 'people' : 'person'}; in the ${esc(dayName(r0.runDate) + ' ' + fmtDay(r0.runDate))} pay run</div></div>
+      <div class="kpi"><div class="k">Money to staff that month</div><div class="v">${gbp(run.reduce((a, x) => a + x.nextPay.net, 0))}</div><div class="s">gross ${gbp(run.reduce((a, x) => a + x.nextPay.gross, 0))}</div></div>
+      <div class="kpi"><div class="k">Tax and NI to pay that month</div><div class="v">${gbp(run.reduce((a, x) => a + x.nextPay.tax + x.nextPay.eeNI + x.nextPay.erNI, 0))}</div><div class="s">income tax, employee and employer NI</div></div>
+      <div class="kpi"><div class="k">Total cost that month</div><div class="v">${gbp(run.reduce((a, x) => a + x.nextPay.cost, 0))}</div><div class="s">a normal full month: ${gbp(sum(live, 'cost'))}</div></div></div>`;
   }
+  const figCell = x => {
+    const st = x.s.figure_status || 'estimate', ps = x.s.payslip;
+    const pill = x.actual ? '<span class="pill ok">Payslip</span>' : st === 'unconfirmed' ? '<span class="pill unv">Figure not confirmed</span>' : st === 'contract' ? '<span class="pill">Contract</span>' : '<span class="pill est">Estimate</span>';
+    const sub = x.actual && ps ? `actual: ${esc(ps.period || '')}${ps.paid_on ? ', paid ' + esc(fmtDay(ps.paid_on)) : ''}` : st === 'contract' ? 'salary from the contract; tax and NI estimated' : st === 'unconfirmed' ? 'not checked against a payslip or contract' : 'tax and NI estimated';
+    const change = hasVal(x.s.next_annual_salary) && x.s.next_from ? `<div class="small">${gbp(x.s.next_annual_salary).replace('.00', '')} a year from ${esc(fmtLong(x.s.next_from))}</div>` : '';
+    return `<td class="l" title="${esc([x.s.source, x.s.note].filter(Boolean).join(' | '))}">${pill}<div class="small muted">${sub}</div>${change}</td>`;
+  };
   if (sal.length) {
-    h += `<div class="scroll" style="margin-top:10px"><table class="t"><thead><tr><th class="l">Name</th><th class="l">Company</th><th>A year</th><th>A month (gross)</th><th>Income tax</th><th>Employee NI</th><th>Net a month</th><th>Employer NI</th><th>Cost a month</th><th class="l">Next pay day</th><th class="l">Where we're up to</th><th class="l">Tax settings</th><th></th></tr></thead><tbody>${sal.map(x => `<tr>
+    h += `<div class="scroll" style="margin-top:10px"><table class="t" id="salTable"><thead><tr><th class="l">Name</th><th class="l">Company</th><th>A year</th><th>A month (gross)</th><th>Income tax</th><th>Employee NI</th><th>Money to staff</th><th>Employer NI</th><th>Total cost</th><th class="l">Figures</th><th class="l">Next pay day</th><th class="l">Where we're up to</th><th class="l">Tax settings</th><th></th></tr></thead><tbody>${sal.map(x => `<tr data-sal="${esc(x.s.name)}">
       <td class="name">${esc(x.s.name)}${x.s.job_title ? `<div class="small muted">${esc(x.s.job_title)}</div>` : ''}</td><td class="l">${esc(companyName(x.s.company))}</td>
       ${x.noAmount ? '<td colspan="7" class="l sev-warn">No salary entered yet</td>' : `<td>${gbp(x.annual)}</td><td>${gbp(x.monthly)}</td><td>${gbp(x.tax)}</td><td>${gbp(x.eeNI)}</td><td><b>${gbp(x.net)}</b></td><td>${gbp(x.erNI)}</td><td>${gbp(x.cost)}</td>`}
-      <td class="l">${esc(fmtLong(x.next))}<div class="small muted">${x.days === 0 ? 'today' : x.days < 7 ? 'in ' + x.days + ' days' : 'in ' + (x.days / 7).toFixed(1).replace('.0', '') + ' weeks'}${x.s.pay_day ? ', the ' + ordinal(x.s.pay_day) : ', last working day'}</div></td>
-      <td class="l">${x.paid} of 12 this tax year${x.noAmount ? '' : `<div class="small muted">${gbp(x.paidSoFar)} gross so far</div>`}</td>
+      ${figCell(x)}
+      <td class="l">${esc(fmtLong(x.next))}<div class="small muted">${x.days === 0 ? 'today' : x.days < 7 ? 'in ' + x.days + ' days' : 'in ' + (x.days / 7).toFixed(1).replace('.0', '') + ' weeks'}${x.s.pay_day ? ', the ' + ordinal(x.s.pay_day) : ', last working day'}; in the ${esc(dayName(x.run.runDate) + ' ' + fmtDay(x.run.runDate))} pay run</div>${x.nextPay.part ? `<div class="small sev-warn">First month, part pay: ${gbp(x.nextPay.gross)} gross (${x.nextPay.part.days} of ${x.nextPay.part.of} days), about ${gbp(x.nextPay.net)} to them</div>` : ''}</td>
+      <td class="l">${x.paid} of 12 this tax year${x.noAmount ? '' : `<div class="small muted">${gbp(x.paidSoFar)} gross so far</div>`}${x.s.start_date ? '' : '<div class="small muted">no start date entered, so counted from 6 April</div>'}</td>
       <td class="l">${taxCell('salary:' + x.s.id, x.set, x.custom)}</td><td><button class="btn sm" type="button" data-saledit="${esc(x.s.id)}">Edit</button></td></tr>`).join('')}
-      <tr class="tot"><td class="name">Totals</td><td></td><td>${gbp(sum(sal, 'annual'))}</td><td>${gbp(sum(sal, 'monthly'))}</td><td>${gbp(sum(sal, 'tax'))}</td><td>${gbp(sum(sal, 'eeNI'))}</td><td>${gbp(sum(sal, 'net'))}</td><td>${gbp(sum(sal, 'erNI'))}</td><td>${gbp(sum(sal, 'cost'))}</td><td colspan="4"></td></tr></tbody></table></div>`;
+      <tr class="tot"><td class="name">A normal month</td><td></td><td>${gbp(sum(live, 'annual'))}</td><td>${gbp(sum(live, 'monthly'))}</td><td>${gbp(sum(live, 'tax'))}</td><td>${gbp(sum(live, 'eeNI'))}</td><td>${gbp(sum(live, 'net'))}</td><td>${gbp(sum(live, 'erNI'))}</td><td>${gbp(sum(live, 'cost'))}</td><td colspan="5" class="l small muted">tax and NI to pay ${gbp(sum(live, 'tax') + sum(live, 'eeNI') + sum(live, 'erNI'))}</td></tr></tbody></table></div>
+      <p class="small muted">Payslip = the figures on the last real payslip summary. Contract = the salary in the signed contract, with tax and NI estimated. Figure not confirmed = a figure someone said; check it. Hover over a figure to see where it came from.</p>`;
   } else h += `<p class="muted" style="margin-top:8px">No salaries entered yet. Add each salaried or office person below (the Planner doesn't hold salaries).</p>`;
   if (salariedInPlanner.length && view === 'dgc') h += `<p class="small sev-warn">Salaried in the Planner but no salary here yet: ${salariedInPlanner.map(s => `<button class="chip" type="button" data-saladd="${esc(s.id)}">${esc(s.name)}: add</button>`).join(' ')}</p>`;
   h += `<p class="small muted">David Smith is paid weekly on his hours until he moves to salary, so he stays in the hours above.</p>`;
+  /* the rule, in plain words, and a director can change it */
+  const wd = payWeekday(), rule = payRule(), ps = S.paySet || {};
+  h += `<details class="small" style="margin-top:6px"${S.editPaySet ? ' open' : ''}><summary><b>How salaries are paid:</b> once a month, shown in the ${esc(WEEKDAYS[wd])} pay run nearest the pay day</summary>
+    <p>A salary is a yearly amount paid in 12 equal monthly payments, once each calendar month, on the person's own pay day (the 28th for the DGC monthly payroll and India's contract; a weekend or bank holiday moves it to the working day before). It is not every 4 weeks: that makes 13 payments a year and wouldn't match the contracts or the Isle of Man monthly payroll (12 tax months, 6 April to 5 April). Hourly staff are paid each ${esc(WEEKDAYS[wd])} for the Monday to Sunday week before, so each month's salaries are shown in ${esc(PAY_RULES[rule])}, as their own line, and the real pay day is shown beside them. Someone who starts after the 1st gets part of the first month, by calendar days.</p>
+    ${ps._by ? `<p class="muted">Rule last set by ${esc(nameOf(ps._by))}${ps._at ? ', ' + esc(fmtWhen(ps._at)) : ''}.</p>` : ''}
+    ${me.director ? `<div class="formgrid"><label class="f">Weekly pay day<select id="psDay">${[1, 2, 3, 4, 5].map(d => `<option value="${d}"${d === wd ? ' selected' : ''}>${WEEKDAYS[d]}</option>`).join('')}</select></label>
+      <label class="f">Show each month's salaries in<select id="psRule">${Object.entries(PAY_RULES).map(([k, l]) => `<option value="${k}"${k === rule ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+      <button class="btn sm primary" type="button" data-act="payset-save">Save the rule</button></div>` : '<p class="muted">Ash or Harry can change this.</p>'}</details>`;
   const cur = E && E !== 'new' && !String(E).startsWith('staff:') ? (W.salaries || []).find(s => s.id === E) : null;
   const pre = E && String(E).startsWith('staff:') ? W.staff.find(s => s.id === E.slice(6)) : null;
   if (E) {
-    const v = cur || { name: pre ? pre.name : '', company: pre ? 'dgc' : (S.view === 'silverdale' ? 'silverdale' : 'dgc'), staff_id: pre ? pre.id : '', job_title: pre ? pre.role : '' };
+    const v = cur || { name: pre ? pre.name : '', company: pre ? 'dgc' : (S.view === 'silverdale' ? 'silverdale' : 'dgc'), staff_id: pre ? pre.id : '', job_title: pre ? pre.role : '', figure_status: 'estimate' };
     h += `<div class="confirm"><b>${cur ? 'Change ' + esc(cur.name) : 'Add a salaried person'}</b><div class="formgrid" style="margin-top:8px">
       <label class="f">Name<input id="slName" value="${esc(v.name || '')}"></label>
       <label class="f">Company<select id="slCo">${[['dgc', 'DGC'], ['silverdale', 'Silverdale'], ['mds', 'Manx Drain Solutions']].map(([k, l]) => `<option value="${k}"${v.company === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -861,6 +973,10 @@ function salariesHTML(sal, view, est) {
       <label class="f">Or a set amount a month (£)<input id="slMonth" type="number" min="0" step="0.01" value="${v.monthly_amount != null ? esc(v.monthly_amount) : ''}"></label>
       <label class="f">Pay day (day of the month; empty = last working day)<input id="slDay" type="number" min="1" max="31" value="${v.pay_day != null ? esc(v.pay_day) : ''}"></label>
       <label class="f">Started<input id="slStart" type="date" value="${esc(v.start_date || '')}"></label>
+      <label class="f">Figures from<select id="slFig">${Object.entries(FIGURES).map(([k, l]) => `<option value="${k}"${(v.figure_status || 'estimate') === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+      <label class="f">Where the figure came from<input id="slSrc" value="${esc(v.source || '')}"></label>
+      <label class="f">New salary a year (£), agreed<input id="slNext" type="number" min="0" step="1" value="${v.next_annual_salary != null ? esc(v.next_annual_salary) : ''}"></label>
+      <label class="f">New salary from<input id="slNextFrom" type="date" value="${esc(v.next_from || '')}"></label>
       <label class="f">Note<input id="slNote" value="${esc(v.note || '')}"></label></div>
       <input type="hidden" id="slStaff" value="${esc(v.staff_id || '')}"><input type="hidden" id="slId" value="${esc(cur ? cur.id : '')}">
       <div class="bar" style="margin-top:8px"><button class="btn primary" type="button" data-act="sal-save">Save</button><button class="btn" type="button" data-act="sal-cancel">Cancel</button>${cur ? `<button class="btn" type="button" data-act="sal-off">No longer paid (keeps the record)</button>` : ''}</div></div>`;
@@ -977,8 +1093,8 @@ async function buildWorkbook() {
   plain('Dayworks', ['Name', 'Date', 'Site', 'Start', 'Finish', 'Hours on the sheet', 'Hours billed', 'Sent to the client'], (W.dayworks || []).map(x => [x.name, x.date, x.site, x.start, x.finish, num(x.hours), x.billedHours != null ? num(x.billedHours) : num(x.hours), x.sentAt ? fmtWhen(x.sentAt) : 'Not yet']));
   if (money) {
     const sal = salaryRows('dgc');
-    plain('Salaries', ['Name', 'Company', 'Job', 'A year', 'A month (gross)', 'Income tax (est.)', 'Employee NI (est.)', 'Net a month (est.)', 'Employer NI (est.)', 'Cost a month (est.)', 'Next pay day', 'Paid this tax year'],
-      sal.map(x => [x.s.name, companyName(x.s.company), x.s.job_title || '', r2(x.annual), r2(x.monthly), r2(x.tax), r2(x.eeNI), r2(x.net), r2(x.erNI), r2(x.cost), x.next, x.paid + ' of 12']), [4, 5, 6, 7, 8, 9, 10]);
+    plain('Salaries', ['Name', 'Company', 'Job', 'A year', 'A month (gross)', 'Income tax (est.)', 'Employee NI (est.)', 'Net a month (est.)', 'Employer NI (est.)', 'Cost a month (est.)', 'Next pay day', 'Paid this tax year', 'Figures from', 'In the pay run of'],
+      sal.map(x => [x.s.name, companyName(x.s.company), x.s.job_title || '', r2(x.annual), r2(x.monthly), r2(x.tax), r2(x.eeNI), r2(x.net), r2(x.erNI), r2(x.cost), x.next, x.paid + ' of 12', x.actual ? 'Payslip' : (FIGURES[x.s.figure_status] || 'Estimate'), x.run.runDate]), [4, 5, 6, 7, 8, 9, 10]);
   }
   if (hasAdj || B.fixedHere.length || (B.C.madeHere || []).length) plain('Corrections', ['Name', 'Day corrected', 'Week corrected', 'Was (hours)', 'Now (hours)', 'Difference (hours)', ...(money ? ['Rate', 'Difference £'] : []), 'Paid in the week of', 'Why', 'Evidence', 'Recorded by', 'Recorded at', 'Status'],
     [...(B.C.paidHere || []), ...(B.C.madeHere || []).filter(c => !(B.C.paidHere || []).some(p => p.id === c.id))].map(c => { const d = r2(num(c.newHours) - num(c.oldHours)); return [c.name, c.date, c.periodStart, num(c.oldHours), num(c.newHours), d, ...(money ? [num(c.rate), r2(d * num(c.rate))] : []), c.payWeek, c.reason, c.evidence || '', nameOf(c.by), fmtWhen(c.at), c.cancelledAt ? 'Cancelled by ' + nameOf(c.cancelledBy) + ': ' + (c.cancelReason || '') : (c.payWeek === B.start ? 'Paid in this run' : 'To be paid in the week of ' + c.payWeek)]; }), money ? [8] : []);
@@ -1040,6 +1156,9 @@ async function reload(keepMsg) {
     W.corrections = C; S.W = W; if (!keepMsg) S.msg = ''; render();
   }
   catch (e) { $('#app').innerHTML = `<div class="card"><h2>Couldn't load the week</h2><p>${esc(e.message)}</p><button class="btn" type="button" data-act="retry">Try again</button></div>`; }
+}
+async function loadPaySet() {
+  try { const r = await rpc('acc_settings_get'); if (r && r.salary_run) S.paySet = { weekday: 2, rule: 'nearest', ...r.salary_run }; } catch (e) { /* keep the default: Tuesday, nearest */ }
 }
 async function saveSalary(patch) {
   try { await rpc('acc_salary_save', { p: patch }); S.editSalary = null; say('Saved.', 'ok'); await reload(true); }
@@ -1107,8 +1226,13 @@ document.addEventListener('click', async ev => {
     case 'tax-cancel': S.editTax = null; render(); return;
     case 'rate-cancel': S.editRate = null; render(); return;
     case 'sal-new': S.editSalary = 'new'; render(); return;
+    case 'payset-save': {
+      const v = { weekday: Number($('#psDay').value), rule: $('#psRule').value };
+      try { await rpc('acc_setting_set', { p_key: 'salary_run', p_value: v }); await loadPaySet(); S.editPaySet = true; S.fc = null; say('Saved: salaries now show in ' + PAY_RULES[v.rule] + ' (' + WEEKDAYS[v.weekday] + 's).', 'ok'); render(); }
+      catch (e) { say('Not saved: ' + e.message, 'err'); } return;
+    }
     case 'sal-cancel': S.editSalary = null; render(); return;
-    case 'sal-save': return saveSalary({ id: $('#slId').value, name: $('#slName').value, company: $('#slCo').value, job_title: $('#slJob').value, annual_salary: $('#slYear').value, monthly_amount: $('#slMonth').value, pay_day: $('#slDay').value, start_date: $('#slStart').value, note: $('#slNote').value, staff_id: $('#slStaff').value, active: true });
+    case 'sal-save': return saveSalary({ id: $('#slId').value, name: $('#slName').value, company: $('#slCo').value, job_title: $('#slJob').value, annual_salary: $('#slYear').value, monthly_amount: $('#slMonth').value, pay_day: $('#slDay').value, start_date: $('#slStart').value, note: $('#slNote').value, staff_id: $('#slStaff').value, active: true, figure_status: $('#slFig').value, source: $('#slSrc').value, next_annual_salary: $('#slNext').value, next_from: $('#slNextFrom').value });
     case 'sal-off': { const s = S.W.salaries.find(x => x.id === $('#slId').value); if (s) return saveSalary({ ...s, active: false }); return; }
     case 'approver-add': {
       const email = $('#apEmail').value.trim(), name = $('#apName').value.trim();
@@ -1146,6 +1270,7 @@ window.addEventListener('hashchange', () => { const s = pickStartFromHash(); if 
   S.focusApprove = /approve/.test(location.hash);
   /* default: last week (the one being paid), unless asked for another */
   S.start = fromHash || addDays(mondayOf(todayIso()), -7);
+  await loadPaySet();
   await reload(); await refreshHandle();
 })();
 </script>
