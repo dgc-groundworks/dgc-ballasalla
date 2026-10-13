@@ -97,6 +97,15 @@ details > summary { cursor: pointer; font-weight: 700; }
 .fc4 span:nth-child(odd) { color: var(--muted); }
 .fc4 span:nth-child(even) { text-align: right; font-variant-numeric: tabular-nums; }
 .fc4 .b { font-weight: 800; }
+.fcb { max-width: 360px; margin: 6px 0; }
+table.fct td.l, table.fct th.l { white-space: normal; min-width: 128px; }
+table.fct td { vertical-align: top; font-variant-numeric: tabular-nums; }
+table.fct tr.in td { border-bottom: 0; }
+table.fct tr.sal td { color: var(--muted); }
+table.fct tr.wt td { font-weight: 800; }
+table.fct tr.wt td .small { font-weight: 400; }
+.fcp { color: var(--info); }
+@media (max-width: 480px) { table.fct { font-size: .72rem; } table.fct th, table.fct td { padding: 5px 3px; } table.fct th { white-space: normal; vertical-align: bottom; } table.fct td.l, table.fct th.l { min-width: 0; width: 34%; } table.fct.open td.l, table.fct.open th.l { min-width: 150px; } }
 @media (max-width: 640px) { main { padding: 10px 12px 50px; } .anom { flex-direction: column; gap: 0; } .anom .who { min-width: 0; } }
 </style>
 </head>
@@ -117,7 +126,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.0 (12 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.1 (13 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -398,25 +407,33 @@ function salariesBetween(from, to) {
   return out.sort((a, b) => a.payDate.localeCompare(b.payDate) || a.s.name.localeCompare(b.s.name));
 }
 function forecastHTML(est) {
-  const F = S.fc;
-  let h = `<div class="card"><div class="bar"><h2 style="margin:0">Average pay per week</h2>${est}<span class="push small muted">hourly staff</span></div>`;
+  /* Ash, 13 Oct 2026: "key information at the top", "two numbers for each of the next 4 weeks", plus salaries in the
+     week they're paid. Words: Money to staff (net), Tax and NI to pay (income tax, employee and employer NI), Total cost.
+     The detail sits behind "Show the breakdown". Presentation only: the sums are the same as before. */
+  const F = S.fc, open = !!S.fcBreak;
+  const toggle = `<button class="btn sm" type="button" data-act="fc-break" aria-expanded="${open}">${open ? 'Hide the breakdown' : 'Show the breakdown'}</button>`;
+  const taxNI = o => num(o.tax) + num(o.eeNI) + num(o.erNI);
+  let h = `<div class="card"><div class="bar"><h2 style="margin:0">An average week</h2>${est}<span class="push small muted">hourly staff</span></div>`;
   if (!F || F.status === 'loading') return h + '<p class="muted small">Working out the average from the last approved weeks...</p></div>';
   if (F.status === 'error') return h + `<p class="small sev-bad">Couldn't work out the average: ${esc(F.msg)}</p></div>`;
   const A = F.avg, n = F.basis.length;
   if (!n) return h + '<p class="muted">No approved weeks yet to average.</p></div>';
   h += `<div class="cards">
-      <div class="kpi"><div class="k">Net pay to staff</div><div class="v">${gbp(A.net)}</div><div class="s">after tax and NI; ${gbp(A.gross)} before</div></div>
-      <div class="kpi"><div class="k">Tax and NI to pay away</div><div class="v">${gbp(A.tax + A.eeNI + A.erNI)}</div><div class="s">income tax ${gbp(A.tax)}, employee NI ${gbp(A.eeNI)}, employer NI ${gbp(A.erNI)}</div></div>
-      <div class="kpi"><div class="k">Grand total cost</div><div class="v">${gbp(A.cost)}</div><div class="s">gross pay plus employer NI</div></div>
-      <div class="kpi"><div class="k">Hours paid</div><div class="v">${hrs(A.total)}h</div><div class="s">a week, on average</div></div></div>
-    <p class="small muted">The average of the last ${n} ${F.draft ? 'weeks with hours (none approved yet, so these are UNAPPROVED figures)' : 'approved week' + (n > 1 ? 's' : '')}: ${F.basis.slice().reverse().map(w => esc(fmtDay(w))).join(', ')}. Up to ${FC_WEEKS} approved weeks are used${n < FC_WEEKS ? `; only ${n} ${n > 1 ? 'are' : 'is'} approved on the Monday weeks so far (they started on 14 Sep 2026)` : ''}. Salaries are separate, below.</p></div>`;
+      <div class="kpi"><div class="k">Money to staff</div><div class="v">${gbp(A.net)}</div><div class="s">to their bank accounts</div></div>
+      <div class="kpi"><div class="k">Tax and NI to pay</div><div class="v">${gbp(taxNI(A))}</div><div class="s">to the Treasury</div></div>
+      <div class="kpi"><div class="k">Total cost</div><div class="v">${gbp(A.cost)}</div><div class="s">the two added together</div></div>
+      <div class="kpi"><div class="k">Hours paid</div><div class="v">${hrs(A.total)}h</div><div class="s">a week</div></div></div>
+    <p class="small muted">Based on the average of the last ${n} ${F.draft ? 'weeks with hours. None are approved yet, so these are UNAPPROVED figures' : 'approved week' + (n > 1 ? 's' : '')} (${F.basis.slice().reverse().map(w => esc(fmtDay(w))).join(', ')}). Salaries are added in the next 4 weeks below.</p>
+    ${open ? `<div class="fc4 fcb"><span>Gross pay</span><span>${gbp(A.gross)}</span><span>Income tax</span><span>${gbp(A.tax)}</span><span>Employee NI</span><span>${gbp(A.eeNI)}</span><span>Employer NI</span><span>${gbp(A.erNI)}</span></div>
+      <p class="small muted">Money to staff is gross pay less income tax and employee NI. Tax and NI to pay is income tax plus employee and employer NI. Total cost is gross pay plus employer NI. Up to ${FC_WEEKS} approved weeks are used${n < FC_WEEKS ? `; only ${n} ${n > 1 ? 'are' : 'is'} approved on the Monday weeks so far (they started on 14 Sep 2026)` : ''}.</p>` : ''}
+    ${toggle}</div>`;
 
   /* ---- the next 4 weeks ---- */
   const names = ['This week', 'Next week', 'The week after', 'The week after that'];
   const curB = F.cur ? buildWeek(F.cur) : null;
   const weeks = names.map((label, i) => {
     const mon = addDays(F.thisMon, i * 7), sun = addDays(mon, 6);
-    let hourly = { ...A }, how = 'the average week';
+    let hourly = { ...A }, how = 'the average week', partly = false;
     if (i === 0 && curB) {
       const wd = curB.dates.map((d, j) => ({ d, j })).filter(o => isWeekday(o.d));
       const missing = wd.filter(o => !(curB.dayTotals[o.j] > 0)).length, got = wd.length - missing;
@@ -424,21 +441,33 @@ function forecastHTML(est) {
       if (got || weekendHrs) {
         hourly = {}; FC_KEYS.forEach(k => hourly[k] = num(curB.T[k]) + A[k] * missing / 5);
         how = missing ? `real hours for ${got} day${got === 1 ? '' : 's'} so far, the average for the other ${missing}` : 'the real hours entered';
+        partly = true;
       }
     }
     const sal = salariesBetween(mon, sun);
     const S2 = { gross: 0, net: 0, tax: 0, eeNI: 0, erNI: 0, cost: 0 };
     sal.forEach(x => { S2.gross += x.monthly; S2.net += x.net; S2.tax += x.tax; S2.eeNI += x.eeNI; S2.erNI += x.erNI; S2.cost += x.cost; });
     const tot = {}; ['gross', 'net', 'tax', 'eeNI', 'erNI', 'cost'].forEach(k => tot[k] = num(hourly[k]) + S2[k]);
-    return { label, mon, sun, hourly, how, sal, S2, tot };
+    return { label, mon, sun, hourly, how, partly, sal, S2, tot };
   });
-  const four = (o, strong) => `<div class="fc4"><span>Before tax and NI</span><span>${gbp(o.gross)}</span><span>After tax and NI</span><span${strong ? ' class="b"' : ''}>${gbp(o.net)}</span><span>Tax and NI to pay away</span><span>${gbp(o.tax + o.eeNI + o.erNI)}</span><span>Total cost</span><span${strong ? ' class="b"' : ''}>${gbp(o.cost)}</span></div>`;
-  h += `<div class="card"><div class="bar"><h2 style="margin:0">The next 4 weeks</h2>${est}<span class="push small muted">hourly staff and salaries</span></div><div class="fcgrid">${weeks.map(w => `<div class="fcw">
-      <div class="fch"><b>${esc(w.label)}</b><span class="small muted">${esc(fmtDay(w.mon))} to ${esc(fmtDay(w.sun))}</span></div>
-      <h3>Hourly staff <span class="pill est">ESTIMATE</span></h3>${four(w.hourly)}<div class="small muted">From ${esc(w.how)}, about ${hrs(w.hourly.total)}h.</div>
-      <h3>Salaries <span class="pill est">ESTIMATE</span></h3>${w.sal.length ? four(w.S2) + `<div class="small muted">${w.sal.map(x => esc(x.s.name) + ' (' + esc(companyName(x.s.company)) + ', ' + esc(dayName(x.payDate) + ' ' + fmtDay(x.payDate)) + ')').join('; ')}</div>` : '<div class="small muted">No salary pay day this week.</div>'}
-      <h3>Week total <span class="pill est">ESTIMATE</span></h3>${four(w.tot, true)}</div>`).join('')}</div>
-    <p class="small muted">Estimate only. Hourly pay uses the average week above (this week uses the real hours where they've been entered). Salaries come from the salary list (every company), on each person's pay day. Tax and NI use the Isle of Man rates below.${(S.W.salaries || []).some(x => x.active !== false) ? '' : ' No salaries have been entered yet, so none are included.'}</p></div>`;
+  const all = { gross: 0, net: 0, tax: 0, eeNI: 0, erNI: 0, cost: 0 };
+  weeks.forEach(w => Object.keys(all).forEach(k => all[k] += w.tot[k]));
+  const cells = o => `<td>${gbp(o.net)}</td><td>${gbp(taxNI(o))}</td><td>${gbp(o.cost)}</td>` + (open ? `<td>${gbp(o.gross)}</td><td>${gbp(o.tax)}</td><td>${gbp(o.eeNI)}</td><td>${gbp(o.erNI)}</td>` : '');
+  const payDays = w => [...new Set(w.sal.map(x => x.payDate))].map(p => dayName(p) + ' ' + fmtDay(p)).join(' and ');
+  let rows = '';
+  weeks.forEach(w => {
+    const head = `<b>${esc(w.label)}</b> <span class="small muted">${esc(fmtDay(w.mon))} to ${esc(fmtDay(w.sun))}</span><div class="small ${w.partly ? 'fcp' : 'muted'}">${w.partly ? 'Partly actual' : 'Estimate'}</div>`
+      + (open ? `<div class="small muted">Hourly staff from ${esc(w.how)}, about ${hrs(w.hourly.total)}h.</div>` : '');
+    if (!w.sal.length) { rows += `<tr class="wt"><td class="l">${head}</td>${cells(w.tot)}</tr>`; return; }
+    rows += `<tr class="in"><td class="l">${head}${open ? '' : '<div class="small muted">Hourly staff</div>'}</td>${cells(w.hourly)}</tr>`
+      + `<tr class="in sal"><td class="l">+ salaries <span class="small muted">(paid ${esc(payDays(w))})</span>${open ? `<div class="small muted">${w.sal.map(x => esc(x.s.name) + ' (' + esc(companyName(x.s.company)) + ', ' + esc(dayName(x.payDate) + ' ' + fmtDay(x.payDate)) + ')').join('; ')}</div>` : ''}</td>${cells(w.S2)}</tr>`
+      + `<tr class="wt"><td class="l">Week total, with salaries</td>${cells(w.tot)}</tr>`;
+  });
+  h += `<div class="card"><div class="bar"><h2 style="margin:0">The next 4 weeks</h2>${est}<span class="push small muted">hourly staff and salaries</span></div>
+    <div class="scroll"><table class="t fct${open ? ' open' : ''}"><thead><tr><th class="l">Week</th><th>Money to staff</th><th>Tax and NI to pay</th><th>Total cost</th>${open ? '<th>Gross pay</th><th>Income tax</th><th>Employee NI</th><th>Employer NI</th>' : ''}</tr></thead>
+    <tbody>${rows}<tr class="tot"><td class="l">4-week total</td>${cells(all)}</tr></tbody></table></div>
+    <p class="small muted">These are estimates, not payslips, worked out on the Isle of Man tax and NI rates (see Rates below). Estimate rows use the average week above. Partly actual means this week's real hours so far, with the average for the days still to come. Salaries come from the salary list (every company) and are added in the week of each person's pay day.${(S.W.salaries || []).some(x => x.active !== false) ? '' : ' No salaries have been entered yet, so none are included.'}</p>
+    ${toggle}</div>`;
   return h;
 }
 
@@ -459,6 +488,8 @@ function render() {
     <span class="push"></span>
     <div class="seg" role="group" aria-label="Which company">${[['dgc', 'DGC office (everything)'], ['silverdale', 'Silverdale only']].map(([k, l]) => `<button type="button" data-view="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <button class="btn sm" type="button" data-act="theme">Light / dark</button></div>`;
+  /* ---- an average week and the next 4 weeks, at the top (Ash, 12 Oct 2026, night; moved up 13 Oct 2026) ---- */
+  if (B.money && view === 'dgc') { h += forecastHTML(est); if (!S.fc) setTimeout(loadForecast, 0); }
   h += `<div class="bar" style="margin-top:10px"><button class="btn" type="button" data-act="prev" aria-label="Previous week">&lsaquo;</button>
     <h2 style="margin:0">Week ${esc(weekLabel(B.start))}</h2>
     <button class="btn" type="button" data-act="next" aria-label="Next week">&rsaquo;</button>
@@ -487,17 +518,15 @@ function render() {
   if (B.money && view === 'dgc') {
     h += `<div class="card"><div class="bar"><h2 style="margin:0">Pay this week</h2>${est}${draft}<span class="push small muted">Tax year ${esc(B.R.year)}${B.R.missingYear ? ` <span class="pill unv">no ${esc(B.R.wanted)} rates yet: using ${esc(B.R.year)}</span>` : ''}</span></div>
       <div class="cards">
-        <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Net pay to staff</div><div class="v">${gbp(B.T.net)}</div><div class="s">what they receive${B.T.advances ? `; ${gbp(B.T.advances)} already paid as advances, so ${gbp(B.T.toPay)} left to pay` : ''}</div></div>
-        <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Tax and NI to pay away</div><div class="v">${gbp(B.T.tax + B.T.eeNI + B.T.erNI)}</div><div class="s">income tax ${gbp(B.T.tax)}, employee NI ${gbp(B.T.eeNI)}, employer NI ${gbp(B.T.erNI)}</div></div>
-        <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Grand total cost</div><div class="v">${gbp(B.T.cost)}</div><div class="s">gross pay ${gbp(B.T.gross)} plus employer NI</div></div>
+        <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Money to staff</div><div class="v">${gbp(B.T.net)}</div><div class="s">what they receive${B.T.advances ? `; ${gbp(B.T.advances)} already paid as advances, so ${gbp(B.T.toPay)} left to pay` : ''}</div></div>
+        <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Tax and NI to pay</div><div class="v">${gbp(B.T.tax + B.T.eeNI + B.T.erNI)}</div><div class="s">income tax ${gbp(B.T.tax)}, employee NI ${gbp(B.T.eeNI)}, employer NI ${gbp(B.T.erNI)}</div></div>
+        <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Total cost</div><div class="v">${gbp(B.T.cost)}</div><div class="s">gross pay ${gbp(B.T.gross)} plus employer NI</div></div>
         <div class="kpi"><div class="k">Hours paid</div><div class="v">${hrs(B.T.total)}h</div><div class="s">${hrs(B.T.worked)}h worked, ${hrs(B.T.leavePaid)}h paid leave and bank holiday, ${hrs(B.T.ot)}h overtime; ${B.rows.length} people</div></div>
       </div>
       ${B.R.unverified.length ? `<p class="small sev-warn">[UNVERIFIED] ${B.R.unverified.map(r => esc(r.label)).join('; ')}. See Rates below.</p>` : ''}
       <p class="small muted">Estimate only, not a payslip. Isle of Man rates for ${esc(B.R.year)} from gov.im (see Rates). Everyone is on the standard single-person allowance unless accounts set their own. Income tax uses a normal week (a day off is averaged out) so a short week doesn't drop anyone into a lower band; NI is worked out on this week's pay. Advances already paid are taken off what's left to pay.</p></div>`;
   }
 
-  /* ---- average pay per week and the next 4 weeks (Ash, 12 Oct 2026, night) ---- */
-  if (B.money && view === 'dgc') { h += forecastHTML(est); if (!S.fc) setTimeout(loadForecast, 0); }
 
   /* ---- hours grid ---- */
   if (view === 'dgc') {
@@ -866,6 +895,7 @@ document.addEventListener('click', async ev => {
     case 'this': return goWeek(mondayOf(todayIso()));
     case 'retry': return reload();
     case 'theme': if (typeof toggleTheme === 'function') toggleTheme(); return;
+    case 'fc-break': S.fcBreak = !S.fcBreak; render(); return;
     case 'approve': S.approveAsk = true; render(); return;
     case 'approve-no': S.approveAsk = false; render(); return;
     case 'approve-yes':
