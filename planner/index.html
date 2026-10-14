@@ -582,11 +582,11 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
   <div id="sync-notice">Running in local mode — data is saved on this device only.</div>
   <div class="nav">
     <button class="active" onclick="showTab('timeline',this)">Timeline</button>
-    <button onclick="showTab('staffhours',this)">Staff</button>
+    <button id="nav-staffhours" onclick="showTab('staffhours',this)" hidden>Staff</button>
     <button onclick="showTab('sitediary',this)">Site Diary</button>
     <button onclick="showTab('accidents',this)">Accident Report</button>
     <button onclick="showTab('resources',this)">Deployment</button>
-    <button onclick="showTab('daywork',this)">Day work</button>
+    <button id="nav-daywork" onclick="showTab('daywork',this)" hidden>Day work</button>
     <button id="nav-accounts" onclick="showTab('accounts',this)" hidden>Accounts</button>
   </div>
   <style>#acc-remind[hidden], .nav button[hidden] { display: none !important; }</style>
@@ -636,7 +636,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
       <button onclick="showSV('stholidays',this)">Holidays <span style="font-size:0.68rem;font-weight:700;background:rgba(245,158,11,.2);color:#f59e0b;border:1px solid rgba(245,158,11,.35);border-radius:4px;padding:1px 5px;vertical-align:middle;letter-spacing:.02em">Under Construction</span></button>
     </div>
     <div id="sv-sthours" class="sv active">
-      <iframe src="../staff/?v=313" style="width:100%;height:calc(100vh - 150px);border:none;display:block" title="Staff Hours"></iframe>
+      <iframe data-src="../staff/?v=314" style="width:100%;height:calc(100vh - 150px);border:none;display:block" title="Staff Hours"></iframe>
     </div>
     <div id="sv-sttimesheets" class="sv">
       <iframe data-src="../staff/timesheets.html?v=296" style="width:100%;height:calc(100vh - 150px);border:none;display:block" title="Timesheets"></iframe>
@@ -654,12 +654,12 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
   <!-- Site Diary tab -->
   <div id="tab-sitediary" class="panel">
-    <iframe data-src="site-diary.html?v=297" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Site Diary"></iframe>
+    <iframe data-src="site-diary.html?v=298" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Site Diary"></iframe>
   </div>
 
   <!-- Accident Report tab (7 Oct 2026): same fields as the DGC OS Site App form; one register for Planner and tablet reports -->
   <div id="tab-accidents" class="panel">
-    <iframe data-src="accidents.html?v=1" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Accident Report"></iframe>
+    <iframe data-src="accidents.html?v=2" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Accident Report"></iframe>
   </div>
 
   <!-- Resources tab -->
@@ -689,7 +689,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
   <!-- Day work tab -->
   <div id="tab-daywork" class="panel">
-    <iframe data-src="dayworks.html?v=311" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Dayworks"></iframe>
+    <iframe data-src="dayworks.html?v=312" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Dayworks"></iframe>
   </div>
 
   <!-- Accounts tab (Ash, 12 Oct 2026): the week's hours as they come in, UNAPPROVED until a PM approves the week -->
@@ -824,7 +824,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v3.14';
+const VERSION = 'v3.15';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -2316,7 +2316,25 @@ function backToPlanner() {
 }
 
 // ── Tabs ──────────────────────────────────────────────────
+// Who sees which tab (Ash, 14 Oct 2026): Day work and Staff for John and the directors only; Timeline, Site Diary,
+// Accident Report and Deployment for everyone signed in. The database says who (dgc_my_hours_person), and the dayworks
+// tables are locked the same way, so hiding a tab is not the only lock. Until it has answered, both stay hidden.
+var _plAccess = { staffhours: false, daywork: false, known: false };
+var _plPendingTab = null;
+async function plannerAccess(s, tries) {
+  if (!s) return;
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/dgc_my_hours_person', { method: 'POST', headers: authedHeaders(s), body: '{}' });
+    if (!r.ok) { if (r.status >= 500 && (tries || 0) < 3) setTimeout(() => plannerAccess(getStoredSession(), (tries || 0) + 1), 30000); return; }
+    const me = await r.json();
+    window.SD_PLANNER_ME = me;
+    _plAccess.staffhours = !!me.staff; _plAccess.daywork = !!me.dayworks; _plAccess.known = true;
+    ['staffhours', 'daywork'].forEach(t => { const b = document.getElementById('nav-' + t); if (b) b.hidden = !_plAccess[t]; });
+    if (_plPendingTab && _plAccess[_plPendingTab]) { const t = _plPendingTab; _plPendingTab = null; showTab(t, document.getElementById('nav-' + t)); }
+  } catch (e) { if ((tries || 0) < 3) setTimeout(() => plannerAccess(getStoredSession(), (tries || 0) + 1), 30000); }
+}
 function showTab(name, btn) {
+  if ((name === 'staffhours' || name === 'daywork') && !_plAccess[name]) { if (!_plAccess.known) _plPendingTab = name; return; }
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
   const tab = document.getElementById('tab-'+name);
@@ -3871,7 +3889,7 @@ window.addEventListener('touchend', async e => {
 const SUPABASE_URL = SB_URL;
 const SUPABASE_KEY = SB_KEY;
 </script>
-<script src="../staff/auth.js?v=5"></script>
+<script src="../staff/auth.js?v=6"></script>
 <script>
 // Who's signed in (top right) and a Sign out button
 function _sessEmail(s) {
@@ -3933,6 +3951,7 @@ function showSignedIn(s) {
   const em = _sessEmail(s);
   const b = document.getElementById('usr-badge'); if (b) { b.textContent = em; b.title = 'Signed in as ' + em; }
   const o = document.getElementById('signout-btn'); if (o) o.style.display = '';
+  plannerAccess(s);
   accCheck(s);
 }
 // Accounts (Ash, 12 Oct 2026): the tab shows for the directors, the hours
@@ -4002,10 +4021,14 @@ window.dgcSaveTheme = async t => {
 // own login: if one finds no session it tells the planner, which re-checks
 // and either reloads that page or shows the one sign-in screen at the front.
 let _plannerStarted = false;
+// 14 Oct 2026: a tab is reloaded once; if it still finds no sign-in within 20 seconds, the one sign-in screen shows.
+const _plFrameReloads = new WeakMap();
 window.addEventListener('message', async e => {
   if (e.origin !== location.origin || !e.data || e.data.type !== 'dgc-need-login') return;
   const s = await ensureLoggedIn();
-  if (s) { document.querySelectorAll('iframe[src]').forEach(f => { if (f.contentWindow === e.source) f.src = f.src; }); return; }
+  const f = [...document.querySelectorAll('iframe')].find(x => x.contentWindow === e.source);
+  if (s && !f) return;
+  if (s && f && Date.now() - (_plFrameReloads.get(f) || 0) > 20000) { _plFrameReloads.set(f, Date.now()); f.src = f.src; return; }
   document.getElementById('plannerLoginOverlay').style.display = 'flex';
 });
 (async () => {

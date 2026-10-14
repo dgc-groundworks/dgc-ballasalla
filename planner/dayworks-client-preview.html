@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dayworks — Client View (PREVIEW)</title>
 <script src="../staff/config.js"></script>
+<script src="../staff/auth.js?v=6"></script>
 <style>
 :root{--bg:#e4ebf3;--surf:#fff;--surf2:#eef2f7;--bord:#c2cfdd;--accent:#1a2a3f;--text:#1a2b3c;--muted:#4f657d;--green:#16a34a}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -62,7 +63,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 // see an internal draft/unchecked row.
 const REST = SUPABASE_URL + '/rest/v1/dgc_dayworks_entries';
 const STORAGE_PUBLIC = SUPABASE_URL + '/storage/v1/object/public/dayworks-timesheets/';
-function sbHeaders(){ return { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }; }
+/* 14 Oct 2026: the dayworks table only answers John and the directors, so this preview reads with the signed-in login */
+let _pvSession = null;
+function sbHeaders(){ return { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + ((_pvSession && _pvSession.access_token) || SUPABASE_KEY) }; }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtDate(iso){ return iso ? iso.split('-').reverse().join('/') : '—'; }
 function getMonday(iso){ const d=new Date(iso+'T12:00:00'); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return d.toISOString().slice(0,10); }
@@ -156,6 +159,8 @@ function renderWeeks(main){
 }
 
 (async function boot(){
+  _pvSession = await ensureLoggedIn();
+  if (!_pvSession) { waitForPlannerSignIn('Dayworks client preview'); return; }
   try {
     const r = await fetch(REST + '?select=*&order=work_date.desc.nullslast', { headers: sbHeaders() });
     if (!r.ok) throw new Error(await r.text());

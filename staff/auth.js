@@ -115,9 +115,39 @@ async function ensureLoggedIn() {
 }
 
 // Inside the planner: let the planner show its own sign-in screen instead of
-// this page asking for a second login.
+// this page asking for a second login. The planner is this page's parent; inside
+// the Silverdale app the planner is itself inside the app, so window.top is the
+// app, not the planner (14 Oct 2026: ask the parent as well as the top).
 function _askPlannerToSignIn() {
-  try { if (window.top !== window.self) window.top.postMessage({ type: 'dgc-need-login' }, location.origin); } catch (e) {}
+  try {
+    if (window.parent && window.parent !== window.self) window.parent.postMessage({ type: 'dgc-need-login' }, location.origin);
+    if (window.top !== window.self && window.top !== window.parent) window.top.postMessage({ type: 'dgc-need-login' }, location.origin);
+  } catch (e) {}
+}
+
+// A Job Planner tab with no sign-in (14 Oct 2026, Ash: "If you're logged in, you're logged in"). Never sends anyone to
+// another login page. Inside the Planner it asks the Planner (which shows its one sign-in) and waits; on its own it shows
+// the sign-in here. Either way the page reloads once someone is signed in.
+function waitForPlannerSignIn(appName) {
+  const box = document.createElement('div');
+  box.setAttribute('role', 'dialog');
+  box.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg,#0b0d12);overflow:auto;padding:16px';
+  document.body.appendChild(box);
+  const reloadWhenIn = () => { if (getStoredSession()) { location.reload(); return true; } return false; };
+  window.addEventListener('storage', e => { if (!e.key || /dgc_(auth_session|planner_orig_session)$/.test(e.key)) reloadWhenIn(); });
+  if (window.parent === window.self) {
+    showLoginForm(box, appName).then(() => location.reload());
+    return;
+  }
+  _askPlannerToSignIn();
+  box.innerHTML = '<div style="max-width:420px;margin:60px auto;padding:22px;background:var(--surf,#1e2331);color:var(--text,#e2e8f0);border:1px solid var(--bord,#3a4058);border-radius:12px;text-align:center;font-family:inherit">'
+    + '<h2 style="margin:0 0 8px;font-size:1.05rem">' + String(appName).replace(/[&<>"]/g, '') + ': sign in on the Job Planner</h2>'
+    + '<p style="margin:0 0 16px;color:var(--muted,#94a3b8);font-size:.92rem;line-height:1.4">The Job Planner is asking you to sign in. Once you have, this opens on its own.</p>'
+    + '<button type="button" style="min-height:44px;padding:8px 20px;border-radius:8px;border:0;background:var(--accent,#f59e0b);color:#1a1100;font-weight:800;font-size:.95rem;cursor:pointer">Try again</button></div>';
+  box.querySelector('button').addEventListener('click', async () => {
+    if (reloadWhenIn()) return;
+    if (await ensureLoggedIn()) location.reload();
+  });
 }
 
 function logout() {

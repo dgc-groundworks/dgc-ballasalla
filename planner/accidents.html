@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Accident Reports</title>
 <script src="../staff/config.js"></script>
-<script src="../staff/auth.js?v=5"></script>
+<script src="../staff/auth.js?v=6"></script>
 <script src="theme.js"></script>
 <style>
 :root {
@@ -242,7 +242,7 @@ function showForm() {
   document.getElementById('panel').innerHTML = `
     <div class="warn-999"><b>If anyone is seriously injured call 999 immediately.</b> Complete this form as soon as it is safe to do so.</div>
     <div class="section-title">Accident report</div>
-    <label>Job<select id="fJob"><option value="">Choose the job…</option>${jobs.map(j => `<option>${esc(j.name)}</option>`).join('')}</select></label>
+    <label>Job<select id="fJob" required aria-required="true"><option value="">Choose the job…</option>${jobs.map(j => `<option>${esc(j.name)}</option>`).join('')}</select></label>
     <label>Date &amp; Time of Accident<input type="datetime-local" id="fDT" value="${now}"></label>
     <label>Name of Injured Person<input type="text" id="fInjured" list="staffNames" placeholder="Full name"></label>
     <datalist id="staffNames">${staff.map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>
@@ -307,7 +307,7 @@ function setStatus(m, err) { const el = document.getElementById('formStatus'); i
 
 (async () => {
   session = await ensureLoggedIn();
-  if (!session) { window.location.replace('../staff/'); return; }
+  if (!session) { waitForPlannerSignIn('Accident Report'); return; } /* 14 Oct 2026: never the Staff login page */
   setInterval(async () => { session = await ensureLoggedIn(); }, 45 * 60 * 1000);
   try { await Promise.all([load(), loadJobs(), loadStaff()]); renderList(); }
   catch (err) { const m = /does not exist|42P01/.test(err.message) ? 'The accident table isn\'t set up yet. Run create_accidents.sql in Supabase first.' : 'Error: ' + err.message;

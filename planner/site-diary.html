@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Site Diary</title>
 <script src="../staff/config.js"></script>
-<script src="../staff/auth.js?v=5"></script>
+<script src="../staff/auth.js?v=6"></script>
 <script src="theme.js"></script>
 <style>
 :root {
@@ -239,6 +239,15 @@ async function loadPlannerJobs() {
   } catch {}
 }
 
+// Who is signed in, and where they are booked this week (Ash, 14 Oct 2026: "everyone needs the site diary... preset to
+// the user's site and changeable"). From public.dgc_my_hours_person: login -> person -> the Deployment board this week.
+let me = null;
+async function loadMe() {
+  try {
+    const r = await fetch(REST + '/rpc/dgc_my_hours_person', { method: 'POST', headers: ah({ 'Content-Type': 'application/json' }), body: '{}' });
+    if (r.ok) me = await r.json();
+  } catch {}
+}
 // Who's on which job: from the database (dgc_resource_alloc, since Planner v3.05), else this browser's copy
 let resAlloc = null;
 async function loadResAlloc() {
@@ -601,14 +610,16 @@ function showForm(existing = null) {
   const pastSites = [...new Set(entries.map(e => e.site).filter(Boolean))];
   const jobNames = plannerJobs.map(j => j.name);
   const allSites = [...new Set([...jobNames, ...pastSites])].sort((a, b) => a.localeCompare(b));
-  const existingSite = existing?.site || '';
+  // a new entry starts on the job this person is booked on this week (or the job they run), and can be changed
+  const preset = (!existing && me && Array.isArray(me.booked)) ? (me.booked.find(b => b.how === 'booked' && allSites.includes(b.job)) || me.booked.find(b => allSites.includes(b.job))) : null;
+  const existingSite = existing?.site || (preset ? preset.job : '');
   const existingIsCustom = existingSite && !allSites.includes(existingSite);
   const siteOptions = allSites.map(s =>
     `<option value="${esc(s)}" ${existingSite === s ? 'selected' : ''}>${esc(s)}</option>`
   ).join('');
 
   // H7/D2: author prefill from email
-  const authorDefault = existing?.author || mapEmailToName(session?.user?.email) || '';
+  const authorDefault = existing?.author || (me && me.name) || mapEmailToName(session?.email || session?.user?.email) || '';
 
   panel.innerHTML = `
     <div class="section-title">Date &amp; Site</div>
@@ -623,6 +634,7 @@ function showForm(existing = null) {
         <input type="text" id="f-site-custom" placeholder="Custom site name"
           style="margin-top:6px;display:${existingIsCustom ? 'block' : 'none'}"
           value="${existingIsCustom ? esc(existingSite) : ''}">
+        ${preset ? `<span id="f-site-preset" style="display:block;margin-top:5px;font-size:0.78rem;color:var(--muted)">${preset.how === 'booked' ? 'Set to where you are booked this week' : 'Set to the job you run this week'}. Change it if you are somewhere else.</span>` : ''}
       </label>
     </div>
     <label>Written by <input type="text" id="f-author" value="${esc(authorDefault)}" placeholder="Name"></label>
@@ -755,13 +767,13 @@ function setStatus(msg, err = false) {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 (async () => {
   session = await ensureLoggedIn();
-  if (!session) { window.location.replace('../staff/'); return; }
+  if (!session) { waitForPlannerSignIn('Site Diary'); return; } /* 14 Oct 2026: never the Staff login page */
 
   // Silently refresh the JWT every 45 minutes so long sessions don't expire mid-save
   setInterval(async () => { session = await ensureLoggedIn(); }, 45 * 60 * 1000);
 
   try {
-    await Promise.all([loadEntries(), loadPlannerJobs(), loadStaff(), loadResAlloc()]);
+    await Promise.all([loadEntries(), loadPlannerJobs(), loadStaff(), loadResAlloc(), loadMe()]);
     renderList();
   } catch (err) {
     const msg = err.message.includes('does not exist') || err.message.includes('42P01')

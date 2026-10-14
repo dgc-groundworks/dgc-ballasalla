@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dayworks</title>
 <script src="../staff/config.js"></script>
+<script src="../staff/auth.js?v=6"></script>
 <script src="theme.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -294,9 +295,20 @@ const NO_NAME = '(Needs a name)';
 const DAYWORKS_RATE = 29; // £/hr charged to Dandara — shown on the client export, matches the client site
 function fmtMoney(n) { return '£' + n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// 14 Oct 2026 (Ash: "Day work = John, Harry and Ash only"): the dayworks tables only answer John and the directors,
+// so every table call goes with the signed-in Job Planner login. The photo upload and the photo reader still use the
+// public key (the photo store is unchanged).
+let _dwSession = null;
 function sbHeaders(extra) {
+  const tok = _dwSession && _dwSession.access_token;
+  return Object.assign({ apikey: SUPABASE_KEY, Authorization: 'Bearer ' + (tok || SUPABASE_KEY) }, extra || {});
+}
+function sbAnonHeaders(extra) {
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, extra || {});
 }
+async function dwFreshSession() { const s = await ensureLoggedIn(); if (s) _dwSession = s; return s; }
+setInterval(() => { dwFreshSession(); }, 10 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) dwFreshSession(); });
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtDate(iso) { return iso ? iso.split('-').reverse().join('/') : '—'; }
 // Ash, 9 Sep 2026: lunch is now a field the PM can see and change on
@@ -659,7 +671,7 @@ async function uploadImageFile(file) {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = crypto.randomUUID() + '.' + ext;
   const r = await fetch(STORAGE_UPLOAD + encodeURIComponent(path), {
-    method: 'POST', headers: sbHeaders({ 'Content-Type': file.type || 'image/jpeg' }), body: file
+    method: 'POST', headers: sbAnonHeaders({ 'Content-Type': file.type || 'image/jpeg' }), body: file
   });
   if (!r.ok) throw new Error(await r.text());
   return path;
@@ -1235,7 +1247,7 @@ function wireDayRow(e) {
     try {
       const r = await fetch(READ_PHOTO_FN, {
         method: 'POST',
-        headers: sbHeaders({ 'Content-Type': 'application/json' }),
+        headers: sbAnonHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ imageUrl: e.image })
       });
       const body = await r.json();
@@ -1911,6 +1923,18 @@ document.querySelectorAll('.dw-navbtn').forEach(btn => {
 });
 
 (async function boot() {
+  if (!(await dwFreshSession())) { waitForPlannerSignIn('Day work'); return; }
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/dgc_my_hours_person', { method: 'POST', headers: sbHeaders({ 'Content-Type': 'application/json' }), body: '{}' });
+    const me = r.ok ? await r.json() : null;
+    if (!me || !me.dayworks) {
+      document.getElementById('mainArea').innerHTML = '<p class="empty-state">Day work is for John and the directors.<br><span style="font-size:0.8rem">Signed in as ' + esc((me && me.email) || (_dwSession && _dwSession.email) || 'someone else') + '.</span></p>';
+      return;
+    }
+  } catch (err) {
+    document.getElementById('mainArea').innerHTML = '<p class="empty-state">Could not check who you are. Check the connection and open Day work again.</p>';
+    return;
+  }
   try {
     await detectSentColumns();
     await loadEntries();
