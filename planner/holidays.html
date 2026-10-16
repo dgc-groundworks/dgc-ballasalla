@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holidays</title>
+<script src="../staff/config.js"></script>
+<script src="../staff/auth.js?v=6"></script>
+<script src="theme.js"></script>
+<style>
+:root{--bg:#0b0d12;--surf:#1e2331;--surf2:#282d3e;--bord:#3a4058;--accent:#f59e0b;--text:#e2e8f0;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--blue:#3b82f6}
+[data-theme="light"]{--bg:#e4ebf3;--surf:#ffffff;--surf2:#e9eff6;--bord:#afc2d2;--accent:#e08a00;--text:#1a2b3c;--muted:#4a657e;--green:#16a34a;--red:#dc2626;--blue:#2563eb}
+[data-theme="light"] .topbar{background:#1b2a3b;border-bottom-color:#0d1a26}
+[data-theme="light"] .topbar h1{color:#f59e0b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px}
+.topbar{background:var(--surf);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:1.1rem;font-weight:800;color:var(--accent);flex:1}
+.wrap{max-width:820px;margin:0 auto;padding:16px}
+.card{background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px}
+.ask{display:grid;grid-template-columns:1fr 200px;gap:12px}
+@media(max-width:600px){.ask{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:6px;font-size:.85rem;color:var(--muted);font-weight:600}
+input,select{background:var(--surf2);border:1px solid var(--bord);border-radius:9px;padding:12px;color:var(--text);font-size:1.05rem;font-family:inherit;min-height:48px;width:100%}
+.big{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:600px){.big{grid-template-columns:1fr}}
+.stat{background:var(--surf2);border:1px solid var(--bord);border-radius:10px;padding:14px}
+.stat .n{font-size:2.1rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat .l{font-size:.85rem;color:var(--muted);margin-top:4px}
+.stat.go .n{color:var(--green)} .stat.warn .n{color:var(--accent)} .stat.bad .n{color:var(--red)}
+h2{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:10px}
+p{line-height:1.45}
+.muted{color:var(--muted);font-size:.9rem}
+table{width:100%;border-collapse:collapse;font-size:.92rem;font-variant-numeric:tabular-nums}
+td,th{padding:7px 6px;border-bottom:1px solid var(--bord);text-align:left}
+th{color:var(--muted);font-weight:600;font-size:.8rem}
+td.r,th.r{text-align:right}
+.msg{white-space:pre-wrap;background:var(--surf2);border:1px solid var(--bord);border-radius:10px;padding:12px;font-size:.98rem;line-height:1.45}
+.btn{min-height:48px;padding:10px 18px;border-radius:9px;border:0;background:var(--accent);color:#1a1100;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit}
+.btn.sec{background:var(--surf2);color:var(--text);border:1px solid var(--bord)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.flag{border-left:4px solid var(--accent);padding:8px 12px;background:var(--surf2);border-radius:6px;margin-top:8px;font-size:.92rem}
+.hide{display:none}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Holidays</h1><span class="muted" id="who"></span></div>
+<div class="wrap">
+  <div class="card">
+    <div class="ask">
+      <label>Who
+        <input id="person" list="people" placeholder="Start typing a name" autocomplete="off">
+        <datalist id="people"></datalist>
+      </label>
+      <label>By this date
+        <input id="upto" type="date">
+      </label>
+    </div>
+    <p class="muted" style="margin-top:10px">Holiday is earned only on days actually worked: 22 days a year, so each 8 hours worked earns 22 ÷ 260 of a day. Unpaid days off earn nothing. "By this date" assumes they're in every working day from now.</p>
+  </div>
+  <div id="out" class="hide">
+    <div class="card">
+      <h2 id="title">Answer</h2>
+      <div class="big">
+        <div class="stat go"><div class="n" id="nNow">0</div><div class="l" id="lNow">Can take now</div></div>
+        <div class="stat"><div class="n" id="nBy">0</div><div class="l" id="lBy">By the date</div></div>
+        <div class="stat warn"><div class="n" id="nXmas">0</div><div class="l">Can take before Christmas, keeping 3 for the closure</div></div>
+      </div>
+      <div id="flags"></div>
+    </div>
+    <div class="card">
+      <h2>Message to send</h2>
+      <div class="msg" id="msg"></div>
+      <div class="row"><button class="btn" id="copy">Copy message</button></div>
+    </div>
+    <div class="card">
+      <h2>How it's worked out</h2>
+      <table id="sum"></table>
+    </div>
+    <div class="card">
+      <h2>Holidays and days off this year</h2>
+      <table id="leave"></table>
+    </div>
+  </div>
+  <p id="err" class="flag hide"></p>
+</div>
+<script>
+const REST = SUPABASE_URL + '/rest/v1';
+const DAYS_A_YEAR = 22, WORK_DAYS = 260, DAY_H = 8, XMAS_KEEP = 3, TT_KEEP = 4;
+// Isle of Man bank holidays. 2027 TT Senior Race Day still to confirm [UNVERIFIED].
+const BANK = new Set(['2026-01-01','2026-04-03','2026-04-06','2026-05-04','2026-05-25','2026-06-05','2026-07-06','2026-08-31','2026-12-25','2026-12-28',
+  '2027-01-01','2027-03-26','2027-03-29','2027-05-03','2027-05-31','2027-06-04','2027-07-05','2027-08-30','2027-12-27','2027-12-28']);
+let session, staff = [], cache = {};
+const $ = id => document.getElementById(id);
+const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const nice = s => parse(s).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+const r1 = n => Math.round(n * 10) / 10;
+const half = n => Math.floor(n * 2 + 1e-9) / 2; // round down to the half day, safe for staff
+const isWork = d => d.getDay() > 0 && d.getDay() < 6 && !BANK.has(iso(d));
+function workDays(fromIso, toIso, skip) { // working days from..to inclusive, minus days in skip
+  let n = 0; const d = parse(fromIso), end = parse(toIso);
+  while (d <= end) { if (isWork(d) && !(skip && skip.has(iso(d)))) n++; d.setDate(d.getDate() + 1); }
+  return n;
+}
+function leaveDays(l, fromIso, toIso) { // working days of a leave row inside a window
+  const a = l.from_date > fromIso ? l.from_date : fromIso, b = l.to_date < toIso ? l.to_date : toIso;
+  const out = []; if (a > b) return out; const d = parse(a), e = parse(b);
+  while (d <= e) { if (isWork(d)) out.push(iso(d)); d.setDate(d.getDate() + 1); }
+  return out;
+}
+async function get(path) {
+  const r = await fetch(REST + path, { headers: authedHeaders(session) });
+  if (!r.ok) throw new Error('Could not read ' + path.split('?')[0] + ' (' + r.status + ')');
+  return r.json();
+}
+async function load(s) {
+  if (cache[s.id]) return cache[s.id];
+  const [hours, leave] = await Promise.all([
+    get('/dgc_staff_hours?staff_id=eq.' + s.id + '&select=work_date,hours&order=work_date'),
+    get('/dgc_staff_leave?staff_id=eq.' + s.id + '&select=leave_type,from_date,to_date,notes&order=from_date')]);
+  return (cache[s.id] = { hours, leave });
+}
+function calc(s, data, uptoIso) {
+  const today = iso(new Date());
+  const yearStart = uptoIso.slice(0, 4) + '-01-01', yearEnd = uptoIso.slice(0, 4) + '-12-31';
+  const from = s.start_date && s.start_date > yearStart ? s.start_date : yearStart;
+  const worked = data.hours.filter(h => h.work_date >= from && h.work_date <= today && Number(h.hours) > 0);
+  const hrs = worked.reduce((t, h) => t + Number(h.hours), 0);
+  const lastDay = worked.length ? worked[worked.length - 1].work_date : null;
+  const earnedNow = hrs / DAY_H * DAYS_A_YEAR / WORK_DAYS;
+  const hol = data.leave.filter(l => /holiday/i.test(l.leave_type));
+  const unpaid = data.leave.filter(l => /unpaid/i.test(l.leave_type));
+  const holDays = new Set(hol.flatMap(l => leaveDays(l, from, yearEnd)));
+  const taken = [...holDays].filter(d => d <= today).length;
+  const booked = [...holDays].filter(d => d > today && d <= uptoIso).length;
+  const bookedYear = [...holDays].filter(d => d > today).length;
+  // Forecast: every working day after the last recorded day (or today), not on booked holiday
+  const startF = iso(new Date(Math.max(parse(lastDay || from).getTime() + 864e5, parse(from).getTime())));
+  const fDays = uptoIso >= startF ? workDays(startF, uptoIso, holDays) : 0;
+  const earnedBy = earnedNow + fDays * DAYS_A_YEAR / WORK_DAYS;
+  const xmasIso = uptoIso.slice(0, 4) + '-12-24';
+  const fX = xmasIso >= startF ? workDays(startF, xmasIso, holDays) : 0;
+  const earnedXmas = earnedNow + fX * DAYS_A_YEAR / WORK_DAYS;
+  const gap = lastDay ? workDays(iso(new Date(parse(lastDay).getTime() + 864e5)), today) : 0;
+  return { from, hrs, days: worked.length, lastDay, earnedNow, taken, booked, bookedYear, fDays, earnedBy, earnedXmas, gap, today,
+    nowLeft: earnedNow - taken, byLeft: earnedBy - taken - booked, xmasFree: earnedXmas - taken - bookedYear - XMAS_KEEP, hol, unpaid };
+}
+function show() {
+  const name = $('person').value.trim().toLowerCase();
+  const s = staff.find(x => x.name.toLowerCase() === name);
+  if (!s) { $('out').classList.add('hide'); return; }
+  const upto = $('upto').value || iso(new Date());
+  load(s).then(data => {
+    const c = calc(s, data, upto), first = s.name.split(' ')[0];
+    $('title').textContent = s.name + (s.start_date ? ', started ' + nice(s.start_date) + ' ' + s.start_date.slice(0, 4) : '');
+    $('nNow').textContent = half(Math.max(0, c.nowLeft)); $('lNow').textContent = 'Can take now (' + r1(c.nowLeft) + ' exactly)';
+    $('nBy').textContent = half(Math.max(0, c.byLeft)); $('lBy').textContent = 'By ' + nice(upto) + ', if in every day (' + r1(c.byLeft) + ')';
+    $('nXmas').textContent = half(Math.max(0, c.xmasFree));
+    const fl = [];
+    if (!s.start_date) fl.push('No start date in the Planner, so this counts from 1 January. Add the start date in Staff.');
+    if (c.gap > 3) fl.push('No hours recorded for ' + c.gap + ' working days since ' + nice(c.lastDay) + '. Those days are counted as not worked until the hours are in.');
+    if (c.unpaid.length) fl.push('Unpaid days off this year: ' + c.unpaid.map(l => nice(l.from_date) + (l.to_date !== l.from_date ? ' to ' + nice(l.to_date) : '')).join(', ') + '. They earn no holiday.');
+    if (c.xmasFree < 0) fl.push('Already over: taking more now means no pay over the Christmas closure.');
+    $('flags').innerHTML = fl.map(f => '<p class="flag">' + f + '</p>').join('');
+    $('sum').innerHTML = [
+      ['Counted from', nice(c.from)],
+      ['Hours worked to date', r1(c.hrs) + ' h on ' + c.days + ' days (' + r1(c.hrs / DAY_H) + ' full days)'],
+      ['Holiday earned to date', r1(c.earnedNow) + ' days'],
+      ['Paid holiday already taken', c.taken + ' days'],
+      ['Booked between now and ' + nice(upto), c.booked + ' days'],
+      ['Working days from now to ' + nice(upto), c.fDays + ' (adds ' + r1(c.fDays * DAYS_A_YEAR / WORK_DAYS) + ')'],
+      ['Earned by Christmas Eve if in every day', r1(c.earnedXmas) + ' days'],
+      ['Kept for the Christmas closure', XMAS_KEEP + ' days'],
+      ['TT week (next year)', TT_KEEP + ' days come out of next year\'s ' + DAYS_A_YEAR]
+    ].map(r => '<tr><td>' + r[0] + '</td><td class="r">' + r[1] + '</td></tr>').join('');
+    const rows = [...c.hol.map(l => [l, 'Holiday']), ...c.unpaid.map(l => [l, 'Unpaid'])].sort((a, b) => a[0].from_date < b[0].from_date ? -1 : 1);
+    $('leave').innerHTML = '<tr><th>From</th><th>To</th><th>Type</th><th class="r">Working days</th></tr>' + (rows.length ? rows.map(([l, t]) =>
+      '<tr><td>' + nice(l.from_date) + '</td><td>' + nice(l.to_date) + '</td><td>' + t + '</td><td class="r">' + leaveDays(l, '0000', '9999').length + '</td></tr>').join('') : '<tr><td colspan="4" class="muted">None recorded</td></tr>');
+    $('msg').textContent = 'Hi ' + first + ', your holidays:\n\n'
+      + 'You earn holiday on the days you work (' + DAYS_A_YEAR + ' days a year).\n\n'
+      + 'Right now you have ' + half(Math.max(0, c.nowLeft)) + ' days to take.\n'
+      + 'If you\'re in every day, by ' + nice(upto) + ' you\'ll have ' + half(Math.max(0, c.byLeft)) + '.\n\n'
+      + XMAS_KEEP + ' days have to be kept for when we close between Christmas and New Year, so you can take up to ' + half(Math.max(0, c.xmasFree)) + ' days before Christmas. If you take more, you won\'t be paid over Christmas.\n\n'
+      + 'Let me know the dates you want and I\'ll check them.';
+    $('out').classList.remove('hide');
+  }).catch(e => { $('err').textContent = e.message; $('err').classList.remove('hide'); });
+}
+$('copy').onclick = () => navigator.clipboard.writeText($('msg').textContent).then(() => { $('copy').textContent = 'Copied'; setTimeout(() => $('copy').textContent = 'Copy message', 1500); });
+$('person').addEventListener('input', show); $('person').addEventListener('change', show); $('upto').addEventListener('change', show);
+(async () => {
+  session = await ensureLoggedIn();
+  if (!session) { waitForPlannerSignIn('Holidays'); return; }
+  $('who').textContent = session.email || '';
+  const d = new Date(); $('upto').value = d.getFullYear() + '-12-24' >= iso(d) ? d.getFullYear() + '-12-24' : iso(d);
+  try {
+    staff = await get('/dgc_staff?select=id,name,start_date,status&order=name');
+    staff = staff.filter(s => s.status !== 'Left');
+    if (!staff.length) throw new Error('This login can\'t see staff records. Holidays is for John and the directors for now.');
+    $('people').innerHTML = staff.map(s => '<option value="' + s.name.replace(/"/g, '') + '">').join('');
+    const q = new URLSearchParams(location.search).get('name'); if (q) { $('person').value = q; show(); }
+  } catch (e) { $('err').textContent = e.message; $('err').classList.remove('hide'); }
+})();
+</script>
+</body>
+</html>
