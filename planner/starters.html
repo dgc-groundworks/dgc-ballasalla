@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New starters</title>
+<script src="../staff/config.js"></script>
+<script src="../staff/auth.js?v=6"></script>
+<script src="theme.js"></script>
+<style>
+:root{--bg:#0b0d12;--surf:#1e2331;--surf2:#282d3e;--bord:#3a4058;--accent:#f59e0b;--text:#e2e8f0;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--blue:#3b82f6}
+[data-theme="light"]{--bg:#e4ebf3;--surf:#ffffff;--surf2:#e9eff6;--bord:#afc2d2;--accent:#e08a00;--text:#1a2b3c;--muted:#4a657e;--green:#16a34a;--red:#dc2626;--blue:#2563eb}
+[data-theme="light"] .topbar{background:#1b2a3b;border-bottom-color:#0d1a26}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px}
+.topbar{background:var(--surf);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:1.1rem;font-weight:800;color:var(--accent);flex:1}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+.card{background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px}
+h2{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:6px;font-size:.85rem;color:var(--muted);font-weight:600}
+label.full{grid-column:1/-1}
+input,select,textarea{background:var(--surf2);border:1px solid var(--bord);border-radius:9px;padding:11px;color:var(--text);font-size:1rem;font-family:inherit;min-height:46px;width:100%}
+textarea{min-height:70px;resize:vertical}
+.btn{min-height:46px;padding:10px 18px;border-radius:9px;border:0;background:var(--accent);color:#1a1100;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit}
+.btn.sec{background:var(--surf2);color:var(--text);border:1px solid var(--bord)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+td,th{padding:9px 6px;border-bottom:1px solid var(--bord);text-align:left;vertical-align:middle}
+th{color:var(--muted);font-weight:600;font-size:.8rem}
+tr.pick{cursor:pointer} tr.pick:hover td{background:var(--surf2)}
+.pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:.78rem;font-weight:700;border:1px solid var(--bord);background:var(--surf2)}
+.pill.ok{color:var(--green);border-color:var(--green)} .pill.wait{color:var(--accent);border-color:var(--accent)}
+.muted{color:var(--muted);font-size:.9rem;line-height:1.45}
+.flag{border-left:4px solid var(--accent);padding:8px 12px;background:var(--surf2);border-radius:6px;margin-top:8px;font-size:.92rem}
+.hide{display:none!important}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+/* The printed pack: A4, white, black text */
+.paper{background:#fff;color:#111;border-radius:8px;padding:28px 34px;font-family:Georgia,'Times New Roman',serif;font-size:12pt;line-height:1.45}
+.paper .lh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #f59e0b;padding-bottom:10px;margin-bottom:18px}
+.paper .lh img{height:58px}
+.paper .lh .addr{font-family:-apple-system,'Segoe UI',sans-serif;font-size:9pt;text-align:right;color:#333;line-height:1.35}
+.paper h3{font-family:-apple-system,'Segoe UI',sans-serif;font-size:13pt;letter-spacing:.06em;margin:4px 0 14px}
+.paper p{margin:0 0 10px}
+.paper table.terms{margin-bottom:12px}.paper table.terms td{border:0;padding:3px 10px 3px 0;vertical-align:top}
+.paper table.terms td:first-child{font-weight:700;white-space:nowrap}
+.paper ul{margin:0 0 10px 22px}
+.paper table.form{border:1px solid #999;margin-bottom:12px}
+.paper table.form td{border:1px solid #999;padding:6px 8px;font-size:10.5pt;height:30px}
+.paper table.form td:first-child{width:42%;background:#f4f4f4;font-family:-apple-system,'Segoe UI',sans-serif;font-size:9.5pt}
+.paper .sec{font-family:-apple-system,'Segoe UI',sans-serif;font-weight:700;font-size:10.5pt;margin:12px 0 6px}
+.pagebreak{height:24px}
+@media print{
+  @page{size:A4;margin:14mm}
+  body{background:#fff}
+  .topbar,.noprint{display:none!important}
+  .wrap{max-width:none;padding:0}
+  .paper{border-radius:0;padding:0}
+  .pagebreak{break-after:page;height:0}
+}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>New starters</h1><span class="muted" id="who"></span></div>
+<div class="wrap">
+
+  <div class="card noprint" id="listCard">
+    <div class="row" style="margin-top:0;justify-content:space-between">
+      <h2 style="margin:0">Starters</h2>
+      <button class="btn" id="newBtn">+ New starter</button>
+    </div>
+    <table id="list" style="margin-top:10px"></table>
+    <p class="muted" id="empty" style="margin-top:10px">No starters yet. Press "New starter" to add one.</p>
+  </div>
+
+  <div class="card noprint hide" id="formCard">
+    <h2 id="formTitle">New starter</h2>
+    <div class="grid">
+      <label>Full name (as on passport)<input id="f_full_name" autocomplete="off"></label>
+      <label>Job title<input id="f_job_title" placeholder="e.g. Groundworker, Plant Operator (360)"></label>
+      <label>Pay<input id="f_pay_rate" type="number" step="0.01" min="0" placeholder="e.g. 17.00"></label>
+      <label>Paid per<select id="f_pay_basis"><option value="hour">Hour</option><option value="year">Year (salary)</option></select></label>
+      <label>Weekly hours (for the yearly figure)<input id="f_weekly_hours" type="number" step="0.5" min="0"></label>
+      <label>Start date<input id="f_start_date" type="date"></label>
+      <label class="full">Working hours (as it should read on the offer)<input id="f_hours_text"></label>
+      <label class="full">Holiday (as it should read on the offer)<input id="f_holiday_text"></label>
+      <label>Probation (months)<input id="f_probation_months" type="number" min="0" max="12"></label>
+      <label>Line manager<input id="f_line_manager" placeholder="e.g. John McLoughlin"></label>
+      <label>First site<input id="f_first_site"></label>
+      <label>Mobile<input id="f_mobile" type="tel"></label>
+      <label>Email<input id="f_email" type="email"></label>
+      <label>Address (if known)<input id="f_address"></label>
+      <label class="full">Accommodation (only if we're providing it: where, how long, any charge)<input id="f_accommodation"></label>
+      <label class="full">Anything else agreed (van, phone, bonus). Only what will go in the contract<textarea id="f_extras"></textarea></label>
+      <label>Status<select id="f_status"><option>Offer drafted</option><option>Offer sent</option><option>Accepted</option><option>Contract sent</option><option>Started</option><option>Withdrawn</option></select></label>
+      <label>Offer sent on<input id="f_offer_sent_on" type="date"></label>
+      <label>Accepted on<input id="f_accepted_on" type="date"></label>
+      <label>Contract sent on<input id="f_contract_sent_on" type="date"></label>
+      <label class="full">Notes (office only, never printed)<textarea id="f_notes"></textarea></label>
+    </div>
+    <div class="row">
+      <button class="btn" id="saveBtn">Save</button>
+      <button class="btn sec" id="cancelBtn">Back to the list</button>
+      <span class="muted" id="saveMsg"></span>
+    </div>
+  </div>
+
+  <div class="card noprint hide" id="actCard">
+    <h2>Offer and starter form</h2>
+    <p class="muted">Check it below, then print it, or press Print and choose "Save as PDF" to email it or send it on WhatsApp. Page 1 is the offer of employment; page 2 is the starter form for them to fill in and bring back.</p>
+    <div class="row">
+      <button class="btn" id="printBtn">Print or save as PDF</button>
+      <button class="btn sec" id="copyBtn">Copy email text</button>
+      <button class="btn sec" id="sentBtn">Mark offer sent today</button>
+    </div>
+    <div class="flag" id="checks"></div>
+    <p class="muted" style="margin-top:10px">Next, once they accept: the contract. Sending it automatically isn't built yet (Ash, 16 Oct 2026).</p>
+  </div>
+
+  <div id="pack" class="hide"></div>
+  <p id="err" class="flag hide"></p>
+</div>
+<script>
+const REST = SUPABASE_URL + '/rest/v1';
+const FIELDS = ['full_name','job_title','pay_rate','pay_basis','weekly_hours','start_date','hours_text','holiday_text','probation_months','line_manager','first_site','mobile','email','address','accommodation','extras','status','offer_sent_on','accepted_on','contract_sent_on','notes'];
+const DEFAULTS = { pay_basis: 'hour', weekly_hours: 40, probation_months: 6, status: 'Offer drafted',
+  hours_text: '8:00 am to 5:00 pm, Monday to Friday (overtime or shift work as required)',
+  holiday_text: '22 days per year (4 to be used during company closure over TT week) plus bank holidays' };
+let session, rows = [], cur = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const money = n => '£' + Number(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const ord = d => d + (d % 10 === 1 && d !== 11 ? 'st' : d % 10 === 2 && d !== 12 ? 'nd' : d % 10 === 3 && d !== 13 ? 'rd' : 'th');
+function longDate(s) { if (!s) return ''; const [y, m, d] = s.split('-').map(Number); return ord(d) + ' ' + new Date(y, m - 1, d).toLocaleDateString('en-GB', { month: 'long' }) + ' ' + y; }
+function today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+async function api(path, opts) {
+  const r = await fetch(REST + path, Object.assign({}, opts, { headers: authedHeaders(session, Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, (opts && opts.headers) || {})) }));
+  if (!r.ok) throw new Error('Could not save or read starters (' + r.status + '). ' + (await r.text()).slice(0, 160));
+  return r.status === 204 ? null : r.json();
+}
+function payLine(r) {
+  if (r.pay_rate == null || r.pay_rate === '') return '';
+  if (r.pay_basis === 'year') return money(r.pay_rate) + ' per year';
+  const yr = Number(r.pay_rate) * Number(r.weekly_hours || 40) * 52;
+  return money(r.pay_rate) + ' per hour (which equates to ' + money(yr).replace('.00', '') + ' per year, based on ' + Number(r.weekly_hours || 40) + ' hours a week)';
+}
+function firstName(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+async function loadList() {
+  rows = await api('/dgc_new_starters?select=*&order=start_date.desc.nullslast,created_at.desc');
+  $('empty').classList.toggle('hide', rows.length > 0);
+  $('list').innerHTML = rows.length ? '<tr><th>Name</th><th>Job</th><th>Start</th><th>Status</th></tr>' + rows.map((r, i) =>
+    '<tr class="pick" data-i="' + i + '"><td><b>' + esc(r.full_name) + '</b></td><td>' + esc(r.job_title) + '</td><td>' + esc(longDate(r.start_date)) + '</td><td><span class="pill ' +
+    (/Started|Contract sent|Accepted/.test(r.status) ? 'ok' : 'wait') + '">' + esc(r.status) + '</span></td></tr>').join('') : '';
+  $('list').querySelectorAll('tr.pick').forEach(tr => tr.onclick = () => openStarter(rows[+tr.dataset.i]));
+}
+function openStarter(r) {
+  cur = r || null;
+  const v = Object.assign({}, DEFAULTS, r || {});
+  FIELDS.forEach(f => { $('f_' + f).value = v[f] == null ? '' : v[f]; });
+  $('formTitle').textContent = r ? r.full_name : 'New starter';
+  $('saveMsg').textContent = '';
+  $('formCard').classList.remove('hide');
+  $('listCard').classList.add('hide');
+  render();
+}
+function back() { cur = null; $('formCard').classList.add('hide'); $('actCard').classList.add('hide'); $('pack').classList.add('hide'); $('listCard').classList.remove('hide'); loadList().catch(showErr); }
+function formValues() {
+  const o = {};
+  FIELDS.forEach(f => { let v = $('f_' + f).value.trim(); o[f] = v === '' ? null : v; });
+  ['pay_rate', 'weekly_hours', 'probation_months'].forEach(f => { if (o[f] != null) o[f] = Number(o[f]); });
+  return o;
+}
+async function save() {
+  const o = formValues();
+  if (!o.full_name) { $('saveMsg').textContent = 'Put their name in first.'; return; }
+  o.updated_at = new Date().toISOString();
+  $('saveMsg').textContent = 'Saving...';
+  const res = cur ? await api('/dgc_new_starters?id=eq.' + cur.id, { method: 'PATCH', body: JSON.stringify(o) })
+                  : await api('/dgc_new_starters', { method: 'POST', body: JSON.stringify(o) });
+  cur = res[0]; $('formTitle').textContent = cur.full_name;
+  $('saveMsg').textContent = 'Saved.';
+  render();
+}
+function missing(r) {
+  const m = [];
+  if (!r.job_title) m.push('job title'); if (r.pay_rate == null) m.push('pay'); if (!r.start_date) m.push('start date');
+  if (!r.hours_text) m.push('working hours');
+  return m;
+}
+function render() {
+  const r = Object.assign({}, formValues());
+  const m = missing(r);
+  $('actCard').classList.toggle('hide', !r.full_name);
+  $('checks').textContent = m.length ? 'Still to fill in before you send it: ' + m.join(', ') + '.' : 'Everything the offer needs is filled in. Check the figures before sending.';
+  $('pack').classList.toggle('hide', !r.full_name);
+  if (!r.full_name) return;
+  const head = '<div class="lh"><img src="../dgc-logo-dark.png" alt="DGC"><div class="addr"><b>Drainage &amp; Groundwork Contractors Ltd</b><br>23 Circular Road, Douglas, Isle of Man, IM1 1AF<br>07624 202220 &nbsp;|&nbsp; info@dgc.im</div></div>';
+  const line = (k, v) => v ? '<tr><td>' + k + ':</td><td>' + esc(v) + '</td></tr>' : '';
+  const offer = '<div class="paper">' + head + '<p>' + esc(longDate(today())) + '</p><h3>OFFER OF EMPLOYMENT</h3>'
+    + '<p>Dear ' + esc(firstName(r.full_name)) + ',</p>'
+    + '<p>We are pleased to offer you a position with Drainage &amp; Groundwork Contractors Ltd. We were impressed by your attitude, experience and work ethic, and believe you will be a great addition to our team.</p>'
+    + '<table class="terms">' + line('Position', r.job_title || '________________') + line('Start date', longDate(r.start_date) || '________________')
+    + line('Pay', payLine(r) || '________________') + line('Hours', r.hours_text) + line('Holiday', r.holiday_text)
+    + line('Reporting to', r.line_manager) + line('First site', r.first_site) + line('Accommodation', r.accommodation) + line('Also agreed', r.extras) + '</table>'
+    + '<p>This offer is subject to a ' + esc(r.probation_months == null ? 6 : r.probation_months) + '-month probationary period. During this time we will review your performance, conduct, attendance and overall suitability for the role. We may extend the probation period if necessary.</p>'
+    + '<p>When you pass your probation, you will be eligible for these discretionary benefits:</p><ul><li>private medical cover;</li><li>a gym membership contribution or benefit;</li><li>an extra day off for your birthday.</li></ul>'
+    + '<p>Please give at least 14 days\' notice when asking for annual leave. Unless agreed in writing by management, annual leave is not normally approved in your first two months or over the Christmas period.</p>'
+    + '<p>This offer is subject to satisfactory reference checks. Please give us contact details for two previous employers.</p>'
+    + '<p>Your full terms and conditions will be set out in your contract of employment and the company handbook, which we will send you once you accept this offer.</p>'
+    + '<p>Please confirm you accept by replying to this email or message, and send us the starter form (page 2) with copies of your tickets and certificates, your photo ID and your driving licence (if you have one).</p>'
+    + '<p>We\'re delighted to have you join us. If you have any questions, please get in touch.</p>'
+    + '<p style="margin-top:22px">Yours sincerely,</p><p style="margin-top:34px">For and on behalf of<br><b>Drainage &amp; Groundwork Contractors Ltd</b></p></div>';
+  const row = (k, v) => '<tr><td>' + k + '</td><td>' + esc(v || '') + '</td></tr>';
+  const form = '<div class="pagebreak"></div><div class="paper">' + head + '<h3>NEW STARTER FORM</h3>'
+    + '<p style="font-size:10.5pt">Please fill in every box (write N/A if it doesn\'t apply) and bring it to the office or send a clear photo of it. We use it for your contract and your wages, so names must match your passport.</p>'
+    + '<div class="sec">The job (filled in by DGC)</div><table class="form">' + row('Name', r.full_name) + row('Job title', r.job_title) + row('Start date', longDate(r.start_date)) + row('Pay', payLine(r)) + row('Hours', r.hours_text) + '</table>'
+    + '<div class="sec">Your details</div><table class="form">' + row('Full name as on your passport') + row('Date of birth') + row('Nationality') + row('Home address and postcode', r.address) + row('Mobile', r.mobile) + row('Email', r.email) + row('National Insurance number') + row('Isle of Man tax reference (if you have one)') + '</table>'
+    + '<div class="sec">Right to work</div><table class="form">' + row('Do you already live on the Isle of Man? (Yes / No)') + row('If not, do you need a work permit? We will send you a separate form') + '</table>'
+    + '<div class="sec">Tickets and driving</div><table class="form">' + row('Plant tickets (CPCS / NPORS): number, categories, expiry') + row('CSCS / EUSR / other cards: number, expiry') + row('Other certificates (first aid, SSSTS, asbestos, confined spaces)') + row('Driving licence categories and any points') + '</table>'
+    + '<div class="sec">Emergency contact and health</div><table class="form">' + row('Emergency contact: name, relationship, phone') + row('Medical conditions or allergies we should know about on site (optional, kept private)') + '</table>'
+    + '<div class="sec">References</div><table class="form">' + row('Last employer: company, your job, dates, contact') + row('Employer before that: company, your job, dates, contact') + '</table>'
+    + '<p style="font-size:10pt">Bank details for wages: please give these in person or by phone to the office, not by WhatsApp.</p>'
+    + '<table class="form">' + row('Signed') + row('Date') + '</table></div>';
+  $('pack').innerHTML = offer + form;
+}
+function emailText(r) {
+  return 'Hi ' + firstName(r.full_name) + ',\n\nGreat to have you on board. Attached is your offer of employment and a starter form.\n\n'
+    + 'Please read the offer, fill in the starter form and send it back with copies of your tickets and certificates, your photo ID and your driving licence. Reply to say you accept and we\'ll send your contract.\n\n'
+    + 'Any questions, give us a ring on 07624 202220.\n\nThanks,\nDGC';
+}
+function showErr(e) { $('err').textContent = e.message || String(e); $('err').classList.remove('hide'); }
+$('newBtn').onclick = () => openStarter(null);
+$('cancelBtn').onclick = back;
+$('saveBtn').onclick = () => save().catch(showErr);
+$('printBtn').onclick = () => { render(); window.print(); };
+$('copyBtn').onclick = () => navigator.clipboard.writeText(emailText(formValues())).then(() => { $('copyBtn').textContent = 'Copied'; setTimeout(() => $('copyBtn').textContent = 'Copy email text', 1500); });
+$('sentBtn').onclick = () => { $('f_offer_sent_on').value = today(); if ($('f_status').value === 'Offer drafted') $('f_status').value = 'Offer sent'; save().catch(showErr); };
+document.querySelectorAll('#formCard input,#formCard select,#formCard textarea').forEach(el => el.addEventListener('input', render));
+(async () => {
+  session = await ensureLoggedIn();
+  if (!session) { waitForPlannerSignIn('New starters'); return; }
+  $('who').textContent = session.email || '';
+  try { await loadList(); } catch (e) { showErr(new Error('This login can\'t see new starters. It\'s for John and the directors.')); }
+})();
+</script>
+</body>
+</html>
