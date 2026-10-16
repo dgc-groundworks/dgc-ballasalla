@@ -57,7 +57,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
         <input id="upto" type="date">
       </label>
     </div>
-    <p class="muted" style="margin-top:10px">Holiday is earned only on days actually worked: 22 days a year, so each 8 hours worked earns 22 ÷ 260 of a day. Unpaid days off earn nothing. "By this date" assumes they're in every working day from now.</p>
+    <p class="muted" style="margin-top:10px">Holiday is earned only on days actually worked: 22 days a year, so each day worked (up to 8 hours) earns 22 ÷ 260 of a day; overtime earns no extra. Unpaid days off earn nothing. Bank holidays are paid and don't come out of the 22. "By this date" assumes they're in every working day from now.</p>
   </div>
   <div id="out" class="hide">
     <div class="card">
@@ -127,7 +127,7 @@ function calc(s, data, uptoIso) {
   const yearStart = uptoIso.slice(0, 4) + '-01-01', yearEnd = uptoIso.slice(0, 4) + '-12-31';
   const from = s.start_date && s.start_date > yearStart ? s.start_date : yearStart;
   const worked = data.hours.filter(h => h.work_date >= from && h.work_date <= today && Number(h.hours) > 0);
-  const hrs = worked.reduce((t, h) => t + Number(h.hours), 0);
+  const hrs = worked.reduce((t, h) => t + Math.min(DAY_H, Number(h.hours)), 0); // capped at 8 h a day (Ash, 16 Oct 2026: overtime earns no extra holiday)
   const lastDay = worked.length ? worked[worked.length - 1].work_date : null;
   const earnedNow = hrs / DAY_H * DAYS_A_YEAR / WORK_DAYS;
   const hol = data.leave.filter(l => /holiday/i.test(l.leave_type));
@@ -166,7 +166,7 @@ function show() {
     $('flags').innerHTML = fl.map(f => '<p class="flag">' + f + '</p>').join('');
     $('sum').innerHTML = [
       ['Counted from', nice(c.from)],
-      ['Hours worked to date', r1(c.hrs) + ' h on ' + c.days + ' days (' + r1(c.hrs / DAY_H) + ' full days)'],
+      ['Hours counted to date (max 8 a day)', r1(c.hrs) + ' h on ' + c.days + ' days (' + r1(c.hrs / DAY_H) + ' full days)'],
       ['Holiday earned to date', r1(c.earnedNow) + ' days'],
       ['Paid holiday already taken', c.taken + ' days'],
       ['Booked between now and ' + nice(upto), c.booked + ' days'],
