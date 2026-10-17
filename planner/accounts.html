@@ -152,7 +152,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.4 (13 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.5 (17 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -1210,11 +1210,34 @@ async function doCsv() {
 /* ============================== actions ============================== */
 function say(m, k) { S.msg = m; S.msgKind = k || ''; const el = document.querySelector('.msg'); if (el) { el.textContent = m; el.className = 'msg ' + (k || ''); } else render(); }
 async function goWeek(start) { S.start = start; S.approveAsk = false; S.open.clear(); S.msg = ''; history.replaceState(null, '', '#week=' + start); await reload(); await refreshHandle(); }
+/* Weekly Hours sends a director here with a correction filled in (Ash, 17 Oct 2026):
+   #week=YYYY-MM-DD&correct=<staff id>|<day>|<should have been>|<why>. It only fills the form, once; nothing is saved
+   until Save the correction, which goes through acc_correction_add as before. */
+function correctFromHash() {
+  const m = /[#&]correct=([^&]+)/.exec(location.hash); if (!m) return null;
+  let parts; try { parts = decodeURIComponent(m[1]).split('|'); } catch (e) { return null; }
+  const [staffId, date, newH, ...why] = parts;
+  if (!/^[0-9a-f-]{36}$/i.test(staffId || '') || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return null;
+  const n = newH === '' || newH == null ? null : Number(newH);
+  return { staffId, date, newHours: n != null && isFinite(n) ? n : null, reason: why.join('|') };
+}
+function applyPendingCorr() {
+  const c = S.pendingCorr; if (!c || !S.B || mondayOf(c.date) !== S.start) return;
+  S.pendingCorr = null;
+  if (!S.me || !S.me.director) { say('Only a director can record a correction.', 'err'); return; }
+  if (!S.B.approved) { say('This week is not approved for pay yet, so change the hours on the Staff screen instead.', 'err'); return; }
+  if ((S.B.fixedHere || []).some(f => f.staffId === c.staffId && f.date === c.date)) { say('There is already a correction for that day (see Corrections). Cancel it first if it is wrong.', 'err'); return; }
+  if (!S.B.rows.some(r => r.s.id === c.staffId)) { say('That person is not in this week.', 'err'); return; }
+  S.view = 'dgc';
+  S.corr = { staffId: c.staffId, date: c.date, oldHours: corrPaid(c.staffId, c.date), newHours: c.newHours, reason: c.reason, evidence: '' };
+  render(); const f = $('#corrForm'); if (f) f.scrollIntoView({ block: 'center' });
+}
 async function reload(keepMsg) {
   try {
     const [W, C] = await Promise.all([rpc('acc_week', { p_start: S.start }),
       rpc('acc_corrections_for', { p_start: S.start }).catch(e => ({ paidHere: [], madeHere: [], checks: [], error: e.message }))]);
     W.corrections = C; S.W = W; if (!keepMsg) S.msg = ''; render();
+    applyPendingCorr();
   }
   catch (e) { $('#app').innerHTML = `<div class="card"><h2>Couldn't load the week</h2><p>${esc(e.message)}</p><button class="btn" type="button" data-act="retry">Try again</button></div>`; }
 }
@@ -1307,7 +1330,7 @@ document.addEventListener('change', ev => {
   if (t.id === 'cfPerson' || t.id === 'cfDay') { corrFromForm(); render(); const f = $('#corrForm'); if (f) f.scrollIntoView({ block: 'center' }); return; }
 });
 document.addEventListener('input', ev => { if (ev.target.id === 'cfNew') corrPreview(); });
-window.addEventListener('hashchange', () => { const s = pickStartFromHash(); if (s && s !== S.start) { S.focusApprove = /approve/.test(location.hash); goWeek(s); } });
+window.addEventListener('hashchange', () => { S.pendingCorr = correctFromHash() || S.pendingCorr; const s = pickStartFromHash(); if (s && s !== S.start) { S.focusApprove = /approve/.test(location.hash); goWeek(s); } else applyPendingCorr(); });
 
 /* ============================== start ============================== */
 (async function boot() {
@@ -1328,6 +1351,7 @@ window.addEventListener('hashchange', () => { const s = pickStartFromHash(); if 
   let v = null; try { v = localStorage.getItem('acc_view'); } catch (e) {}
   S.view = v === 'silverdale' || v === 'dgc' ? v : (S.me.ws === 'silverdale' ? 'silverdale' : 'dgc');
   const fromHash = pickStartFromHash();
+  S.pendingCorr = correctFromHash();
   S.focusApprove = /approve/.test(location.hash);
   /* default: last week (the one being paid), unless asked for another */
   S.start = fromHash || addDays(mondayOf(todayIso()), -7);
