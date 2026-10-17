@@ -152,7 +152,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.5 (17 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.6 (17 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -209,6 +209,7 @@ async function testRpc(name, a) {
   if (name === 'acc_me') return me;
   if (name === 'acc_week') { const w = FIXTURE.weeks[a.p_start]; if (!me.hours) throw new Error('not allowed for this login'); return w ? JSON.parse(JSON.stringify(w)) : { ...JSON.parse(JSON.stringify(Object.values(FIXTURE.weeks)[0])), periodStart: a.p_start, periodEnd: addDays(a.p_start, 6), hours: [], timesheets: [], leave: [], extras: [], approval: null, approvalLog: [], dayworks: [], exports: [] }; }
   if (name === 'acc_approve') { if (!me.approve) throw new Error('only the approvers can approve hours'); const w = FIXTURE.weeks[a.p_start]; const ap = { by: me.email, at: new Date().toISOString() }; if (w) { w.approval = ap; w.approvalLog.push({ action: 'approved', by: me.email, at: ap.at }); } return ap; }
+  if (name === 'acc_unapprove') { if (!(me.approve || me.director)) throw new Error('only the approvers or a director can open a week again'); if (!String(a.p_reason || '').trim()) throw new Error('say why the week is being opened again'); const w = FIXTURE.weeks[a.p_start]; if (!w || !w.approval) return { already: true }; w.approval = null; const at = new Date().toISOString(); w.approvalLog.push({ action: 'unapproved', by: me.email, at, reason: a.p_reason, via: 'Accounts (test)' }); return { already: false, by: me.email, at }; }
   if (name === 'acc_log_export') { const w = FIXTURE.weeks[a.p_start]; if (w) w.exports.unshift({ kind: a.p_kind, by: me.email, at: new Date().toISOString(), approved: !!w.approval }); return null; }
   if (name === 'acc_salary_save') { if (!me.money) throw new Error('not allowed'); const p = a.p; const row = { ...p, id: p.id || ('t' + Date.now()), annual_salary: p.annual_salary === '' ? null : p.annual_salary, monthly_amount: p.monthly_amount === '' ? null : p.monthly_amount, pay_day: p.pay_day === '' ? null : Number(p.pay_day), active: p.active !== false };
     for (const w of Object.values(FIXTURE.weeks)) { const i = w.salaries.findIndex(s => s.id === row.id); if (i >= 0) w.salaries[i] = row; else w.salaries.push(row); } return row; }
@@ -226,7 +227,7 @@ async function testRpc(name, a) {
 }
 
 /* ============================== state ============================== */
-const S = { me: null, start: null, W: null, view: null, open: new Set(), approveAsk: false, msg: '', msgKind: '', editRate: null, editSalary: null, editTax: null, busy: false, corr: null, gateOk: false, paySet: { weekday: 2, rule: 'nearest' }, editPaySet: false };
+const S = { me: null, start: null, W: null, view: null, open: new Set(), approveAsk: false, reopenAsk: false, msg: '', msgKind: '', editRate: null, editSalary: null, editTax: null, busy: false, corr: null, gateOk: false, paySet: { weekday: 2, rule: 'nearest' }, editPaySet: false };
 if (TEST) window.__accS = S; /* localhost ?test=1 only: lets the test page read the sums */
 function pickStartFromHash() {
   const h = location.hash.slice(1);
@@ -686,8 +687,8 @@ function render() {
   if (view === 'dgc') {
     if (approved) {
       h += `<div class="status ok"><b class="big">Approved</b><span>by ${esc(nameOf(a.by))} on ${esc(fmtWhen(a.at))}. These hours have gone to accounts.</span>
-        ${W.approvalLog.length > 1 ? `<details class="small" style="flex-basis:100%"><summary>Approval history</summary>${W.approvalLog.map(g => `<div>${esc(g.action === 'approved' ? 'Approved' : 'Unapproved (opened again)')} by ${esc(nameOf(g.by))}, ${esc(fmtWhen(g.at))}</div>`).join('')}</details>` : ''}
-        <span class="small muted" style="flex-basis:100%">To change hours now, an approver opens the week again on the Job Planner's Staff screen. Anything changed after approval is flagged in red below.</span>
+        ${W.approvalLog.length > 1 ? `<details class="small" style="flex-basis:100%"><summary>Approval history</summary>${approvalLogHTML(W)}</details>` : ''}
+        ${reopenHTML(B, a)}
         ${B.suggestions.length ? `<span class="small sev-warn" style="flex-basis:100%"><b>${B.suggestions.length} ${B.suggestions.length === 1 ? 'day looks' : 'days look'} wrong in this approved week.</b> If the pay was short or over, ${me.director ? 'use <b>Record a correction</b> below' : 'ask Ash or Harry to record a correction'}: it is paid in the next pay run as its own line, and this week stays exactly as it was sent.</span>` : ''}
         ${B.fixedHere.length ? `<span class="small" style="flex-basis:100%;color:var(--info)">${B.fixedHere.length} correction${B.fixedHere.length === 1 ? '' : 's'} recorded against this week (see Corrections below).</span>` : ''}</div>`;
     } else {
@@ -696,7 +697,8 @@ function render() {
         ${me.approve ? (S.approveAsk
           ? `<div class="confirm" style="flex-basis:100%"><b>Approve ${esc(weekLabel(B.start))}?</b> ${B.rows.length} people, ${hrs(B.T.total)} paid hours${gateItems(B).length ? `, <span class="sev-warn">${gateItems(B).length} still to check</span>` : ''}.${gateHTML(B)}<div class="bar" style="margin-top:8px"><button class="btn go" type="button" data-act="approve-yes" id="approveYes"${gateItems(B).length && !S.gateOk ? ' disabled' : ''}>Yes, approve the hours</button><button class="btn" type="button" data-act="approve-no">Cancel</button></div></div>`
           : `<button class="btn go" type="button" data-act="approve" id="approveBtn">Approve the hours</button>`) : ''}
-        <span class="small muted" style="flex-basis:100%">Approvers: ${esc((W.approvers || []).filter(p => p.active).map(p => p.name).join(' or ') || 'none set')}.</span></div>`;
+        <span class="small muted" style="flex-basis:100%">Approvers: ${esc((W.approvers || []).filter(p => p.active).map(p => p.name).join(' or ') || 'none set')}.</span>
+        ${(W.approvalLog || []).length ? `<details class="small" style="flex-basis:100%"${(W.approvalLog.slice(-1)[0] || {}).action === 'unapproved' ? ' open' : ''}><summary>Approval history</summary>${approvalLogHTML(W)}</details>` : ''}</div>`;
     }
   }
   if (S.msg) h += `<div class="msg ${S.msgKind}">${esc(S.msg)}</div>`;
@@ -1208,8 +1210,32 @@ async function doCsv() {
 }
 
 /* ============================== actions ============================== */
+/* ============================== opening a week again (Ash, 17 Oct 2026) ==============================
+   Ash: "When I've locked in some hours on the time thing, I want to be able to undo it at any point."
+   An approver or a director presses Open this week again, says why, and confirms. acc_unapprove takes the approval off;
+   nothing is deleted from the history: the approval and the opening again are both kept, with who, when, why and where. */
+function approvalLogHTML(W) {
+  return (W.approvalLog || []).map(g => `<div>${esc(g.action === 'approved' ? 'Approved' : 'Opened again')} by ${esc(nameOf(g.by))}, ${esc(fmtWhen(g.at))}${g.reason ? ': ' + esc(g.reason) : ''}${g.via ? ` <span class="muted">(${esc(g.via)})</span>` : ''}</div>`).join('');
+}
+/* the weekly pay run for a week: the pay weekday (Tuesday) after the week ends */
+const payRunOf = start => addDays(start, 6 + payWeekday());
+function reopenHTML(B, a) {
+  const me = S.me || {}, can = me.approve || me.director;
+  const run = payRunOf(B.start), past = todayIso() >= run;
+  const paidLine = past
+    ? `Its pay run (${esc(fmtLong(run))}) has gone, so it has most likely been paid. Opening it again doesn't take back what was paid. Don't change its hours on the Staff screen: a change to a paid week goes onto the next pay run as a correction (${me.director ? 'Record a correction, below' : 'Ash or Harry records it'}).`
+    : `Its pay run is ${esc(fmtLong(run))}. Opening it again lets the hours be changed on the Staff screen; approve it again when they're right.`;
+  if (!can) return `<span class="small muted" style="flex-basis:100%">${paidLine} Only an approver or a director can open the week again. Anything changed after approval is flagged in red below.</span>`;
+  if (!S.reopenAsk) return `<span class="small muted" style="flex-basis:100%">${paidLine} Anything changed after approval is flagged in red below.</span>
+        <button class="btn" type="button" data-act="reopen" id="reopenBtn">Open this week again</button>`;
+  return `<div class="confirm" style="flex-basis:100%" id="reopenForm"><b>Open ${esc(weekLabel(B.start))} again?</b>
+        <p class="small" style="margin:6px 0">${paidLine}</p>
+        <p class="small muted" style="margin:6px 0">Nothing is deleted: the approval stays in the history, with this beside it (who, when, where and why). The week shows as waiting for approval until someone approves it again.</p>
+        <label class="small" style="display:block">Why (required)<textarea id="reopenWhy" style="width:100%;min-height:56px" placeholder="For example: Lee Duffy's Friday is wrong">${esc(S.reopenWhy || '')}</textarea></label>
+        <div class="bar" style="margin-top:8px"><button class="btn primary" type="button" data-act="reopen-yes" id="reopenYes">Yes, open it again</button><button class="btn" type="button" data-act="reopen-no">Cancel</button></div></div>`;
+}
 function say(m, k) { S.msg = m; S.msgKind = k || ''; const el = document.querySelector('.msg'); if (el) { el.textContent = m; el.className = 'msg ' + (k || ''); } else render(); }
-async function goWeek(start) { S.start = start; S.approveAsk = false; S.open.clear(); S.msg = ''; history.replaceState(null, '', '#week=' + start); await reload(); await refreshHandle(); }
+async function goWeek(start) { S.start = start; S.approveAsk = false; S.reopenAsk = false; S.open.clear(); S.msg = ''; history.replaceState(null, '', '#week=' + start); await reload(); await refreshHandle(); }
 /* Weekly Hours sends a director here with a correction filled in (Ash, 17 Oct 2026):
    #week=YYYY-MM-DD&correct=<staff id>|<day>|<should have been>|<why>. It only fills the form, once; nothing is saved
    until Save the correction, which goes through acc_correction_add as before. */
@@ -1291,6 +1317,18 @@ document.addEventListener('click', async ev => {
     case 'fc-break': S.fcBreak = !S.fcBreak; render(); return;
     case 'approve': S.approveAsk = true; render(); return;
     case 'approve-no': S.approveAsk = false; S.gateOk = false; render(); return;
+    case 'reopen': S.reopenAsk = true; render(); { const w = $('#reopenWhy'); if (w) w.focus(); } return;
+    case 'reopen-no': S.reopenAsk = false; render(); return;
+    case 'reopen-yes': {
+      const why = ($('#reopenWhy') || {}).value || '';
+      if (!why.trim()) { say('Say why the week is being opened again first.', 'err'); const w = $('#reopenWhy'); if (w) w.focus(); return; }
+      t.disabled = true;
+      try { const r = await rpc('acc_unapprove', { p_start: S.start, p_reason: why.trim() });
+        S.reopenAsk = false; S.reopenWhy = ''; S.fc = null; await reload(true); say(r && r.already ? 'This week was already open.' : 'Opened again. The approval and why it was opened are kept in the history. Approve it again when the hours are right.', 'ok');
+        try { if (window.top !== window.self) window.top.postMessage({ type: 'acc-approved', periodStart: S.start, reopened: true }, location.origin); } catch (e) {} }
+      catch (e) { t.disabled = false; say('Not opened again: ' + e.message, 'err'); }
+      return;
+    }
     case 'corr-new': S.corr = { staffId: '', date: '', oldHours: 0, newHours: null, reason: '', evidence: '' }; render(); return;
     case 'corr-cancel-form': S.corr = null; render(); return;
     case 'corr-save': return saveCorrection(t);
@@ -1329,7 +1367,7 @@ document.addEventListener('change', ev => {
   if (t.id === 'gateOk') { S.gateOk = t.checked; const b = $('#approveYes'); if (b) b.disabled = !t.checked; return; }
   if (t.id === 'cfPerson' || t.id === 'cfDay') { corrFromForm(); render(); const f = $('#corrForm'); if (f) f.scrollIntoView({ block: 'center' }); return; }
 });
-document.addEventListener('input', ev => { if (ev.target.id === 'cfNew') corrPreview(); });
+document.addEventListener('input', ev => { if (ev.target.id === 'cfNew') corrPreview(); if (ev.target.id === 'reopenWhy') S.reopenWhy = ev.target.value; });
 window.addEventListener('hashchange', () => { S.pendingCorr = correctFromHash() || S.pendingCorr; const s = pickStartFromHash(); if (s && s !== S.start) { S.focusApprove = /approve/.test(location.hash); goWeek(s); } else applyPendingCorr(); });
 
 /* ============================== start ============================== */

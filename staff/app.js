@@ -725,7 +725,13 @@ async function toggleApproval(weekNum) {
     const token = sess ? sess.access_token : SUPABASE_KEY;
     const authHdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
     if (isApproved) {
-      const r = await fetch(REST + '/dgc_payroll_approval?period_start=eq.' + weekStart, { method: 'DELETE', headers: authHdrs });
+      // Opening a week again keeps the history: who, when, why and where (acc_unapprove, Ash 17 Oct 2026).
+      const why = window.prompt('Open this week again? The approval stays in the history with this beside it.\n' +
+        'If the week has already been paid, don\'t change its hours here: record a correction in Accounts instead.\n\nWhy is it being opened again?', '');
+      if (why == null) return;
+      if (!why.trim()) { document.getElementById('hoursStatus').textContent = 'Not opened again: say why first.'; return; }
+      let r = await fetch(REST + '/rpc/acc_unapprove', { method: 'POST', headers: authHdrs, body: JSON.stringify({ p_start: weekStart, p_reason: why.trim() }) });
+      if (r.status === 404) r = await fetch(REST + '/dgc_payroll_approval?period_start=eq.' + weekStart, { method: 'DELETE', headers: authHdrs }); // older database
       if (!r.ok) throw new Error(await r.text());
       weekApproved = false;
       document.getElementById('hoursStatus').textContent = 'Week unlocked — hours can be edited';
