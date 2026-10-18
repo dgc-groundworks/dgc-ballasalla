@@ -79,7 +79,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
         <input id="upto" type="date">
       </label>
     </div>
-    <p class="muted" style="margin-top:10px">Holiday is earned only on days actually worked: 22 days a year, so each day worked (up to 8 hours) earns 22 ÷ 260 of a day; overtime earns no extra. Unpaid days off earn nothing. Bank holidays are paid and don't come out of the 22. "By this date" assumes they're in every working day from now.</p>
+    <p class="muted" style="margin-top:10px">Holiday is earned only on days actually worked: 22 days a year, so each day worked (up to 8 hours) earns 22 ÷ 260 of a day; overtime earns no extra. Paid holidays and bank holidays count as days worked. Unpaid days off earn nothing. Bank holidays are paid and don't come out of the 22. "By this date" assumes they're in every working day from now.</p>
   </div>
   <div id="out" class="hide">
     <div class="card">
@@ -143,6 +143,7 @@ function workDays(fromIso, toIso, skip) { // working days from..to inclusive, mi
   while (d <= end) { if (isWork(d) && !(skip && skip.has(iso(d)))) n++; d.setDate(d.getDate() + 1); }
   return n;
 }
+function weekdays(a, b) { let n = 0; const d = parse(a), e = parse(b); while (d <= e) { if (d.getDay() > 0 && d.getDay() < 6) n++; d.setDate(d.getDate() + 1); } return n; }
 function leaveDays(l, fromIso, toIso) { // working days of a leave row inside a window
   const a = l.from_date > fromIso ? l.from_date : fromIso, b = l.to_date < toIso ? l.to_date : toIso;
   const out = []; if (a > b) return out; const d = parse(a), e = parse(b);
@@ -167,21 +168,27 @@ function calc(s, data, uptoIso) {
   const from = s.start_date && s.start_date > yearStart ? s.start_date : yearStart;
   const hol = data.leave.filter(l => /holiday/i.test(l.leave_type));
   const holDays = new Set(hol.flatMap(l => leaveDays(l, from, yearEnd)));
-  // a paid holiday day earns no holiday, even if 8 h were put on the hours sheet for it
-  const worked = data.hours.filter(h => h.work_date >= from && h.work_date <= today && Number(h.hours) > 0 && !holDays.has(h.work_date));
-  const hrs = worked.reduce((t, h) => t + Math.min(DAY_H, Number(h.hours)), 0); // capped at 8 h a day (Ash, 16 Oct 2026: overtime earns no extra holiday)
-  const lastDay = worked.length ? worked[worked.length - 1].work_date : null;
+  // What counts as a day worked (Ash, 18 Oct 2026): hours worked, capped at 8 a day; a paid holiday day and an
+  // Isle of Man bank holiday count as 8 h (the legal minimum keeps building while on paid leave). Unpaid days earn nothing.
+  const dayH = {};
+  data.hours.forEach(h => { if (h.work_date >= from && h.work_date <= today && Number(h.hours) > 0) dayH[h.work_date] = Math.min(DAY_H, Number(h.hours)); });
+  const lastWorked = Object.keys(dayH).sort().pop() || null;
+  holDays.forEach(d => { if (d <= today) dayH[d] = DAY_H; });
+  BANK.forEach(d => { const x = parse(d); if (d >= from && d <= today && x.getDay() > 0 && x.getDay() < 6) dayH[d] = DAY_H; });
+  const worked = Object.keys(dayH).sort();
+  const hrs = worked.reduce((t, d) => t + dayH[d], 0);
+  const lastDay = lastWorked;
   const earnedNow = hrs / DAY_H * DAYS_A_YEAR / WORK_DAYS;
   const unpaid = data.leave.filter(l => /unpaid/i.test(l.leave_type));
   const taken = [...holDays].filter(d => d <= today).length;
   const booked = [...holDays].filter(d => d > today && d <= uptoIso).length;
   const bookedYear = [...holDays].filter(d => d > today).length;
-  // Forecast: every working day after the last recorded day (or today), not on booked holiday
+  // Forecast: every weekday after the last day worked, holidays and bank holidays included (they count as 8 h)
   const startF = iso(new Date(Math.max(parse(lastDay || from).getTime() + 864e5, parse(from).getTime())));
-  const fDays = uptoIso >= startF ? workDays(startF, uptoIso, holDays) : 0;
+  const fDays = uptoIso >= startF ? weekdays(startF, uptoIso) : 0;
   const earnedBy = earnedNow + fDays * DAYS_A_YEAR / WORK_DAYS;
   const xmasIso = uptoIso.slice(0, 4) + '-12-24';
-  const fX = xmasIso >= startF ? workDays(startF, xmasIso, holDays) : 0;
+  const fX = xmasIso >= startF ? weekdays(startF, xmasIso) : 0;
   const earnedXmas = earnedNow + fX * DAYS_A_YEAR / WORK_DAYS;
   const gap = lastDay ? workDays(iso(new Date(parse(lastDay).getTime() + 864e5)), today) : 0;
   return { from, hrs, days: worked.length, lastDay, earnedNow, taken, booked, bookedYear, fDays, earnedBy, earnedXmas, gap, today,
@@ -206,7 +213,7 @@ function show() {
     $('flags').innerHTML = fl.map(f => '<p class="flag">' + f + '</p>').join('');
     $('sum').innerHTML = [
       ['Counted from', nice(c.from)],
-      ['Hours counted to date (max 8 a day)', r1(c.hrs) + ' h on ' + c.days + ' days (' + r1(c.hrs / DAY_H) + ' full days)'],
+      ['Hours counted to date (max 8 a day; paid holidays and bank holidays at 8)', r1(c.hrs) + ' h on ' + c.days + ' days (' + r1(c.hrs / DAY_H) + ' full days)'],
       ['Holiday earned to date', r1(c.earnedNow) + ' days'],
       ['Paid holiday already taken', c.taken + ' days'],
       ['Booked between now and ' + nice(upto), c.booked + ' days'],
@@ -231,7 +238,7 @@ function show() {
 }
 // ---------- 12-month calendar and booking (18 Oct 2026, Ash: managers put holidays in here first; staff booking later, John approves) ----------
 // Buffer rule (Ash): a day can only be booked if the holiday earned up to 3 working days before it covers it.
-// Earned = capped hours worked (max 8 a day) so far, plus every working day from now that isn't holiday, x 22/260.
+// Earned = capped hours worked (max 8 a day) so far, paid holidays and bank holidays at 8, plus every weekday from now that isn't unpaid, x 22/260.
 const BUFFER = 3;
 let calS = null, calData = null, calStart = null, picked = new Set();
 function addWork(isoD, n) { const d = parse(isoD); let k = 0; while (k < Math.abs(n)) { d.setDate(d.getDate() + (n < 0 ? -1 : 1)); if (isWork(d)) k++; } return iso(d); }
@@ -242,13 +249,16 @@ function calModel() {
   const lastRec = Object.keys(capped).sort().pop() || null;
   const hol = new Set(), unp = new Set(), oth = new Set();
   calData.leave.forEach(l => { const set = /holiday/i.test(l.leave_type) ? hol : /unpaid/i.test(l.leave_type) ? unp : oth; leaveDays(l, '0000', '9999').forEach(x => set.add(x)); });
+  // Paid holiday and bank holidays count as 8 h worked (Ash, 18 Oct 2026); unpaid days earn nothing
+  hol.forEach(x => { if (x >= from && x <= today) capped[x] = DAY_H; });
+  BANK.forEach(x => { const d = parse(x); if (x >= from && x <= today && d.getDay() > 0 && d.getDay() < 6) capped[x] = DAY_H; });
   return { today, from, capped, lastRec, hol, unp, oth };
 }
 function earnedThrough(m, isoD, off) { // holiday earned from start to isoD inclusive
   let hrs = 0; for (const [d, h] of Object.entries(m.capped)) if (d <= isoD) hrs += h;
   let e = hrs / DAY_H * DAYS_A_YEAR / WORK_DAYS;
   const f0 = m.lastRec ? iso(new Date(parse(m.lastRec).getTime() + 864e5)) : m.from; // same as the figures above: forecast from the day after the last recorded hours
-  if (isoD >= f0) { const d = parse(f0), end = parse(isoD); while (d <= end) { const k = iso(d); if (isWork(d) && !off.has(k) && !m.unp.has(k) && !m.oth.has(k) && !(k in m.capped)) e += DAYS_A_YEAR / WORK_DAYS; d.setDate(d.getDate() + 1); } }
+  if (isoD >= f0) { const d = parse(f0), end = parse(isoD); while (d <= end) { const k = iso(d); if (d.getDay() > 0 && d.getDay() < 6 && !m.unp.has(k) && !m.oth.has(k) && !(k in m.capped)) e += DAYS_A_YEAR / WORK_DAYS; /* holidays and bank holidays count */ d.setDate(d.getDate() + 1); } }
   return e;
 }
 function availOn(m, isoD) { // can this day be booked as paid holiday, given what's booked and picked before it
