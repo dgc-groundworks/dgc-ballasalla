@@ -7,7 +7,8 @@ let session = null;
 let records = [];
 let weekOffset = 0; // 0 = this week, -1 = last week, etc.
 let refreshTimer = null;
-let viewMode = 'person'; // 'person' (existing single-week view) or 'jobs' (all jobs, all weeks tally)
+let viewMode = 'person'; // 'person' (single week), 'day' (one day, every person; Ash 18 Oct 2026) or 'jobs' (all jobs, all weeks tally)
+let dayIso = new Date().toISOString().slice(0, 10);
 let summaryRecords = []; // loaded separately for the 'jobs' view — not week-limited
 
 function ah(extra) {
@@ -55,7 +56,14 @@ async function loadData() {
     { headers: ah() }
   );
   if (!r.ok) throw new Error(await r.text());
-  records = await r.json();
+  records = cleanRows(await r.json());
+}
+
+// Ash, 18 Oct 2026: the "Test Test" account is ours, not a worker, so it never shows here.
+// Real hours that ended up under a test site's name show as "Site not known" so they can be put right.
+const TEST_SITE = /^brand new test site/i;
+function cleanRows(rows) {
+  return rows.filter(r => r.staff_name !== 'Test Test').map(r => TEST_SITE.test(r.site || '') ? Object.assign({}, r, { site: 'Site not known (check)', siteFlag: true }) : r);
 }
 
 // All-time load for the "all jobs, all weeks" summary — not limited to
@@ -69,7 +77,7 @@ async function loadSummaryData() {
     { headers: ah() }
   );
   if (!r.ok) throw new Error(await r.text());
-  summaryRecords = await r.json();
+  summaryRecords = cleanRows(await r.json());
 }
 
 function getMonday(iso) {
@@ -83,6 +91,62 @@ function fmtWeekOf(iso) {
   return 'w/c ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+// ── By day (Ash, 18 Oct 2026): one day, everyone on it; arrows go day by day; the week strip shows each day's total ──
+const isoOf = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+function shiftDay(iso, n) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return isoOf(d); }
+async function loadDay() {
+  const mon = getMonday(dayIso), sun = shiftDay(mon, 6);
+  const r = await fetch(REST + '/dgc_timesheets?select=id,staff_name,work_date,site,description,notes,hours,start_time,finish_time,lunch_mins' +
+    '&work_date=gte.' + mon + '&work_date=lte.' + sun + '&order=staff_name.asc', { headers: ah() });
+  if (!r.ok) throw new Error(await r.text());
+  records = cleanRows(await r.json());
+}
+function renderDay() {
+  const app = document.getElementById('app');
+  const mon = getMonday(dayIso), today = isoOf(new Date());
+  const long = new Date(dayIso + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const days = [0, 1, 2, 3, 4, 5, 6].map(i => shiftDay(mon, i));
+  const strip = days.map(d => {
+    const tot = records.filter(r => r.work_date === d).reduce((s, r) => s + parseFloat(r.hours || 0), 0);
+    const on = d === dayIso, lab = new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
+    return `<button class="secondary-btn ts-day" data-d="${d}" style="flex:1;min-width:78px;${on ? 'border-color:var(--accent);color:var(--accent);font-weight:800' : ''}">${lab}<br><small style="opacity:.8">${tot ? fmtHours(tot) : '—'}</small></button>`;
+  }).join('');
+  const rows = records.filter(r => r.work_date === dayIso);
+  const total = rows.reduce((s, r) => s + parseFloat(r.hours || 0), 0);
+  const body = rows.length ? rows.map(e => {
+    const timing = [e.start_time, e.finish_time].filter(Boolean).join(' – ');
+    return `<div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+        <div style="min-width:0"><div style="font-weight:700">${e.staff_name}</div>
+          <div style="font-size:.85rem;color:${e.siteFlag ? 'var(--danger)' : 'var(--muted)'}">${e.site || '—'}${timing ? ' · ' + timing : ''}${e.lunch_mins ? ' · ' + e.lunch_mins + 'm lunch' : ''}</div></div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--accent)">${fmtHours(e.hours)}</div>
+      </div>
+      ${e.description ? `<div style="font-size:.9rem;margin-top:6px;background:var(--panel2);border-left:3px solid var(--accent);padding:6px 10px;border-radius:0 6px 6px 0">${e.description}</div>` : ''}
+    </div>`; }).join('') : '<p style="padding:24px;text-align:center;color:var(--muted)">Nobody has put hours in for this day yet.</p>';
+  app.innerHTML = `
+    <header class="topbar" style="position:sticky;top:0">
+      <h1 style="margin:0;font-size:1rem">Timesheets</h1>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="viewPersonBtn" class="secondary-btn">By person</button>
+        <button id="viewDayBtn" class="secondary-btn" style="border-color:var(--accent);color:var(--accent)">By day</button>
+        <button id="viewJobsBtn" class="secondary-btn">By job, all weeks</button>
+        <button id="prevDayBtn" class="secondary-btn" style="padding:7px 12px;font-size:1rem" aria-label="Day before">&#8249;</button>
+        <span style="font-size:.9rem;white-space:nowrap;min-width:170px;text-align:center">${long}</span>
+        <button id="nextDayBtn" class="secondary-btn" style="padding:7px 12px;font-size:1rem" aria-label="Next day" ${dayIso >= today ? 'disabled' : ''}>&#8250;</button>
+        <button id="refreshBtn" class="secondary-btn">Refresh</button>
+      </div>
+    </header>
+    <div style="padding:12px 16px;display:flex;gap:6px;overflow-x:auto">${strip}</div>
+    <div style="margin:0 16px 16px;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;padding:12px 16px;background:var(--panel2);font-weight:700"><span>${rows.length} ${rows.length === 1 ? 'person' : 'people'}</span><span style="color:var(--accent)">${fmtHours(total)}</span></div>
+      ${body}
+    </div>`;
+  bindControls();
+  document.getElementById('prevDayBtn').onclick = () => { dayIso = shiftDay(dayIso, -1); refresh(); };
+  const nx = document.getElementById('nextDayBtn'); if (dayIso < today) nx.onclick = () => { dayIso = shiftDay(dayIso, 1); refresh(); };
+  app.querySelectorAll('.ts-day').forEach(b => b.onclick = () => { dayIso = b.dataset.d; renderDay(); });
+}
+
 function renderJobSummary() {
   const app = document.getElementById('app');
   const headerHtml = `
@@ -90,6 +154,7 @@ function renderJobSummary() {
       <h1 style="margin:0;font-size:1rem">Timesheets</h1>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button id="viewPersonBtn" class="secondary-btn">By person</button>
+        <button id="viewDayBtn" class="secondary-btn">By day</button>
         <button id="viewJobsBtn" class="secondary-btn" style="border-color:var(--accent);color:var(--accent)">By job, all weeks</button>
         <button id="refreshBtn" class="secondary-btn">Refresh</button>
         ${window.self !== window.top ? '' : '<button id="logoutBtn" class="secondary-btn">Sign out</button>'}
@@ -171,6 +236,7 @@ function render() {
       <h1 style="margin:0;font-size:1rem">Timesheets</h1>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button id="viewPersonBtn" class="secondary-btn" style="border-color:var(--accent);color:var(--accent)">By person</button>
+        <button id="viewDayBtn" class="secondary-btn">By day</button>
         <button id="viewJobsBtn" class="secondary-btn">By job, all weeks</button>
         <button id="prevWeekBtn" class="secondary-btn" style="padding:7px 12px;font-size:1rem">&#8249;</button>
         <span id="weekLabel" style="font-size:0.9rem;color:var(--text);white-space:nowrap;min-width:180px;text-align:center">${label}</span>
@@ -253,6 +319,8 @@ function bindControls() {
     if (viewMode === 'person') return;
     viewMode = 'person'; refresh();
   });
+  const dayBtn = document.getElementById('viewDayBtn');
+  if (dayBtn) dayBtn.addEventListener('click', () => { if (viewMode === 'day') return; viewMode = 'day'; refresh(); });
   document.getElementById('viewJobsBtn').addEventListener('click', () => {
     if (viewMode === 'jobs') return;
     viewMode = 'jobs'; refresh();
@@ -299,6 +367,9 @@ async function refresh() {
     if (viewMode === 'jobs') {
       await loadSummaryData();
       renderJobSummary();
+    } else if (viewMode === 'day') {
+      await loadDay();
+      renderDay();
     } else {
       await loadData();
       render();
