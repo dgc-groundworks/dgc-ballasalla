@@ -165,13 +165,14 @@ function calc(s, data, uptoIso) {
   const today = iso(new Date());
   const yearStart = uptoIso.slice(0, 4) + '-01-01', yearEnd = uptoIso.slice(0, 4) + '-12-31';
   const from = s.start_date && s.start_date > yearStart ? s.start_date : yearStart;
-  const worked = data.hours.filter(h => h.work_date >= from && h.work_date <= today && Number(h.hours) > 0);
+  const hol = data.leave.filter(l => /holiday/i.test(l.leave_type));
+  const holDays = new Set(hol.flatMap(l => leaveDays(l, from, yearEnd)));
+  // a paid holiday day earns no holiday, even if 8 h were put on the hours sheet for it
+  const worked = data.hours.filter(h => h.work_date >= from && h.work_date <= today && Number(h.hours) > 0 && !holDays.has(h.work_date));
   const hrs = worked.reduce((t, h) => t + Math.min(DAY_H, Number(h.hours)), 0); // capped at 8 h a day (Ash, 16 Oct 2026: overtime earns no extra holiday)
   const lastDay = worked.length ? worked[worked.length - 1].work_date : null;
   const earnedNow = hrs / DAY_H * DAYS_A_YEAR / WORK_DAYS;
-  const hol = data.leave.filter(l => /holiday/i.test(l.leave_type));
   const unpaid = data.leave.filter(l => /unpaid/i.test(l.leave_type));
-  const holDays = new Set(hol.flatMap(l => leaveDays(l, from, yearEnd)));
   const taken = [...holDays].filter(d => d <= today).length;
   const booked = [...holDays].filter(d => d > today && d <= uptoIso).length;
   const bookedYear = [...holDays].filter(d => d > today).length;
