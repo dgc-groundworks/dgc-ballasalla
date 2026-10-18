@@ -41,6 +41,28 @@ td.r,th.r{text-align:right}
 .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 .flag{border-left:4px solid var(--accent);padding:8px 12px;background:var(--surf2);border-radius:6px;margin-top:8px;font-size:.92rem}
 .hide{display:none}
+.cal-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.cal-head h2{margin:0;flex:1}
+.cal{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.mon{background:var(--surf2);border:1px solid var(--bord);border-radius:10px;padding:10px}
+.mon h3{font-size:.9rem;margin-bottom:6px}
+.mg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;font-variant-numeric:tabular-nums}
+.mg .dh{font-size:.68rem;color:var(--muted);text-align:center}
+.dy{position:relative;aspect-ratio:1;border-radius:6px;font-size:.8rem;display:flex;align-items:center;justify-content:center;border:1px solid transparent;background:transparent;color:var(--text);font-family:inherit;padding:0}
+.dy.we{color:var(--muted);opacity:.45}
+.dy.bh{background:rgba(59,130,246,.18);color:var(--blue);font-weight:700}
+.dy.hol{background:var(--green);color:#04210f;font-weight:700}
+.dy.unp{background:rgba(245,158,11,.35);font-weight:700}
+.dy.oth{background:rgba(148,163,184,.35)}
+.dy.wk::after{content:'';position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--muted)}
+.dy.ok{border-color:var(--green);cursor:pointer}
+.dy.no{opacity:.35}
+.dy.sel{background:var(--accent);color:#1a1100;font-weight:800;border-color:var(--accent)}
+.dy.today{outline:2px solid var(--text);outline-offset:-2px}
+.key{display:flex;gap:12px;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin:10px 0}
+.key span{display:inline-flex;align-items:center;gap:5px}
+.key i{display:inline-block;width:14px;height:14px;border-radius:4px}
+.bookbar{position:sticky;bottom:0;background:var(--surf);border:1px solid var(--accent);border-radius:12px;padding:12px;margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 </style>
 </head>
@@ -68,6 +90,23 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
         <div class="stat warn"><div class="n" id="nXmas">0</div><div class="l">Can take before Christmas, keeping 3 for the closure</div></div>
       </div>
       <div id="flags"></div>
+    </div>
+    <div class="card" id="calCard">
+      <div class="cal-head">
+        <h2 id="calTitle">12-month calendar</h2>
+        <button class="btn sec" id="calPrev" aria-label="Earlier months">&larr;</button>
+        <button class="btn sec" id="calNext" aria-label="Later months">&rarr;</button>
+      </div>
+      <p class="muted">Tap the days to book. A green outline means they'll have earned that day by then, with a 3 working day buffer, so they can't take days they haven't earned yet. Holiday days don't earn holiday.</p>
+      <div class="key"><span><i style="background:var(--green)"></i>Holiday</span><span><i style="background:rgba(245,158,11,.35)"></i>Unpaid</span><span><i style="background:rgba(148,163,184,.35)"></i>Other leave</span><span><i style="background:rgba(59,130,246,.18)"></i>Bank holiday (paid)</span><span><i style="border:1px solid var(--green)"></i>Can book</span><span><i style="background:var(--accent)"></i>Picked</span></div>
+      <div class="cal" id="cal"></div>
+      <div class="bookbar hide" id="bookBar">
+        <b id="bookTxt"></b>
+        <select id="bookType" style="width:auto;min-height:44px"><option value="Holiday">Paid holiday</option><option value="Unpaid">Unpaid</option></select>
+        <button class="btn" id="bookBtn">Book them</button>
+        <button class="btn sec" id="bookClear">Clear</button>
+        <span class="muted" id="bookMsg"></span>
+      </div>
     </div>
     <div class="card">
       <h2>Message to send</h2>
@@ -185,8 +224,90 @@ function show() {
       + XMAS_KEEP + ' days have to be kept for when we close between Christmas and New Year, so you can take up to ' + half(Math.max(0, c.xmasFree)) + ' days before Christmas. If you take more, you won\'t be paid over Christmas.\n\n'
       + 'Let me know the dates you want and I\'ll check them.';
     $('out').classList.remove('hide');
+    if (!calS || calS.id !== s.id) { picked.clear(); calStart = null; }
+    calS = s; calData = data; renderCal();
   }).catch(e => { $('err').textContent = e.message; $('err').classList.remove('hide'); });
 }
+// ---------- 12-month calendar and booking (18 Oct 2026, Ash: managers put holidays in here first; staff booking later, John approves) ----------
+// Buffer rule (Ash): a day can only be booked if the holiday earned up to 3 working days before it covers it.
+// Earned = capped hours worked (max 8 a day) so far, plus every working day from now that isn't holiday, x 22/260.
+const BUFFER = 3;
+let calS = null, calData = null, calStart = null, picked = new Set();
+function addWork(isoD, n) { const d = parse(isoD); let k = 0; while (k < Math.abs(n)) { d.setDate(d.getDate() + (n < 0 ? -1 : 1)); if (isWork(d)) k++; } return iso(d); }
+function calModel() {
+  const today = iso(new Date());
+  const from = calS.start_date || (today.slice(0, 4) + '-01-01');
+  const capped = {}; calData.hours.forEach(h => { if (h.work_date >= from && Number(h.hours) > 0) capped[h.work_date] = Math.min(DAY_H, Number(h.hours)); });
+  const lastRec = Object.keys(capped).sort().pop() || null;
+  const hol = new Set(), unp = new Set(), oth = new Set();
+  calData.leave.forEach(l => { const set = /holiday/i.test(l.leave_type) ? hol : /unpaid/i.test(l.leave_type) ? unp : oth; leaveDays(l, '0000', '9999').forEach(x => set.add(x)); });
+  return { today, from, capped, lastRec, hol, unp, oth };
+}
+function earnedThrough(m, isoD, off) { // holiday earned from start to isoD inclusive
+  let hrs = 0; for (const [d, h] of Object.entries(m.capped)) if (d <= isoD) hrs += h;
+  let e = hrs / DAY_H * DAYS_A_YEAR / WORK_DAYS;
+  const f0 = m.lastRec ? iso(new Date(parse(m.lastRec).getTime() + 864e5)) : m.from; // same as the figures above: forecast from the day after the last recorded hours
+  if (isoD >= f0) { const d = parse(f0), end = parse(isoD); while (d <= end) { const k = iso(d); if (isWork(d) && !off.has(k) && !m.unp.has(k) && !m.oth.has(k) && !(k in m.capped)) e += DAYS_A_YEAR / WORK_DAYS; d.setDate(d.getDate() + 1); } }
+  return e;
+}
+function availOn(m, isoD) { // can this day be booked as paid holiday, given what's booked and picked before it
+  const off = new Set([...m.hol, ...picked]);
+  const used = [...off].filter(x => x < isoD && x >= m.from).length;
+  return earnedThrough(m, addWork(isoD, -BUFFER), off) - used;
+}
+function renderCal() {
+  if (!calS) return;
+  const m = calModel();
+  if (!calStart) { const t = parse(m.today); calStart = new Date(t.getFullYear(), t.getMonth() - 2, 1); }
+  const end = new Date(calStart.getFullYear(), calStart.getMonth() + 12, 0);
+  $('calTitle').textContent = calStart.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) + ' to ' + end.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  let html = '';
+  for (let i = 0; i < 12; i++) {
+    const first = new Date(calStart.getFullYear(), calStart.getMonth() + i, 1), days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    let g = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => '<div class="dh">' + x + '</div>').join('') + '<div></div>'.repeat((first.getDay() + 6) % 7);
+    for (let dn = 1; dn <= days; dn++) {
+      const d = new Date(first.getFullYear(), first.getMonth(), dn), k = iso(d), cls = ['dy']; let tip = nice(k), can = false;
+      if (k === m.today) cls.push('today');
+      if (BANK.has(k)) { cls.push('bh'); tip += ': bank holiday (paid)'; }
+      else if (d.getDay() === 0 || d.getDay() === 6) cls.push('we');
+      else if (m.hol.has(k)) { cls.push('hol'); tip += ': holiday'; }
+      else if (m.unp.has(k)) { cls.push('unp'); tip += ': unpaid'; }
+      else if (m.oth.has(k)) { cls.push('oth'); tip += ': other leave'; }
+      else if (k < m.from) { cls.push('no'); tip += ': before they started'; }
+      else {
+        if (k in m.capped) { cls.push('wk'); tip += ': worked ' + m.capped[k] + ' h'; } // a day worked can't be booked as holiday
+        else if (picked.has(k)) { cls.push('sel'); can = true; tip += ': picked'; }
+        else { const a = availOn(m, k); can = a >= 1 - 1e-9; cls.push(can ? 'ok' : 'no'); tip += can ? ': can book (' + r1(a) + ' earned)' : ': not earned yet (' + r1(Math.max(0, a)) + ' by then)'; }
+      }
+      g += can ? '<button type="button" class="' + cls.join(' ') + '" data-d="' + k + '" title="' + tip + '" aria-label="' + tip + '" aria-pressed="' + picked.has(k) + '">' + dn + '</button>'
+               : '<div class="' + cls.join(' ') + '" title="' + tip + '">' + dn + '</div>';
+    }
+    html += '<div class="mon"><h3>' + first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) + '</h3><div class="mg">' + g + '</div></div>';
+  }
+  $('cal').innerHTML = html;
+  $('cal').querySelectorAll('button[data-d]').forEach(b => b.onclick = () => { const k = b.dataset.d; picked.has(k) ? picked.delete(k) : picked.add(k); renderCal(); });
+  $('bookBar').classList.toggle('hide', picked.size === 0);
+  const sorted = [...picked].sort();
+  $('bookTxt').textContent = picked.size + ' day' + (picked.size === 1 ? '' : 's') + ' picked' + (sorted.length ? ': ' + nice(sorted[0]) + (sorted.length > 1 ? ' to ' + nice(sorted[sorted.length - 1]) : '') : '');
+}
+function runs(days) { // consecutive working days become one leave row
+  const out = []; let a = null, b = null;
+  days.sort().forEach(k => { if (b && addWork(b, 1) === k) b = k; else { if (a) out.push([a, b]); a = b = k; } });
+  if (a) out.push([a, b]); return out;
+}
+async function bookPicked() {
+  if (!calS || !picked.size) return;
+  const type = $('bookType').value, rowsIn = runs([...picked]).map(([f, t]) => ({ staff_id: calS.id, leave_type: type, from_date: f, to_date: t, notes: 'Booked in the Holidays app by ' + (session.email || 'a manager') }));
+  $('bookMsg').textContent = 'Booking...';
+  const r = await fetch(REST + '/dgc_staff_leave', { method: 'POST', headers: authedHeaders(session, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify(rowsIn) });
+  if (!r.ok) { $('bookMsg').textContent = 'Not booked (' + r.status + '). ' + (await r.text()).slice(0, 120); return; }
+  $('bookMsg').textContent = 'Booked ' + picked.size + ' day' + (picked.size === 1 ? '' : 's') + '. It shows in the Planner too.';
+  picked.clear(); delete cache[calS.id]; show();
+}
+$('calPrev').onclick = () => { calStart = new Date(calStart.getFullYear(), calStart.getMonth() - 3, 1); renderCal(); };
+$('calNext').onclick = () => { calStart = new Date(calStart.getFullYear(), calStart.getMonth() + 3, 1); renderCal(); };
+$('bookClear').onclick = () => { picked.clear(); renderCal(); };
+$('bookBtn').onclick = () => bookPicked().catch(e => { $('bookMsg').textContent = e.message; });
 $('copy').onclick = () => navigator.clipboard.writeText($('msg').textContent).then(() => { $('copy').textContent = 'Copied'; setTimeout(() => $('copy').textContent = 'Copy message', 1500); });
 $('person').addEventListener('input', show); $('person').addEventListener('change', show); $('upto').addEventListener('change', show);
 (async () => {
