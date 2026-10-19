@@ -1664,12 +1664,12 @@ async function saveClientPackToDisk(rows, from, to, opts) {
       const dated = await clientCopies.getDirectoryHandle(range, { create: true });
       await writeFileToDir(dated, `DGC Dayworks Hours ${range}.pdf`, hoursBlob);
       await writeFileToDir(dated, `DGC Dayworks Photos ${range}.pdf`, photosBlob);
-      return { wroteToDisk: true, range, where: `Dandara › ${weekDir.name} › Client Copies › ${range}` };
+      return { wroteToDisk: true, range, where: `Dandara › ${weekDir.name} › Client Copies › ${range}`, hoursBlob, photosBlob };
     }
     const dated = await dirHandle.getDirectoryHandle(range, { create: true });
     await writeFileToDir(dated, `DGC Dayworks Hours ${range}.pdf`, hoursBlob);
     await writeFileToDir(dated, `DGC Dayworks Photos ${range}.pdf`, photosBlob);
-    return { wroteToDisk: true, range, where: `${dirHandle.name} › ${range}` };
+    return { wroteToDisk: true, range, where: `${dirHandle.name} › ${range}`, hoursBlob, photosBlob };
   }
 
   const a = document.createElement('a');
@@ -1678,7 +1678,7 @@ async function saveClientPackToDisk(rows, from, to, opts) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  return { wroteToDisk: false, range, why: lastFolderProblem };
+  return { wroteToDisk: false, range, why: lastFolderProblem, hoursBlob, photosBlob };
 }
 
 // Ash, 10 Sep 2026: don't hard-block the button when something's still
@@ -1719,6 +1719,28 @@ async function attemptSaveForClient(pool, from, to, anyUnready) {
   showUnreadyModal(count, () => showSendPreview(freshPool, freshFrom, freshTo));
 }
 
+// Ash, 19 Oct 2026: "when you download it or save it... Copy to clipboard, ready to just email."
+// A web page can't put PDF files on the clipboard, so: the covering email is copied to the clipboard,
+// and "Email the PDFs" opens the computer's share menu (Mail) with both PDFs already attached where the browser allows it.
+function packEmailText(pool, from, to) {
+  const rows = packRows(pool);
+  const hrs = rows.reduce((s, e) => s + effectiveHours(e), 0);
+  const allTime = entries.filter(e => e.confirmed && !e.flagged && !e.removedAt).reduce((s, e) => s + effectiveHours(e), 0) * DAYWORKS_RATE;
+  const owed = Math.max(0, allTime - totalPaid);
+  const sun = new Date(getMonday(to) + 'T12:00:00'); sun.setDate(sun.getDate() + 6);
+  const we = sun.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const notes = rows.filter(e => /kal/i.test(e.note || '')).map(e => '- ' + e.name + ', ' + new Date(e.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + ': ' + (e.note || '').replace(/\s*Mention (it )?to Kal( when sending)?\.?/i, '').replace(/\s*\(the rule since[^)]*\)/i, '').trim());
+  return 'Hi Kal,\n\nPlease find attached the dayworks timesheets for the week ending ' + we + ': ' + hrs + ' hours, ' + fmtMoney(hrs * DAYWORKS_RATE) + '.\n\n'
+    + (notes.length ? 'A few notes on the sheets:\n' + notes.join('\n') + '\n\n' : '')
+    + 'Paid to date: ' + fmtMoney(totalPaid) + '. Total outstanding including this week: ' + fmtMoney(owed) + '.\n\nKind regards,\n';
+}
+async function copyPackEmail(pool, from, to) {
+  const text = packEmailText(pool, from, to);
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch (e) { prompt('Copy this email (Cmd+C), then paste it into a new email:', text); return false; }
+}
+
+let lastSaved = null;
 function showSendPreview(pool, from, to) {
   const range = rangeLabel(from, to);
   const batchRef = `DGC Dayworks Hours ${range}`;
@@ -1733,6 +1755,7 @@ function showSendPreview(pool, from, to) {
     </div>
     <p class="flag-note" style="max-width:none;background:none;border:none;color:var(--muted);padding:4px 0 0">"Save" / "Save As" only writes the PDFs — nothing is marked as sent to the client until you click "Save to Archive".</p>
     <p class="save-where" id="saveWhere"></p>
+    <div class="report-actions" id="mailActions" style="display:none"><button class="btn-primary" id="copyMailBtn">Copy to clipboard, ready to email</button><button class="btn-secondary" id="shareMailBtn">Email the PDFs…</button></div>
     <p class="flag-note" id="saveStatus" style="max-width:none;display:none"></p>`;
   document.getElementById('printPackBtn').addEventListener('click', () => printPack(from, to));
   document.getElementById('cancelSendBtn').addEventListener('click', render);
@@ -1758,9 +1781,12 @@ function showSendPreview(pool, from, to) {
     status.textContent = forceAs ? 'Pick the Daywork › Dandara folder, then building the PDFs…' : 'Building the PDFs…';
     try {
       const result = await saveClientPackToDisk(pool, from, to, { forcePick: forceAs });
-      status.textContent = result.wroteToDisk
+      lastSaved = result;
+      const copied = await copyPackEmail(pool, from, to);
+      document.getElementById('mailActions').style.display = 'flex';
+      status.textContent = (copied ? 'Email copied to the clipboard, ready to paste. ' : '') + (result.wroteToDisk
         ? `Saved. Find the two PDFs in: ${result.where} (on OneDrive, DGC Projects - Documents › Daywork). Nothing has been sent to the client.`
-        : `Not saved to a folder${result.why ? ' (' + result.why + ')' : ''}, so it downloaded "DGC Dayworks ${range}.zip" to your Downloads folder instead. In Finder, open Downloads and double-click the zip to get the two PDFs. Nothing has been sent to the client.`;
+        : `Not saved to a folder${result.why ? ' (' + result.why + ')' : ''}, so it downloaded "DGC Dayworks ${range}.zip" to your Downloads folder instead. In Finder, open Downloads and double-click the zip to get the two PDFs. Nothing has been sent to the client.`);
     } catch (err) {
       status.textContent = 'Save failed: ' + err.message;
     } finally {
@@ -1770,6 +1796,23 @@ function showSendPreview(pool, from, to) {
   };
   document.getElementById('justSaveBtn').addEventListener('click', () => doSave(false));
   document.getElementById('saveAsBtn').addEventListener('click', () => doSave(true));
+  document.getElementById('copyMailBtn').addEventListener('click', async () => {
+    const st = document.getElementById('saveStatus'); st.style.display = 'block';
+    st.textContent = (await copyPackEmail(pool, from, to)) ? 'Email copied to the clipboard. Paste it into a new email to Kal and attach the two PDFs' + (lastSaved && lastSaved.where ? ' from: ' + lastSaved.where + '.' : ' (in your Downloads zip).') : 'Copy the email from the box, then paste it.';
+  });
+  document.getElementById('shareMailBtn').addEventListener('click', async () => {
+    const st = document.getElementById('saveStatus'); st.style.display = 'block';
+    if (!lastSaved || !lastSaved.hoursBlob) { st.textContent = 'Press Save first.'; return; }
+    const files = [new File([lastSaved.hoursBlob], `DGC Dayworks Hours ${range}.pdf`, { type: 'application/pdf' }), new File([lastSaved.photosBlob], `DGC Dayworks Photos ${range}.pdf`, { type: 'application/pdf' })];
+    const text = packEmailText(pool, from, to);
+    if (navigator.canShare && navigator.canShare({ files })) {
+      try { await navigator.share({ files, title: `Dayworks timesheets ${range}`, text }); st.textContent = 'Opened the share menu with both PDFs attached.'; }
+      catch (e) { st.textContent = 'Share cancelled.'; }
+    } else {
+      await copyPackEmail(pool, from, to);
+      st.textContent = "This browser can't attach files to an email itself. The email is on the clipboard; attach the two PDFs" + (lastSaved.where ? ' from: ' + lastSaved.where + '.' : ' from the zip in Downloads.');
+    }
+  });
   folderName('dandaraFolder').then(n => { const w = document.getElementById('saveWhere'); if (w) w.textContent = n
     ? 'Save puts the two PDFs in: ' + n + (n === DANDARA_FOLDER_NAME ? " › this week's folder › Client Copies" : '') + '. Save As lets you pick a different folder.'
     : "Save will ask you to choose a folder the first time (normally DGC Projects - Documents › Daywork › Dandara), then remember it."; });
