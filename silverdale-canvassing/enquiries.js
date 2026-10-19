@@ -4,8 +4,10 @@
 // against the planning register, the letters sent and the folders, so nobody who has already
 // contacted us is sent a canvassing letter, and every enquiry shows its planning history and value.
 
-const ENQ = { rows: [], loaded: false, loading: null, index: null, showHidden: false, filter: 'all' };
+const ENQ = { rows: [], loaded: false, loading: null, index: null, showHidden: false, filter: 'all', stageFilter: '', siteFilter: '' };
 const ENQ_KINDS = [['', 'Sort this: what is it?'], ['job', 'Job lead'], ['spam', 'Spam'], ['sales', 'Sales pitch'], ['test', 'Test'], ['other', 'Other']];
+// Where a job lead has got to (11 Oct 2026). Stored in notes.stage, so no database change.
+const ENQ_STAGES = [['new', 'New'], ['contacted', 'Contacted'], ['quote', 'Quote sent'], ['won', 'Won'], ['lost', 'Lost']];
 const ENQ_SITE = { silverdale: 'Silverdale', manx: 'Manx Drain Solutions', dgc: 'DGC' };
 const STATS_URL = 'https://dgc-ltd.github.io/dgc-traffic-dashboard/';
 
@@ -56,6 +58,7 @@ function normaliseEnquiry(row){
   e.kind = e.notes.kind || (e.notes.junk ? 'spam' : e.notes.test ? 'test' : '');
   e.test = e.kind === 'test' || !!e.notes.test || /^test\b/i.test(e.name) && /test only/i.test(e.message);
   e.junk = e.kind === 'spam' || e.kind === 'sales' || !!e.notes.junk;
+  e.stage = e.kind === 'job' ? (e.notes.stage || 'new') : '';
   e.keys = addrKeysOf(`${e.addressText} ${e.message}`);
   e.postcode = ((`${e.addressText} ${e.message}`).match(/\bIM\d{1,2}\s?\d[A-Z]{2}\b/i) || [''])[0].toUpperCase().replace(/\s+/g, '');
   e.n = personNorm(e.name);
@@ -192,7 +195,7 @@ function lettersFor(e){
 // ---- The Responses tab ----
 function updateEnquiryCount(){
   const el = document.querySelector('.nav-count[data-count="responses"]');
-  if (el) el.textContent = ENQ.rows.filter(e => !e.test && !e.junk && !e.notes.done).length || '';
+  if (el) el.textContent = ENQ.rows.filter(e => !e.test && !e.junk && !e.notes.done && e.stage !== 'won' && e.stage !== 'lost').length || '';
 }
 async function saveEnquiryNotes(e, patch){
   e.notes = Object.assign({}, e.notes, patch);
@@ -222,6 +225,7 @@ function enquiryCardHtml(e){
     <div class="row-bar"><span class="rb-caret">&#9656;</span><span class="lr-applicant">${esc(e.name)}</span>
       <span class="tag tag-dupe">${esc(ENQ_SITE[e.site] || e.site)}</span><span class="rb-meta">${esc(enqWhenTime(e))} &middot; ${esc(e.via)}</span>
       ${e.test ? '<span class="tag tag-dupe">Test</span>' : e.junk ? '<span class="tag tag-dupe">' + (e.kind === 'sales' ? 'Sales pitch' : 'Spam') + '</span>' : `<span class="tag ${status}">${e.notes.done ? 'Dealt with' : e.notes.replied ? 'Replied' : 'New'}</span>`}
+      ${e.stage ? `<select class="enq-stage f-move" title="Where this job lead has got to" style="margin-left:6px">${ENQ_STAGES.map(([v, t]) => `<option value="${v}"${e.stage === v ? ' selected' : ''}>${t}</option>`).join('')}</select>` : ''}
       <select class="enq-kind f-move" title="Sort this enquiry" style="margin-left:6px">${ENQ_KINDS.map(([v, t]) => `<option value="${v}"${(e.kind || '') === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
       <span class="rb-what">${esc((e.message || '').slice(0, 160))}</span></div>
     <div class="row-body">
@@ -247,7 +251,9 @@ async function renderResponses(main){
   if (state.tab !== 'responses') return;
   const visibleAll = ENQ.rows.filter(e => ENQ.showHidden || (!e.test && !e.junk));
   const cnt = { all: visibleAll.length, job: visibleAll.filter(e => e.kind === 'job').length, unsorted: visibleAll.filter(e => !e.kind).length };
-  const shown = visibleAll.filter(e => ENQ.filter === 'job' ? e.kind === 'job' : ENQ.filter === 'unsorted' ? !e.kind : true);
+  const shown = visibleAll.filter(e => (ENQ.filter === 'job' ? e.kind === 'job' : ENQ.filter === 'unsorted' ? !e.kind : true)
+    && (ENQ.filter !== 'job' || !ENQ.stageFilter || e.stage === ENQ.stageFilter) && (!ENQ.siteFilter || e.site === ENQ.siteFilter));
+  const stageCnt = s => visibleAll.filter(e => e.kind === 'job' && (!ENQ.siteFilter || e.site === ENQ.siteFilter) && (!s || e.stage === s)).length;
   const hidden = ENQ.rows.length - ENQ.rows.filter(e => !e.test && !e.junk).length;
   main.innerHTML = `
     <div class="panel"><div class="panel-title">Responses: people who have contacted us</div>
@@ -256,6 +262,8 @@ async function renderResponses(main){
       Each card shows whether we'd written to them, the planning at their address with its agent and engineer, and the job value.</p>
       ${ENQ.error ? `<p class="hint" style="color:var(--red)">Couldn't load enquiries: ${esc(ENQ.error)}</p>` : ''}
       <div class="fview-bar" style="margin-top:10px">${[['all', `Everything (${cnt.all})`], ['unsorted', `Not sorted yet (${cnt.unsorted})`], ['job', `Job leads (${cnt.job})`]].map(([k, t]) => `<button type="button" data-enqf="${k}" class="${ENQ.filter === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+      ${ENQ.filter === 'job' ? `<div class="fview-bar" style="margin-top:6px">${[['', `Every stage (${stageCnt('')})`], ...ENQ_STAGES.map(([k, t]) => [k, `${t} (${stageCnt(k)})`])].map(([k, t]) => `<button type="button" data-enqs="${k}" class="${ENQ.stageFilter === k ? 'on' : ''}">${t}</button>`).join('')}</div>` : ''}
+      <div class="fview-bar" style="margin-top:6px">${[['', 'All companies'], ...Object.entries(ENQ_SITE)].map(([k, t]) => `<button type="button" data-enqsite="${k}" class="${ENQ.siteFilter === k ? 'on' : ''}">${t}</button>`).join('')}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
         <button type="button" class="btn-secondary" id="enqRefresh">&#8635; Check for new</button>
         <button type="button" class="btn-secondary" id="enqAdd">+ Add one by hand (phone call, email)</button>
@@ -273,6 +281,8 @@ async function renderResponses(main){
   updateEnquiryCount();
   if (ENQ.focus) { const el = document.getElementById('enq-' + ENQ.focus); if (el) el.scrollIntoView({ block: 'start' }); ENQ.focus = null; }
   main.querySelectorAll('[data-enqf]').forEach(b => b.onclick = () => { ENQ.filter = b.dataset.enqf; render(); });
+  main.querySelectorAll('[data-enqs]').forEach(b => b.onclick = () => { ENQ.stageFilter = b.dataset.enqs; render(); });
+  main.querySelectorAll('[data-enqsite]').forEach(b => b.onclick = () => { ENQ.siteFilter = b.dataset.enqsite; render(); });
   main.querySelector('#enqRefresh').onclick = async () => { await loadEnquiries(true); ENQ.index = null; render(); };
   const hb = main.querySelector('#enqHidden'); if (hb) hb.onclick = () => { ENQ.showHidden = !ENQ.showHidden; render(); };
   main.querySelector('#enqAdd').onclick = () => { const f = main.querySelector('#enqAddForm'); f.style.display = f.style.display === 'none' ? 'flex' : 'none'; };
@@ -292,6 +302,8 @@ async function renderResponses(main){
     card.querySelector('.enq-replied').onclick = async () => { await saveEnquiryNotes(e, { replied: !e.notes.replied }); render(); };
     card.querySelector('.enq-done').onclick = async () => { await saveEnquiryNotes(e, { done: !e.notes.done }); render(); };
     card.querySelector('.enq-junk').onclick = async () => { await saveEnquiryNotes(e, e.junk ? { junk: false, kind: '' } : { junk: true, kind: 'spam' }); render(); };
+    const stageSel = card.querySelector('.enq-stage');
+    if (stageSel) stageSel.addEventListener('change', async ev => { await saveEnquiryNotes(e, { stage: ev.target.value, stageAt: new Date().toISOString(), stageBy: (typeof cloud !== 'undefined' && cloud.email) || '' }); render(); });
     card.querySelector('.enq-kind').addEventListener('change', async ev => {
       const k = ev.target.value;
       await saveEnquiryNotes(e, { kind: k, junk: k === 'spam' || k === 'sales', test: k === 'test' });
