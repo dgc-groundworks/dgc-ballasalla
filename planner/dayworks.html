@@ -191,6 +191,14 @@ input:focus{border-color:var(--accent)}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px}
 
 /* Upload tab */
+.fold-bar{display:flex;flex-direction:column;gap:8px;margin:0 0 14px;padding:12px 14px;border:1px solid var(--bord);border-radius:10px;background:var(--surf2,rgba(127,127,127,.06))}
+.fold-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.88rem}
+.fold-row b{min-width:150px}
+.fold-row .fold-name{flex:1;min-width:160px;color:var(--muted);word-break:break-word}
+.found-list{margin:10px 0;display:flex;flex-direction:column;gap:6px}
+.found-item{display:flex;gap:10px;align-items:center;font-size:.88rem;padding:6px 8px;border:1px solid var(--bord);border-radius:8px}
+.found-item small{color:var(--muted)}
+.save-where{font-size:.85rem;color:var(--muted);margin:8px 0 0}
 .upload-zone{padding:40px 20px;border:2px dashed var(--bord);border-radius:10px;text-align:center;color:var(--muted);font-size:0.95rem;cursor:pointer;transition:all .15s}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);color:var(--accent);background:rgba(245,158,11,.06)}
 .upload-zone input{display:none}
@@ -1460,45 +1468,47 @@ async function idbSet(key, val) {
     tx.onerror = () => reject(tx.error);
   });
 }
-// Grabs (or asks Ash to pick, once) the Daywork/Dandara folder handle.
-// Must be called as the FIRST await after the click, before any slow
-// work — the browser only allows the picker/permission prompt while the
-// click's "user activation" is still fresh.
-// Ash, 5 Oct 2026: "always save to the same place". The folder picked
-// must be Daywork > Dandara itself (the one holding the weekly photo
-// folders). A remembered folder with any other name (it had been
-// Living Hope Church since 18 Sep) is ignored, and a wrong pick is
-// refused, so a pack can never land in another job's folder again.
+// Ash, 19 Oct 2026: "an option to select a folder where to find it and an option to select a folder where to save it",
+// so Dayworks can be run without Claude. Two remembered folders (Chrome or Edge on a computer):
+//   photosFolder: where the timesheet photos are put (normally DGC Projects - Documents > Daywork > Dandara)
+//   dandaraFolder: where the packs are saved. If it's the Dandara folder, packs go in that week's folder > Client Copies > dates,
+//   same as before; any other folder gets a dated folder straight inside it.
 const DANDARA_FOLDER_NAME = 'Dandara';
+let lastFolderProblem = '';
+function folderApiProblem() {
+  if (!('showDirectoryPicker' in window)) return "This browser can't save to or read from a folder. Use Chrome or Edge on a computer.";
+  try { if (window.self !== window.top) return ''; } catch (e) { return ''; }
+  return '';
+}
+async function rememberedFolder(key, mode, askIfNeeded) {
+  if (!('showDirectoryPicker' in window)) return null;
+  const handle = await idbGet(key).catch(() => null);
+  if (!handle) return null;
+  try {
+    if ((await handle.queryPermission({ mode })) === 'granted') return handle;
+    if (askIfNeeded && (await handle.requestPermission({ mode })) === 'granted') return handle;
+  } catch (e) { /* the folder was moved or deleted */ }
+  return null;
+}
+async function pickFolder(key, mode, pickerId) {
+  lastFolderProblem = '';
+  const p = folderApiProblem(); if (p) { lastFolderProblem = p; return null; }
+  let handle;
+  try { handle = await window.showDirectoryPicker({ id: pickerId, mode }); }
+  catch (e) {
+    if (e && e.name === 'SecurityError') lastFolderProblem = "The folder picker is blocked inside this window. Press 'Open in its own tab', then choose the folder there.";
+    else lastFolderProblem = 'No folder was chosen.';
+    return null;
+  }
+  await idbSet(key, handle);
+  return handle;
+}
+async function folderName(key) { const h = await idbGet(key).catch(() => null); return h ? h.name : ''; }
+// Save folder: remembered one (asks for access if needed), or the picker if there isn't one / forcePick (Save As).
 async function getDandaraFolderHandle(opts) {
   const forcePick = !!(opts && opts.forcePick);
-  if (!('showDirectoryPicker' in window)) return null;
-  if (!forcePick) {
-    let handle = await idbGet('dandaraFolder').catch(() => null);
-    if (handle && handle.name !== DANDARA_FOLDER_NAME) handle = null;
-    if (handle) {
-      try {
-        const perm = await handle.queryPermission({ mode: 'readwrite' });
-        if (perm === 'granted') return handle;
-        if ((await handle.requestPermission({ mode: 'readwrite' })) === 'granted') return handle;
-      } catch (e) { /* handle gone (folder moved/deleted) — fall through to re-pick */ }
-    }
-  }
-  // forcePick (the "Save As..." button) always opens the picker fresh,
-  // ignoring whatever was remembered — and remembers THIS choice as the
-  // new default for next time, same as a real "Save As" changing where
-  // "Save" points afterwards.
-  let handle;
-  try {
-    handle = await window.showDirectoryPicker({ id: 'dgc-dayworks-dandara', mode: 'readwrite' });
-  } catch (e) {
-    return null; // user cancelled the picker
-  }
-  if (handle.name !== DANDARA_FOLDER_NAME) {
-    throw new Error(`that's the "${handle.name}" folder. Press Save again and pick DGC Projects - Documents › Daywork › Dandara (the folder with the weekly timesheet folders in it)`);
-  }
-  await idbSet('dandaraFolder', handle);
-  return handle;
+  if (!forcePick) { const h = await rememberedFolder('dandaraFolder', 'readwrite', true); if (h) return h; }
+  return pickFolder('dandaraFolder', 'readwrite', 'dgc-dayworks-dandara');
 }
 // The week's own folder inside Dandara (where its timesheet photos are),
 // found by its week-ending Sunday in any of the spellings already used
@@ -1648,12 +1658,18 @@ async function saveClientPackToDisk(rows, from, to, opts) {
     // with the raw timesheet photos, and never overwriting an earlier
     // pay run's copy since each one gets its own date-range folder.
     // Ash, 5 Oct 2026: always Dandara › <that week's folder> › Client Copies › <range>.
-    const weekDir = await getWeekFolderHandle(dirHandle, to);
-    const clientCopies = await weekDir.getDirectoryHandle('Client Copies', { create: true });
-    const dated = await clientCopies.getDirectoryHandle(range, { create: true });
+    if (dirHandle.name === DANDARA_FOLDER_NAME) {
+      const weekDir = await getWeekFolderHandle(dirHandle, to);
+      const clientCopies = await weekDir.getDirectoryHandle('Client Copies', { create: true });
+      const dated = await clientCopies.getDirectoryHandle(range, { create: true });
+      await writeFileToDir(dated, `DGC Dayworks Hours ${range}.pdf`, hoursBlob);
+      await writeFileToDir(dated, `DGC Dayworks Photos ${range}.pdf`, photosBlob);
+      return { wroteToDisk: true, range, where: `Dandara › ${weekDir.name} › Client Copies › ${range}` };
+    }
+    const dated = await dirHandle.getDirectoryHandle(range, { create: true });
     await writeFileToDir(dated, `DGC Dayworks Hours ${range}.pdf`, hoursBlob);
     await writeFileToDir(dated, `DGC Dayworks Photos ${range}.pdf`, photosBlob);
-    return { wroteToDisk: true, range, where: `Dandara › ${weekDir.name} › Client Copies › ${range}` };
+    return { wroteToDisk: true, range, where: `${dirHandle.name} › ${range}` };
   }
 
   const a = document.createElement('a');
@@ -1662,7 +1678,7 @@ async function saveClientPackToDisk(rows, from, to, opts) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  return { wroteToDisk: false, range };
+  return { wroteToDisk: false, range, why: lastFolderProblem };
 }
 
 // Ash, 10 Sep 2026: don't hard-block the button when something's still
@@ -1716,6 +1732,7 @@ function showSendPreview(pool, from, to) {
       <button class="btn-secondary" id="cancelSendBtn">Cancel</button>
     </div>
     <p class="flag-note" style="max-width:none;background:none;border:none;color:var(--muted);padding:4px 0 0">"Save" / "Save As" only writes the PDFs — nothing is marked as sent to the client until you click "Save to Archive".</p>
+    <p class="save-where" id="saveWhere"></p>
     <p class="flag-note" id="saveStatus" style="max-width:none;display:none"></p>`;
   document.getElementById('printPackBtn').addEventListener('click', () => printPack(from, to));
   document.getElementById('cancelSendBtn').addEventListener('click', render);
@@ -1742,8 +1759,8 @@ function showSendPreview(pool, from, to) {
     try {
       const result = await saveClientPackToDisk(pool, from, to, { forcePick: forceAs });
       status.textContent = result.wroteToDisk
-        ? `Saved into ${result.where}. Nothing has been sent to the client, this was just the files.`
-        : `Downloaded "DGC Dayworks ${range}.zip" — nothing has been sent to the client, this was just the files.`;
+        ? `Saved. Find the two PDFs in: ${result.where} (on OneDrive, DGC Projects - Documents › Daywork). Nothing has been sent to the client.`
+        : `Not saved to a folder${result.why ? ' (' + result.why + ')' : ''}, so it downloaded "DGC Dayworks ${range}.zip" to your Downloads folder instead. In Finder, open Downloads and double-click the zip to get the two PDFs. Nothing has been sent to the client.`;
     } catch (err) {
       status.textContent = 'Save failed: ' + err.message;
     } finally {
@@ -1753,6 +1770,9 @@ function showSendPreview(pool, from, to) {
   };
   document.getElementById('justSaveBtn').addEventListener('click', () => doSave(false));
   document.getElementById('saveAsBtn').addEventListener('click', () => doSave(true));
+  folderName('dandaraFolder').then(n => { const w = document.getElementById('saveWhere'); if (w) w.textContent = n
+    ? 'Save puts the two PDFs in: ' + n + (n === DANDARA_FOLDER_NAME ? " › this week's folder › Client Copies" : '') + '. Save As lets you pick a different folder.'
+    : "Save will ask you to choose a folder the first time (normally DGC Projects - Documents › Daywork › Dandara), then remember it."; });
 
   document.getElementById('archiveBtn').addEventListener('click', async () => {
     // Ash, 10 Sep 2026: "approved by John" on the client site — there's no
@@ -1778,8 +1798,8 @@ function showSendPreview(pool, from, to) {
         await saveEntry(e.id, Object.assign({}, e, { sentAt: new Date().toISOString(), sentBatchRef: batchRef, approvedBy, approvedAt }));
       }
       status.textContent = (result.wroteToDisk
-        ? `Saved into ${result.where}`
-        : `Downloaded "DGC Dayworks ${range}.zip"`) + ` and archived — this batch is now in Historic.`;
+        ? `Saved in: ${result.where}`
+        : `Downloaded "DGC Dayworks ${range}.zip" to your Downloads folder`) + `, and archived: this batch is now in Historic.`;
       setTimeout(() => { state.job = null; state.name = null; state.tab = 'current'; render(); }, 1200);
     } catch (err) {
       buttons().forEach(b => b.disabled = false);
@@ -1790,10 +1810,90 @@ function showSendPreview(pool, from, to) {
 }
 
 // ---------------------------------------------------------------
+// Find new sheets (Ash, 19 Oct 2026): look in the photos folder (and the week folders inside it)
+// for photos added since the last sheets went into Dayworks, list them, and add them with one press.
+// Runs by itself when the Upload tab opens if the browser already has access to the folder.
+// ---------------------------------------------------------------
+const IMG_EXT = /\.(jpe?g|png|heic|heif|webp)$/i;
+const SKIP_DIR = /client copies|archive|all sent|previous packs|^\./i;
+async function lastEntryTime() {
+  try {
+    const r = await fetch(REST + '?select=created_at&order=created_at.desc&limit=1', { headers: sbHeaders() });
+    const rows = r.ok ? await r.json() : [];
+    return rows.length ? new Date(rows[0].created_at).getTime() : 0;
+  } catch (e) { return 0; }
+}
+async function importedKeys() { return new Set((await idbGet('importedKeys').catch(() => null)) || []); }
+async function addImportedKeys(keys) { const s = await importedKeys(); keys.forEach(k => s.add(k)); await idbSet('importedKeys', [...s].slice(-2000)); }
+const fileKey = (f, where) => where + '/' + f.name + '|' + f.size + '|' + f.lastModified;
+async function scanForSheets(dir) {
+  const found = [], since = await lastEntryTime(), done = await importedKeys(), floor = Date.now() - 45 * 864e5;
+  const look = async (d, where, depth) => {
+    for await (const [name, h] of d.entries()) {
+      if (h.kind === 'file' && IMG_EXT.test(name)) {
+        const f = await h.getFile();
+        const k = fileKey(f, where);
+        if (f.lastModified > Math.max(since, floor) && !done.has(k)) found.push({ file: f, where, key: k });
+      } else if (h.kind === 'directory' && depth < 2 && !SKIP_DIR.test(name)) {
+        await look(h, where ? where + ' › ' + name : name, depth + 1);
+      }
+    }
+  };
+  await look(dir, '', 0);
+  return found.sort((a, b) => a.file.lastModified - b.file.lastModified);
+}
+let foundSheets = [];
+async function runFind(fromClick) {
+  const box = document.getElementById('foundBox'); if (!box) return;
+  let dir = await rememberedFolder('photosFolder', 'read', fromClick);
+  if (!dir && fromClick && !(await idbGet('photosFolder').catch(() => null))) dir = await pickFolder('photosFolder', 'read', 'dgc-dayworks-photos');
+  if (!dir) {
+    box.innerHTML = `<p class="flag-note" style="max-width:none">${esc(lastFolderProblem || (await folderName('photosFolder')
+      ? 'Press "Find new sheets" to let this page look in the photos folder.'
+      : 'Choose the photos folder first (normally DGC Projects - Documents › Daywork › Dandara).'))}</p>`;
+    return;
+  }
+  box.innerHTML = '<p class="flag-note" style="max-width:none">Looking in ' + esc(dir.name) + '…</p>';
+  try { foundSheets = await scanForSheets(dir); }
+  catch (e) { box.innerHTML = '<p class="flag-note" style="max-width:none">Couldn\'t read the folder: ' + esc(e.message) + '</p>'; return; }
+  if (!foundSheets.length) {
+    box.innerHTML = '<p class="flag-note" style="max-width:none">No new timesheet photos in ' + esc(dir.name) + ' since the last sheets were added. ' +
+      'New ones are photos put in that folder (or a week folder inside it) after the last entry went into Dayworks.</p>';
+    return;
+  }
+  box.innerHTML = `<p style="margin:6px 0"><b>${foundSheets.length} new ${foundSheets.length === 1 ? 'photo' : 'photos'}</b> in ${esc(dir.name)}. Untick any that aren't timesheets.</p>
+    <div class="found-list">${foundSheets.map((s, i) => `<label class="found-item"><input type="checkbox" data-i="${i}" checked>
+      <span>${esc(s.file.name)}<br><small>${esc(s.where || dir.name)} · added ${new Date(s.file.lastModified).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></span></label>`).join('')}</div>
+    <button class="btn-primary" id="addFoundBtn">Add these to Dayworks</button>`;
+  document.getElementById('addFoundBtn').addEventListener('click', async () => {
+    const pick = [...box.querySelectorAll('input[type=checkbox]')].filter(c => c.checked).map(c => foundSheets[+c.dataset.i]);
+    if (!pick.length) return;
+    await addImportedKeys(pick.map(s => s.key));
+    await handleFiles(pick.map(s => s.file));
+  });
+}
+async function renderFolderBar() {
+  const bar = document.getElementById('folderBar'); if (!bar) return;
+  const pn = await folderName('photosFolder'), sn = await folderName('dandaraFolder');
+  const problem = folderApiProblem();
+  bar.innerHTML = problem ? `<p class="flag-note" style="max-width:none;margin:0">${esc(problem)}</p>` : `
+    <div class="fold-row"><b>Photos are in</b><span class="fold-name">${pn ? esc(pn) : 'not chosen yet'}</span><button class="btn-secondary" id="pickPhotosBtn">Choose folder…</button></div>
+    <div class="fold-row"><b>Packs are saved to</b><span class="fold-name">${sn ? esc(sn) + (sn === DANDARA_FOLDER_NAME ? ' › that week\'s folder › Client Copies' : '') : 'not chosen yet (you\'ll be asked when you save)'}</span><button class="btn-secondary" id="pickSaveBtn">Choose folder…</button></div>
+    <div class="fold-row"><button class="btn-primary" id="findBtn">Find new sheets</button>${(() => { try { return window.self !== window.top ? '<button class="btn-secondary" id="ownTabBtn">Open in its own tab</button>' : ''; } catch (e) { return ''; } })()}</div>`;
+  const on = (id, fn) => { const b = document.getElementById(id); if (b) b.addEventListener('click', fn); };
+  on('pickPhotosBtn', async () => { if (await pickFolder('photosFolder', 'read', 'dgc-dayworks-photos')) { await renderFolderBar(); runFind(true); } else { await renderFolderBar(); if (lastFolderProblem) document.getElementById('foundBox').innerHTML = '<p class="flag-note" style="max-width:none">' + esc(lastFolderProblem) + '</p>'; } });
+  on('pickSaveBtn', async () => { await pickFolder('dandaraFolder', 'readwrite', 'dgc-dayworks-dandara'); await renderFolderBar(); if (lastFolderProblem) document.getElementById('foundBox').innerHTML = '<p class="flag-note" style="max-width:none">' + esc(lastFolderProblem) + '</p>'; });
+  on('findBtn', () => runFind(true));
+  on('ownTabBtn', () => window.open(location.href, '_blank'));
+}
+
+// ---------------------------------------------------------------
 // Upload tab
 // ---------------------------------------------------------------
 function renderUpload() {
   document.getElementById('mainArea').innerHTML = `
+    <div class="fold-bar" id="folderBar"></div>
+    <div id="foundBox"></div>
     <div class="upload-zone" id="uploadZone">
       <span id="uploadZoneLabel">&#128247; Drop timesheet photos here, or click to choose<br>
       <span style="font-size:0.78rem">(AI reading needs Ash's Claude API key set up first — new uploads land in Current under "${NO_JOB}" for you to categorise)</span></span>
@@ -1806,6 +1906,7 @@ function renderUpload() {
   zone.addEventListener('dragover', () => zone.classList.add('drag'));
   zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
   zone.addEventListener('drop', e => { zone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+  renderFolderBar().then(() => runFind(false));
 }
 async function handleFiles(files) {
   const imgFiles = [...files].filter(f => f.type.startsWith('image/'));
