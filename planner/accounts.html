@@ -969,7 +969,8 @@ function gridInfo(name, date) {
     : x.entry && x.entry.id && isAccepted(x.entry.note) ? x.entry.note
     : x.entry && x.entry.fromTimesheet ? 'Taken from their Timesheet app entry.'
     : x.entry && x.entry.id ? 'Typed on the Staff grid.' : x.leave ? (x.leave.type === 'Holiday' ? 'Paid holiday booked.' : 'Unpaid leave booked.') : '';
-  return { text, detail, hours: x.kind === 'hours' ? x.value : null };
+  /* the Hours grid box shows what was typed on the grid, so it can be picked (Ash, 20 Oct 2026) */
+  return { text: q ? hrs(q.manual) + 'h' : text, detail, hours: q ? q.manual : (x.kind === 'hours' ? x.value : null) };
 }
 function openTimesheet(name, date) {
   if (!window.TsPopup) return;
