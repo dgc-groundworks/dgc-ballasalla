@@ -45,6 +45,7 @@
     ".tsp-zarea img{display:block;margin:0 auto;transform-origin:center center}" +
     ".ts-see{font:600 .68rem/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:2px 5px;margin-left:4px;border-radius:5px;border:1px solid var(--accent,#e8b84b);background:transparent;color:var(--accent,#e8b84b);cursor:pointer;vertical-align:middle;white-space:nowrap}" +
     ".ts-see:hover,.ts-see:focus-visible{background:var(--accent,#e8b84b);color:#1a1a1a}" +
+    ".tsp-pick{border:2px solid var(--accent,#e8b84b);border-radius:10px;padding:10px 12px;margin:0 0 10px}.tsp-pick h3{margin:0 0 8px;font-size:.9rem}.tsp-opts{display:flex;flex-wrap:wrap;gap:8px}.tsp-opts label{display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--border,#333a47);border-radius:8px;cursor:pointer;background:var(--panel2,#262c37)}.tsp-opts input[type=number]{width:80px;padding:6px;border-radius:6px;border:1px solid var(--border,#333a47);background:var(--panel,#1d222b);color:inherit}.tsp-acc{margin-top:10px;padding:10px 18px;border-radius:8px;border:0;background:var(--accent,#e8b84b);color:#1a1a1a;font-weight:800;cursor:pointer}.tsp-ok{color:var(--ok,#3fb950)}" +
     ".ts-see.lg{font-size:.78rem;padding:4px 9px}" +
     "@media (max-width:640px){.tsp-back{padding:0}.tsp{border-radius:0;min-height:100%;border:0}.tsp-head{border-radius:0}.tsp-grid2{grid-template-columns:1fr}.tsp-dl{grid-template-columns:96px 1fr}.tsp-sum .v{font-size:1.05rem}.tsp-body{padding:10px 12px 20px}}";
   var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
@@ -135,6 +136,20 @@
     catch (e) { if (mine === back) back.querySelector(".tsp-body").innerHTML = '<p class="tsp-err">Couldn\'t load the timesheet: ' + esc(e.message) + '</p>'; return; }
     if (mine !== back) return;
     back.querySelector(".tsp-body").innerHTML = bodyHTML(opts, data || {});
+    var acc = back.querySelector("#tspAccept");
+    if (acc && opts.onAccept) {
+      var own = back.querySelector("#tspOwn");
+      if (own) own.addEventListener("input", function () { var r = back.querySelector('input[name=tspPick][value=own]'); if (r) r.checked = true; });
+      acc.addEventListener("click", async function () {
+        var pick = back.querySelector("input[name=tspPick]:checked"), msg = back.querySelector("#tspAccMsg");
+        if (!pick) { msg.textContent = "Pick one first."; return; }
+        var val = pick.value === "own" ? Number(own.value) : Number(pick.getAttribute("data-h"));
+        if (!(val >= 0 && val <= 24) || (pick.value === "own" && own.value === "")) { msg.textContent = "Type your hours first."; return; }
+        acc.disabled = true; msg.textContent = "Saving...";
+        try { await opts.onAccept({ hours: val, source: pick.value === "own" ? "own figure" : pick.value }); msg.innerHTML = '<span class="tsp-ok">Accepted: ' + n2(val) + "h.</span>"; setTimeout(close, 700); }
+        catch (e) { acc.disabled = false; msg.innerHTML = '<span class="tsp-err">Not saved: ' + esc(e.message) + "</span>"; }
+      });
+    }
   }
 
   function bodyHTML(o, d) {
@@ -147,6 +162,18 @@
     function box(k, v, odd) { return '<div class="' + (odd ? "odd" : "") + '"><div class="k">' + k + '</div><div class="v">' + (v == null ? '<span class="tsp-none" style="font-size:.85rem;font-weight:400">none</span>' : n2(v) + "h") + "</div></div>"; }
     var h = '<div class="tsp-sum" aria-label="Hours from each source">' + box("Timesheet app", tsH, differ && tsH != null) + box("Paper sheet (AI read)", dwH, differ && dwH != null) + box("Hours grid", gH != null ? gH : null, differ && gH != null) + "</div>";
     h += differ ? '<p class="tsp-warn" style="margin:0 0 4px;font-size:.85rem">The sources don\'t agree. Check the photo below in case the AI misread it.</p>' : "";
+    /* Ash, 20 Oct 2026: "I can pick one of them or my own and click Accept, so the box goes." */
+    if (o.onAccept) {
+      var opt = function (val, label, src, on) { return '<label><input type="radio" name="tspPick" value="' + esc(src) + '" data-h="' + val + '"' + (on ? " checked" : "") + "> " + esc(label) + " <b>" + n2(val) + "h</b></label>"; };
+      var first = tsH != null ? "ts" : dwH != null ? "dw" : "grid";
+      h += '<div class="tsp-pick"><h3>Pick the hours to pay, then press Accept</h3><div class="tsp-opts">' +
+        (tsH != null ? opt(tsH, "Timesheet app", "Timesheet app", first === "ts") : "") +
+        (dwH != null ? opt(dwH, "Paper sheet", "paper sheet", first === "dw") : "") +
+        (gH != null ? opt(gH, "Hours grid", "hours grid", first === "grid") : "") +
+        '<label><input type="radio" name="tspPick" value="own" data-h=""> My own <input type="number" step="0.25" min="0" max="24" id="tspOwn" aria-label="Your own hours"></label></div>' +
+        '<button type="button" class="tsp-acc" id="tspAccept">Accept</button> <span id="tspAccMsg" style="margin-left:8px;font-size:.85rem"></span>' +
+        '<p class="tsp-hint" style="margin:6px 0 0">Accepting puts this figure on the hours grid for the day and clears the amber flag.</p></div>';
+    }
 
     /* 1. Timesheet app */
     h += '<section class="tsp-sec"><h3>1. Timesheet app <span class="tsp-src">what the worker typed</span></h3>';

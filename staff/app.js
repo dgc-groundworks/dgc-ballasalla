@@ -145,6 +145,7 @@ let staff = [];
 let staffById = {};
 let hoursCache = {}; // `${staff_id}_${date}` -> {id, hours, note}
 let hourDiscrepancies = []; // {staffId, date, manualHours, submittedHours} — same person/day entered twice, values disagree
+const isAcceptedNote = note => /^\s*accepted\b/i.test(note || '');
 let noteColumnExists = true; // set false at boot if the note column hasn't been added to dgc_staff_hours yet
 let leaveCache = [];
 let advancesCache = [];
@@ -224,15 +225,14 @@ async function loadAll() {
       const existing = hoursCache[key];
       const submitted = parseFloat(t.hours);
       if (existing && existing.id) {
+        // Ash, 20 Oct 2026: what they put in the Timesheet app is what's paid. The grid figure only stays when a
+        // manager picked it with Accept in Accounts (the note starts "Accepted").
         const adminVal = Number(existing.hours);
-        if (adminVal === submitted) {
-          // Same value — nothing to do
-        } else if (adminVal === 8) {
-          // DB has the default fill value (8) — timesheet wins (e.g. staff submitted 8.5)
-          hoursCache[key] = { id: existing.id, hours: submitted, note: existing.note || '' };
+        if (adminVal === submitted || isAcceptedNote(existing.note)) {
+          // same figure, or a manager's accepted figure: leave it
         } else {
-          // Admin deliberately set a non-default value (e.g. 6 for a short day) — keep it
-          hourDiscrepancies.push({ staffId: sid, date: t.work_date, manualHours: adminVal, submittedHours: submitted });
+          if (existing.hours !== null && existing.hours !== undefined) hourDiscrepancies.push({ staffId: sid, date: t.work_date, manualHours: adminVal, submittedHours: submitted });
+          hoursCache[key] = { id: existing.id, hours: submitted, note: existing.note || '' };
         }
       } else {
         // No saved DB entry — pre-fill from timesheet

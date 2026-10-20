@@ -181,11 +181,11 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=5"></script>
-<script src="ts-popup.js?v=1"></script>
+<script src="ts-popup.js?v=3"></script>
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.7 (18 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.8 (20 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -303,6 +303,7 @@ function niFor(R, gross, period, cat) {
 }
 
 /* ============================== the week, worked out ============================== */
+const isAccepted = note => /^\s*accepted\b/i.test(note || '');
 function buildWeek(W) {
   const start = W.periodStart, dates = [...Array(7)].map((_, i) => addDays(start, i));
   const money = !!(W.me && W.me.money && S.me && S.me.money), today = todayIso();
@@ -310,18 +311,16 @@ function buildWeek(W) {
   const staffByName = {}; W.staff.forEach(s => staffByName[norm(s.name)] = s.id);
   const H = {}; W.hours.forEach(h => H[h.staffId + '_' + h.date] = { ...h });
   const TS = {}; W.timesheets.forEach(t => { const sid = staffByName[norm(t.name)]; if (sid) (TS[sid + '_' + t.date] = TS[sid + '_' + t.date] || []).push(t); });
-  /* worker timesheets override as the Staff screen does: no entry, or the default 8, takes the timesheet's figure */
+  /* Ash, 20 Oct 2026: what they put in the Timesheet app is what's paid. A grid figure only wins when a manager
+     picked it with Accept (the cell's note starts "Accepted"). Several entries for one day are added together. */
   const discrepancies = [];
-  W.timesheets.forEach(t => {
-    const sid = staffByName[norm(t.name)], sub = num(t.hours);
-    if (!sid || !(sub > 0)) return;
-    const k = sid + '_' + t.date, ex = H[k];
-    if (ex && ex.id) {
-      const adm = Number(ex.hours);
-      if (adm === sub) return;
-      if (adm === 8) H[k] = { ...ex, hours: sub, fromTimesheet: true };
-      else discrepancies.push({ staffId: sid, date: t.date, manual: adm, submitted: sub });
-    } else H[k] = { ...(ex || {}), hours: sub, fromTimesheet: true };
+  const tsSum = {};
+  W.timesheets.forEach(t => { const sid = staffByName[norm(t.name)], sub = num(t.hours); if (sid && sub > 0) tsSum[sid + '_' + t.date] = (tsSum[sid + '_' + t.date] || 0) + sub; });
+  Object.keys(tsSum).forEach(k => {
+    const sub = r2(tsSum[k]), ex = H[k], [sid, date] = [k.slice(0, k.lastIndexOf('_')), k.slice(k.lastIndexOf('_') + 1)];
+    if (ex && ex.id && isAccepted(ex.note)) return;
+    if (ex && ex.id && ex.hours != null && Number(ex.hours) !== sub) discrepancies.push({ staffId: sid, date, manual: Number(ex.hours), submitted: sub });
+    H[k] = { ...(ex || {}), hours: sub, fromTimesheet: true };
   });
   const leaveFor = (sid, d) => W.leave.find(l => l.staffId === sid && d >= l.from && d <= l.to);
   const extras = W.extras || [];
@@ -373,6 +372,7 @@ function buildWeek(W) {
     if (off && !worked) flag(s, 'info', 'Marked "Off Work' + (s.offWorkType ? ': ' + s.offWorkType : '') + '" in the Planner: no hours expected this week.');
     days.forEach(x => {
       const d = x.date, label = dayName(d) + ' ' + fmtDay(d);
+      if (x.entry && x.entry.id && isAccepted(x.entry.note)) { x.accepted = true; return; }
       if (x.kind === 'hours' && x.value > 0 && x.leave) { x.flags.push('leave'); flag(s, 'warn', 'Hours logged on a day marked as ' + (x.leave.type === 'Holiday' ? 'paid holiday' : 'unpaid leave') + ' (' + label + ', ' + hrs(x.value) + 'h). Treated as working: hours win over leave. Check the leave record.', d); }
       if (x.kind === 'hours' && x.value > 0 && BANK_HOLIDAYS.has(d)) { x.flags.push('bh'); flag(s, 'info', 'Worked the bank holiday (' + label + ', ' + hrs(x.value) + 'h). Paid as hours worked, not as the bank holiday.', d); }
       if (x.kind === 'hours' && x.value > LONG_DAY) { x.flags.push('long'); flag(s, x.value > VERY_LONG_DAY ? 'bad' : 'warn', 'Long day: ' + hrs(x.value) + 'h on ' + label + '.', d); }
@@ -385,7 +385,7 @@ function buildWeek(W) {
       const dwH = x.dayworks.reduce((a, y) => a + num(y.billedHours != null ? y.billedHours : y.hours), 0);
       if (x.dayworks.length && dwH > x.worked + 0.01) { x.flags.push('dayworks'); flag(s, 'warn', 'Dayworks sheet says ' + hrs(dwH) + 'h on ' + label + ' but only ' + hrs(x.worked) + 'h are on the pay hours.', d); }
     });
-    discrepancies.filter(q => q.staffId === s.id).forEach(q => flag(s, 'warn', 'Entered twice on ' + dayName(q.date) + ' ' + fmtDay(q.date) + ': the Staff grid says ' + hrs(q.manual) + 'h, their own timesheet says ' + hrs(q.submitted) + 'h. Using ' + hrs(q.manual) + 'h (the grid).', q.date));
+    discrepancies.filter(q => q.staffId === s.id).forEach(q => flag(s, 'warn', 'Two figures on ' + dayName(q.date) + ' ' + fmtDay(q.date) + ': their Timesheet says ' + hrs(q.submitted) + 'h, the Staff grid says ' + hrs(q.manual) + 'h. Paying the Timesheet (' + hrs(q.submitted) + 'h). Press See to pick another figure.', q.date));
     if (worked > LONG_WEEK) flag(s, 'warn', 'Long week: ' + hrs(worked) + 'h worked.');
     if (money && total > 0 && !num(s.rate)) flag(s, 'bad', 'No pay rate in the Planner, so no pay can be worked out.');
 
@@ -965,14 +965,32 @@ function gridInfo(name, date) {
   if (!x) return { text: 'Not on the Hours grid', detail: 'This name isn\'t on the staff list (or is kept off the hours grid).' };
   const q = B.discrepancies.find(y => y.staffId === r.s.id && y.date === date);
   const text = x.kind === 'hours' ? hrs(x.value) + 'h' : x.kind === 'H' ? 'Paid holiday (8h)' : x.kind === 'BH' ? 'Bank holiday (8h)' : x.kind === 'U' ? 'Unpaid leave' : x.kind === 'weekend' ? 'Nothing (weekend)' : 'No hours';
-  const detail = q ? 'Entered twice: the grid says ' + hrs(q.manual) + 'h and their timesheet says ' + hrs(q.submitted) + 'h. Pay uses the grid figure.'
+  const detail = q ? 'Entered twice: the grid says ' + hrs(q.manual) + 'h and their timesheet says ' + hrs(q.submitted) + 'h. Pay uses the Timesheet figure unless you pick another with Accept.'
+    : x.entry && x.entry.id && isAccepted(x.entry.note) ? x.entry.note
     : x.entry && x.entry.fromTimesheet ? 'Taken from their Timesheet app entry.'
     : x.entry && x.entry.id ? 'Typed on the Staff grid.' : x.leave ? (x.leave.type === 'Holiday' ? 'Paid holiday booked.' : 'Unpaid leave booked.') : '';
   return { text, detail, hours: x.kind === 'hours' ? x.value : null };
 }
 function openTimesheet(name, date) {
   if (!window.TsPopup) return;
-  TsPopup.open({ name, date, grid: gridInfo(name, date), fetch: (n, d) => rpc('acc_day_sources', { p_name: n, p_date: d }) });
+  const B = S.B, r = B && B.rows.find(x => norm(x.s.name) === norm(name));
+  const locked = !!(S.W && S.W.approval);
+  TsPopup.open({ name, date, grid: gridInfo(name, date), fetch: (n, d) => rpc('acc_day_sources', { p_name: n, p_date: d }),
+    onAccept: (r && !TEST && !locked) ? (pick => acceptHours(r.s.id, date, pick)) : null });
+}
+/* Ash, 20 Oct 2026: pick the right figure and Accept, so the flag goes. Saved on the hours grid with a note saying who
+   picked what; that figure is then paid, and the day's warnings clear. Not offered once the week is approved
+   (use a correction then). */
+async function acceptHours(staffId, date, pick) {
+  const sess = await ensureLoggedIn(); if (!sess) throw new Error('Please sign in again.');
+  const H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + sess.access_token, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
+  const note = 'Accepted ' + hrs(pick.hours) + 'h (' + pick.source + ') by ' + (sess.email || nameOf((S.me && S.me.email) || '')) + ', ' + new Date().toLocaleDateString('en-GB');
+  const ex = ((S.W && S.W.hours) || []).find(h => h.staffId === staffId && h.date === date && h.id);
+  const r = ex
+    ? await fetch(REST + '/dgc_staff_hours?id=eq.' + encodeURIComponent(ex.id), { method: 'PATCH', headers: H, body: JSON.stringify({ hours: pick.hours, note }) })
+    : await fetch(REST + '/dgc_staff_hours', { method: 'POST', headers: H, body: JSON.stringify({ staff_id: staffId, work_date: date, hours: pick.hours, note }) });
+  if (!r.ok) throw new Error((await r.text()).slice(0, 160) || 'Save failed');
+  await reload(true);
 }
 function nameOf(email) {
   const e = norm(email); const p = ((S.W && S.W.approvers) || []).find(x => norm(x.email) === e);
