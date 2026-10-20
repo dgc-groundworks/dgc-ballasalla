@@ -585,6 +585,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
     <button id="nav-staffhours" onclick="showTab('staffhours',this)" hidden>Staff</button>
     <button onclick="showTab('sitediary',this)">Site Diary</button>
     <button onclick="showTab('accidents',this)">Accident Report</button>
+    <button onclick="showTab('toolbox',this)">Toolbox Talks</button>
     <button onclick="showTab('resources',this)">Deployment</button>
     <button id="nav-daywork" onclick="showTab('daywork',this)" hidden>Day work</button>
     <button id="nav-accounts" onclick="showTab('accounts',this)" hidden>Accounts</button>
@@ -661,6 +662,10 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
   <!-- Accident Report tab (7 Oct 2026): same fields as the DGC OS Site App form; one register for Planner and tablet reports -->
   <div id="tab-accidents" class="panel">
     <iframe data-src="accidents.html?v=2" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Accident Report"></iframe>
+  </div>
+  <!-- Toolbox Talks tab (20 Oct 2026): filled in and signed here, filed hourly as a PDF into the job's Toolbox Talks folder -->
+  <div id="tab-toolbox" class="panel">
+    <iframe data-src="toolbox.html?v=1" style="width:100%;height:calc(100vh - 96px);border:none;display:block" title="Toolbox Talks"></iframe>
   </div>
 
   <!-- Resources tab -->
