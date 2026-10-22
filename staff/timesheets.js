@@ -118,7 +118,7 @@ function renderDay() {
     return `<div style="padding:12px 16px;border-bottom:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
         <div style="min-width:0"><div style="font-weight:700">${e.staff_name}</div>
-          <div style="font-size:.85rem;color:${e.siteFlag ? 'var(--danger)' : 'var(--muted)'}">${e.site || '—'}${timing ? ' · ' + timing : ''}${e.lunch_mins ? ' · ' + e.lunch_mins + 'm lunch' : ''}</div></div>
+          <div style="font-size:.85rem;color:${e.siteFlag ? 'var(--danger)' : 'var(--muted)'}">${e.site || '—'}${timing ? ' · ' + timing : ''}${e.lunch_mins ? ' · ' + e.lunch_mins + 'm breaks' : ''}</div></div>
         <div style="font-size:1.1rem;font-weight:700;color:var(--accent)">${fmtHours(e.hours)}</div>
       </div>
       ${e.description ? `<div style="font-size:.9rem;margin-top:6px;background:var(--panel2);border-left:3px solid var(--accent);padding:6px 10px;border-radius:0 6px 6px 0">${e.description}</div>` : ''}
@@ -277,7 +277,7 @@ function render() {
                 <span style="font-size:0.8rem;color:var(--muted)">${fmtDate(e.work_date)}</span>
                 <span style="font-weight:700;font-size:0.95rem">${e.site || '—'}</span>
               </div>
-              ${timing ? `<div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${timing}${e.lunch_mins ? ' · ' + e.lunch_mins + 'm lunch' : ''}</div>` : ''}
+              ${timing ? `<div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${timing}${e.lunch_mins ? ' · ' + e.lunch_mins + 'm breaks' : ''}</div>` : ''}
             </div>
             <div style="flex-shrink:0;text-align:right">
               <div style="font-size:1.1rem;font-weight:700;color:var(--accent)">${fmtHours(e.hours)}</div>
