@@ -174,6 +174,71 @@ table.t.ofc td.notes div + div { margin-top: 2px; }
   html.office-view .ofc-status { background: #fff !important; color: #000; }
   @page { size: A4 landscape; margin: 10mm; }
 }
+/* 2.12: step 1, the project managers' check (from Weekly Hours 0.3, Ash, 22 Oct 2026: one hours screen, one approval) */
+.hm-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel2); margin-top: 10px; font-size: .95rem; }
+.hm-status .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }
+.hm-status.s-ok .dot { background: var(--ok); } .hm-status.s-late .dot { background: var(--danger); }
+.hm-status.s-late { border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }
+.hm-status .counts { margin-left: auto; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.hm-status .counts b { color: var(--text); }
+.hm-step { display: inline-block; font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-right: 6px; }
+.hm-info { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: .84rem; line-height: 1.4; margin: 8px 2px 0; }
+.hm-info svg { width: 16px; height: 16px; flex: none; margin-top: 1px; color: var(--info); }
+.hm-info b { color: var(--text); }
+.hm-viewas { margin-top: 10px; padding: 10px 14px; border-radius: 10px; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.hm-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+.hm-filters { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.hm-filters button { min-height: 40px; padding: 6px 14px; border: 0; background: var(--panel2); color: var(--muted); font-weight: 700; font-size: .86rem; cursor: pointer; }
+.hm-filters button + button { border-left: 1px solid var(--border); }
+.hm-filters button[aria-pressed="true"] { background: var(--accent); color: #1a1a1a; }
+.hm-as { display: inline-flex; gap: 6px; align-items: center; } .hm-as select { min-height: 40px; }
+.hm-toolbar .btn.go { min-height: 40px; }
+details.hm-sites { margin-top: 10px; padding: 4px 14px; border: 1px solid var(--border); border-radius: 10px; }
+details.hm-sites summary { min-height: 40px; display: flex; align-items: center; font-size: .92rem; }
+.hm-siterow { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(200px, 1.6fr) 90px minmax(160px, 1.4fr); gap: 4px 12px; align-items: center; padding: 7px 0; border-top: 1px solid var(--border); font-size: .88rem; }
+.hm-siterow .pill { justify-self: start; white-space: normal; }
+@media (max-width: 900px) { .hm-siterow { grid-template-columns: 1fr 1fr; } }
+table.t.ofc { font-variant-numeric: tabular-nums; }
+table.t.ofc thead th:first-child { border-top-left-radius: 8px; } table.t.ofc thead th:last-child { border-top-right-radius: 8px; }
+table.t.ofc tbody tr:not(.tot):hover td { background: color-mix(in srgb, var(--panel2) 85%, var(--panel)); }
+table.t.ofc td.name { padding: 4px 6px; }
+.hm-pn { display: block; width: 100%; text-align: left; background: transparent; border: 0; color: inherit; border-radius: 8px; padding: 6px; min-height: 44px; cursor: pointer; font: inherit; }
+.hm-pn:hover { background: var(--panel2); }
+.hm-pn b { display: block; line-height: 1.25; }
+.hm-pn small { display: block; color: var(--muted); font-size: .72rem; font-weight: 500; margin-top: 2px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.t.ofc td.c:has(.hm-dc) { padding: 3px; }
+.hm-dc { width: 100%; min-width: 44px; min-height: 44px; background: transparent; border: 1px solid transparent; border-radius: 8px; color: inherit; font: inherit; font-weight: inherit; cursor: pointer; }
+.hm-dc:hover { border-color: var(--border); background: var(--panel); }
+td.hm-chk { min-width: 220px; white-space: normal; }
+.hm-stw { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.hm-stw .btn { min-height: 36px; }
+.hm-pb { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.hm-pill { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; font-weight: 800; padding: 3px 9px; border-radius: 99px; background: var(--panel2); color: var(--muted); white-space: nowrap; }
+.hm-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.hm-pill.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, var(--panel)); }
+.hm-pill.wait { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, var(--panel)); }
+.hm-pill.late { color: var(--danger); background: color-mix(in srgb, var(--danger) 15%, var(--panel)); }
+.hm-by { font-size: .72rem; color: var(--muted); white-space: nowrap; padding-left: 4px; }
+.hm-hist { font-size: .72rem; color: var(--muted); line-height: 1.3; margin-top: 4px; }
+.hm-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: .8rem; color: var(--muted); margin: 12px 2px 0; }
+.hm-legend > b { color: var(--text); }
+.hm-legend .k { display: inline-flex; align-items: center; gap: 6px; }
+.hm-legend .sw { display: inline-grid; place-items: center; min-width: 24px; height: 20px; padding: 0 4px; border-radius: 5px; font-weight: 800; font-size: .78rem; background: var(--panel); border: 1px solid var(--border); color: var(--text); }
+.hm-legend .sw.lv { color: var(--ok); } .hm-legend .sw.miss { color: var(--danger); }
+.hm-legend .sw.flag { background: color-mix(in srgb, var(--warn) 15%, var(--panel)); box-shadow: inset 0 -3px 0 var(--warn); }
+.hm-legend .sw.chg { background: color-mix(in srgb, var(--danger) 14%, var(--panel)); box-shadow: inset 0 -3px 0 var(--danger); }
+.hm-legend .sw.fixed { background: color-mix(in srgb, var(--info) 12%, var(--panel)); box-shadow: inset 0 -3px 0 var(--info); }
+.hm-sheet { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; }
+.hm-sheet[hidden] { display: none; }
+.hm-sheet-in { background: var(--panel); color: var(--text); width: 100%; max-width: 640px; max-height: 88vh; overflow: auto; border-radius: 16px 16px 0 0; padding: 16px 16px 24px; border: 1px solid var(--border); }
+@media (min-width: 900px) { .hm-sheet { align-items: center; } .hm-sheet-in { border-radius: 16px; } }
+.hm-h { margin: 0 0 8px; font-size: 1.15rem; text-transform: none; letter-spacing: 0; color: var(--text); }
+.hm-kv { padding: 8px 0; border-top: 1px solid var(--border); font-size: .95rem; }
+.hm-kv .k { font-size: .74rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.hm-why { background: var(--panel2); border-radius: 10px; padding: 8px 10px; margin: 8px 0; font-weight: 600; }
+textarea.hm-note { width: 100%; min-height: 64px; }
+@media (max-width: 640px) { .hm-status { display: block; } .hm-status .dot { display: inline-block; margin-right: 8px; vertical-align: 1px; } .hm-status .counts { display: block; margin: 4px 0 0; } td.hm-chk { min-width: 180px; } table.t.ofc td.name { white-space: normal; min-width: 108px; max-width: 128px; } .hm-pn { padding: 4px 2px; } .hm-pn b { font-size: .92rem; } .hm-pn small { display: none; } .hm-dc { min-width: 40px; } }
+@media print { html.office-view .hm-pn small, html.office-view .noprint { display: none !important; } html.office-view .hm-dc, html.office-view .hm-pn { min-height: 0; padding: 0; border: 0; } }
 @media (max-width: 480px) { table.fct.ev .evni { white-space: normal; } table.fct.ev .evmix, table.fct.ev .evmore { display: none; } table.fct.ev .pill { white-space: normal; } table.fct.ev th:first-child, table.fct.ev td.l { width: auto; } }
 @media (max-width: 480px) { table.fct { font-size: .72rem; } table.fct th, table.fct td { padding: 5px 3px; } table.fct th { white-space: normal; vertical-align: bottom; } table.fct td.l, table.fct th.l { min-width: 0; width: 34%; } table.fct.open td.l, table.fct.open th.l { min-width: 150px; } }
 @media (max-width: 640px) { main { padding: 10px 16px 50px; } .titlebar .seg button { padding: 8px 9px; font-size: .85rem; } table.t.ofc th, table.t.ofc td { padding: 9px 8px; } .ofc-h { font-size: 1.15rem; } #hoursTable td.c { min-width: 44px; } .anom { flex-direction: column; gap: 0; } .anom .who { min-width: 0; } }
@@ -196,7 +261,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.11 (22 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.12 (22 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -284,7 +349,7 @@ async function testRpc(name, a) {
   await new Promise(r => setTimeout(r, 30));
   const me = FIXTURE.me;
   if (name === 'acc_me') return me;
-  if (name === 'acc_week') { const w = FIXTURE.weeks[a.p_start]; if (!me.hours) throw new Error('not allowed for this login'); return w ? JSON.parse(JSON.stringify(w)) : { ...JSON.parse(JSON.stringify(Object.values(FIXTURE.weeks)[0])), periodStart: a.p_start, periodEnd: addDays(a.p_start, 6), hours: [], timesheets: [], leave: [], extras: [], approval: null, approvalLog: [], dayworks: [], exports: [] }; }
+  if (name === 'acc_week') { const w = FIXTURE.weeks[a.p_start]; if (w && w.__error) throw Object.assign(new Error('not allowed for this login'), { code: w.__error }); if (!me.hours) throw new Error('not allowed for this login'); return w ? JSON.parse(JSON.stringify(w)) : { ...JSON.parse(JSON.stringify(Object.values(FIXTURE.weeks)[0])), periodStart: a.p_start, periodEnd: addDays(a.p_start, 6), hours: [], timesheets: [], leave: [], extras: [], approval: null, approvalLog: [], dayworks: [], exports: [] }; }
   if (name === 'acc_approve') { if (!me.approve) throw new Error('only the approvers can approve hours'); const w = FIXTURE.weeks[a.p_start]; const ap = { by: me.email, at: new Date().toISOString() }; if (w) { w.approval = ap; w.approvalLog.push({ action: 'approved', by: me.email, at: ap.at }); } return ap; }
   if (name === 'acc_unapprove') { if (!(me.approve || me.director)) throw new Error('only the approvers or a director can open a week again'); if (!String(a.p_reason || '').trim()) throw new Error('say why the week is being opened again'); const w = FIXTURE.weeks[a.p_start]; if (!w || !w.approval) return { already: true }; w.approval = null; const at = new Date().toISOString(); w.approvalLog.push({ action: 'unapproved', by: me.email, at, reason: a.p_reason, via: 'Accounts (test)' }); return { already: false, by: me.email, at }; }
   if (name === 'acc_log_export') { const w = FIXTURE.weeks[a.p_start]; if (w) w.exports.unshift({ kind: a.p_kind, by: me.email, at: new Date().toISOString(), approved: !!w.approval }); return null; }
@@ -294,6 +359,22 @@ async function testRpc(name, a) {
   if (name === 'acc_rate_set') { for (const w of Object.values(FIXTURE.weeks)) { const x = w.rates.find(r => r.taxYear === a.p_year && r.key === a.p_key); if (x) Object.assign(x, { value: a.p_value, checkedOn: a.p_checked, verified: a.p_verified }); } return null; }
   if (name === 'acc_day_sources') return (FIXTURE.daySources || {})[a.p_name + '|' + a.p_date] || { name: a.p_name, date: a.p_date, timesheets: [], dayworks: [], grid: [], sameSheet: [] };
   if (name === 'acc_approver_set') { if (!me.director) throw new Error('only a director can change the approvers'); for (const w of Object.values(FIXTURE.weeks)) { const x = w.approvers.find(p => p.email === a.p_email); if (x) x.active = a.p_active; else w.approvers.push({ email: a.p_email, name: a.p_name, active: a.p_active }); } return null; }
+  /* 2.12: the project managers' check (Weekly Hours), from captured real answers; approving only changes the fixture */
+  const fxErr = v => { if (v && v.__error) throw Object.assign(new Error(v.message || 'not allowed'), { code: v.__error }); return v; };
+  window.__hmCalls = window.__hmCalls || [];
+  if (name === 'dgc_wh_who') return fxErr(FIXTURE.who);
+  if (name === 'dgc_wh_week') { const v = a.p_as ? ((FIXTURE.whAs || {})[a.p_as] || {})[a.p_start] : (FIXTURE.wh || {})[a.p_start]; if (!v) throw Object.assign(new Error('no test data for that week'), { code: 'test' }); return JSON.parse(JSON.stringify(fxErr(v))); }
+  if (name === 'acc_pm_week') { const v = a.p_as ? ((FIXTURE.pmAs || {})[a.p_as] || {})[a.p_start] : (FIXTURE.pm || {})[a.p_start]; if (!v) throw Object.assign(new Error('no test data for that week'), { code: 'test' }); return JSON.parse(JSON.stringify(fxErr(v))); }
+  if (name === 'dgc_wh_approve' || name === 'dgc_wh_unapprove') {
+    window.__hmCalls.push({ name, args: JSON.parse(JSON.stringify(a)) });
+    const wk = (FIXTURE.wh || {})[a.p_start]; const at = new Date().toISOString(), em = (FIXTURE.who || {}).email;
+    (wk && wk.people || []).filter(p => (a.p_staff || []).includes(p.id)).forEach(p => {
+      if (name === 'dgc_wh_approve') { const id = Date.now() + Math.random(); p.approvals.push({ id, by: em, manager: em, at, note: a.p_note, live: true }); p.history.push({ action: 'approved', by: em, at, reason: a.p_note }); }
+      else { p.approvals.forEach(x => { x.live = false; }); p.history.push({ action: 'unapproved', by: em, at, reason: a.p_reason }); }
+    });
+    return name === 'dgc_wh_approve' ? { added: (a.p_staff || []).length, alreadyApproved: 0, refused: [] } : { unapproved: (a.p_staff || []).length, wasNotApproved: 0, refused: [] };
+  }
+  if (name === 'acc_corrections_for' && FIXTURE.corrFor && FIXTURE.corrFor[a.p_start]) return JSON.parse(JSON.stringify(FIXTURE.corrFor[a.p_start]));
   if (name === 'acc_corrections_for') { const all = FIXTURE.corrections || [], live = c => c; return { paidHere: all.filter(c => c.payWeek === a.p_start).map(live), madeHere: all.filter(c => c.periodStart === a.p_start).map(c => ({ ...c, payWeekApproved: !!(FIXTURE.weeks[c.payWeek] && FIXTURE.weeks[c.payWeek].approval) })), nextOpenWeek: (() => { let w = addDays(a.p_start, 7); const m = mondayOf(todayIso()); if (w < m) w = m; while (FIXTURE.weeks[w] && FIXTURE.weeks[w].approval) w = addDays(w, 7); return w; })(), checks: (FIXTURE.checks || []).filter(k => k.periodStart === a.p_start) }; }
   if (name === 'acc_correction_add') { if (!me.director) throw new Error('only a director can record a correction'); const p = a.p, w = FIXTURE.weeks[p.start]; if (!w || !w.approval) throw new Error('this week is not approved yet, so change the hours on the Staff screen instead'); FIXTURE.corrections = FIXTURE.corrections || []; if (FIXTURE.corrections.some(c => c.staffId === p.staffId && c.date === p.date && !c.cancelledAt)) throw new Error('there is already a correction for that day'); const st = w.staff.find(x => x.id === p.staffId); let pw = addDays(p.start, 7); if (pw < mondayOf(todayIso())) pw = mondayOf(todayIso()); while (FIXTURE.weeks[pw] && FIXTURE.weeks[pw].approval) pw = addDays(pw, 7); const row = { id: Date.now(), periodStart: p.start, staffId: p.staffId, name: st ? st.name : '?', date: p.date, oldHours: Number(p.oldHours), newHours: Number(p.newHours), rate: st ? st.rate : null, reason: p.reason, evidence: p.evidence || null, payWeek: p.payWeek || pw, by: me.email, at: new Date().toISOString() }; FIXTURE.corrections.push(row); return row; }
   if (name === 'acc_correction_cancel') { const c = (FIXTURE.corrections || []).find(x => String(x.id) === String(a.p_id)); if (c) Object.assign(c, { cancelledBy: me.email, cancelledAt: new Date().toISOString(), cancelReason: a.p_reason }); return c; }
@@ -304,7 +385,7 @@ async function testRpc(name, a) {
 }
 
 /* ============================== state ============================== */
-const S = { me: null, start: null, W: null, view: null, open: new Set(), approveAsk: false, reopenAsk: false, msg: '', msgKind: '', editRate: null, editSalary: null, editTax: null, busy: false, corr: null, gateOk: false, paySet: { weekday: 2, rule: 'nearest' }, editPaySet: false };
+const S = { wh: null, whErr: '', whOn: false, whReady: false, who: null, pmMode: false, asPm: null, whFilter: 'all', me: null, start: null, W: null, view: null, open: new Set(), approveAsk: false, reopenAsk: false, msg: '', msgKind: '', editRate: null, editSalary: null, editTax: null, busy: false, corr: null, gateOk: false, paySet: { weekday: 2, rule: 'nearest' }, editPaySet: false };
 if (TEST) window.__accS = S; /* localhost ?test=1 only: lets the test page read the sums */
 function pickStartFromHash() {
   const h = location.hash.slice(1);
@@ -758,7 +839,7 @@ function render() {
 
   h += `<div class="bar titlebar"><h1>Accounts</h1><span class="muted small ver">${esc(ACC_VERSION)}${TEST ? ' &middot; TEST DATA' : ''}</span>
     <span class="push"></span>
-    <div class="seg" role="group" aria-label="Which company">${[['office', 'DGC and Silverdale hours'], ['dgc', 'Approve and pay'], ['silverdale', 'Silverdale only']].map(([k, l]) => `<button type="button" data-view="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="seg" role="group" aria-label="Which company">${[['office', 'DGC and Silverdale hours'], ['dgc', 'Approve and pay'], ['silverdale', 'Silverdale only']].filter(([k]) => k === 'office' || !(S.pmMode || S.asPm)).map(([k, l]) => `<button type="button" data-view="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <button class="btn sm" type="button" data-act="theme">Light / dark</button></div>`;
   /* ---- an average week and the next 4 weeks, at the top (Ash, 12 Oct 2026, night; moved up 13 Oct 2026) ---- */
   if (B.money && view === 'dgc') { h += forecastHTML(est); if (!S.fc) setTimeout(loadForecast, 0); }
@@ -784,6 +865,7 @@ function render() {
     if (approved) {
       h += `<div class="status ok"><b class="big">Approved</b><span>by ${esc(nameOf(a.by))} on ${esc(fmtWhen(a.at))}. These hours have gone to accounts.</span>
         ${W.approvalLog.length > 1 ? `<details class="small" style="flex-basis:100%"><summary>Approval history</summary>${approvalLogHTML(W)}</details>` : ''}
+        ${checkLineHTML(B)}
         ${reopenHTML(B, a)}
         ${B.suggestions.length ? `<span class="small sev-warn" style="flex-basis:100%"><b>${B.suggestions.length} ${B.suggestions.length === 1 ? 'day looks' : 'days look'} wrong in the approved week on screen.</b> If the pay was short or over, ${me.director ? 'use <b>Record a correction</b> below' : 'ask Ash or Harry to record a correction'}: it is paid in the next pay run as its own line, and the approved week stays exactly as it was sent.</span>` : ''}
         ${B.fixedHere.length ? `<span class="small" style="flex-basis:100%;color:var(--info)">${B.fixedHere.length} correction${B.fixedHere.length === 1 ? '' : 's'} recorded against the week on screen (see Corrections below).</span>` : ''}</div>`;
@@ -793,6 +875,7 @@ function render() {
         ${me.approve ? (S.approveAsk
           ? `<div class="confirm" style="flex-basis:100%"><b>Approve ${esc(weekLabel(B.start))}?</b> ${B.rows.length} people, ${hrs(B.T.total)} paid hours${gateItems(B).length ? `, <span class="sev-warn">${gateItems(B).length} still to check</span>` : ''}.${gateHTML(B)}<div class="bar" style="margin-top:8px"><button class="btn go" type="button" data-act="approve-yes" id="approveYes"${gateItems(B).length && !S.gateOk ? ' disabled' : ''}>Yes, approve the hours</button><button class="btn" type="button" data-act="approve-no">Cancel</button></div></div>`
           : `<button class="btn go" type="button" data-act="approve" id="approveBtn">Approve the hours</button>`) : ''}
+        ${checkLineHTML(B)}
         <span class="small muted" style="flex-basis:100%">Approvers: ${esc((W.approvers || []).filter(p => p.active).map(p => p.name).join(' or ') || 'none set')}.</span>
         ${(W.approvalLog || []).length ? `<details class="small" style="flex-basis:100%"${(W.approvalLog.slice(-1)[0] || {}).action === 'unapproved' ? ' open' : ''}><summary>Approval history</summary>${approvalLogHTML(W)}</details>` : ''}</div>`;
     }
@@ -922,14 +1005,16 @@ function gateItems(B) {
     if (x.flags.includes('leave')) bits.push('hours on a day booked as leave');
     if (bits.length) out.push({ name: r.s.name, staffId: r.s.id, date: x.date, text: dayName(x.date) + ' ' + fmtDay(x.date) + ': ' + bits.join('; ') });
   }));
-  /* dayworks sheets that cover more than a day's pay hours but weren't caught above (a weekend sheet with no pay hours) */
+  /* 2.12: step 1 first. Anyone with hours this week who no project manager has checked is listed, so the approver either
+     waits for the check or ticks that he has checked them himself (the list is kept in acc_approval_checks, as before). */
+  checkRows(B).filter(c => c.needs && !c.approved).forEach(c => out.push({ name: c.r.s.name, staffId: c.r.s.id, date: '', text: 'not checked by a project manager yet (step 1, on DGC and Silverdale hours)' }));
   return out;
 }
 function gateHTML(B) {
   const items = gateItems(B);
   if (!items.length) return '<p class="small muted" style="margin:6px 0 0">Nothing is flagged amber or "?" in the week.</p>';
   return `<div class="gate"><b>Check these before approving.</b> Once approved the hours go to accounts; a mistake found later has to be paid as a correction in a later week.
-    <ul>${items.map(x => `<li><b>${esc(x.name)}</b>, ${esc(x.text)}${seeBtn(x.name, x.date, '')}</li>`).join('')}</ul>
+    <ul>${items.map(x => `<li><b>${esc(x.name)}</b>, ${esc(x.text)}${x.date ? seeBtn(x.name, x.date, '') : ''}</li>`).join('')}</ul>
     <label><input type="checkbox" id="gateOk"${S.gateOk ? ' checked' : ''}> I have checked ${items.length === 1 ? 'this' : 'all ' + items.length} (the See buttons show the timesheet and the paper sheet) and the hours are right.</label></div>`;
 }
 function corrFromForm() {
@@ -1385,39 +1470,255 @@ function officeTable(B) {
   const tot = ['Totals', ...B.dayTotals.map(t => t ? hrs(t) : ''), ...(ot ? [T.ot ? hrs(T.ot) : ''] : []), hrs(T.total), ...(adj ? [(T.adjHours > 0 ? '+' : '') + hrs(T.adjHours), hrs(r2(T.total + T.adjHours))] : []), ...(pay ? ['', gbp(T.gross), T.advances ? gbp(T.advances) : ''] : []), ''];
   return { head, rows, tot, O, pay, adj };
 }
-/* the things to check are for the approvers and directors; the office just gets the hours and whether they are approved */
-function officeChecks(B) { const me = S.me || {}; return (me.approve || me.director) ? B.anomalies.filter(x => x.sev !== 'info') : []; }
+/* the things to check are for the approvers, the directors and (2.12) the project managers doing step 1; the office just
+   gets the hours and whether they are approved */
+function officeChecks(B) { const me = S.me || {}; return (me.approve || me.director || me.pm) ? B.anomalies.filter(x => x.sev !== 'info') : []; }
 function officeStatusText(B) {
   const W = S.W, a = W.approval, who = (W.approvers || []).filter(p => p.active).map(p => p.name.split(' ')[0]).join(' or ') || 'an approver';
   const run = payRunOf(B.start);
   return a ? 'APPROVED by ' + nameOf(a.by) + ' on ' + fmtWhen(a.at) + (todayIso() > run ? '. Its payday was ' + dayMonYear(run) + '.' : '. Ready for wages: payday ' + dayMonYear(run) + '.')
     : 'NOT APPROVED YET: these hours can still change. Wait for ' + who + ' to approve the week before paying from it.';
 }
+/* ============================== step 1: the project managers' check (2.12) ==============================
+   Ash, 22 Oct 2026: "Merge Weekly Hours into Accounts, so there's one hours screen and one approval" (Ideas log 1251).
+   Weekly Hours was the project managers' check on its own page. It is now this: each project manager presses Approve for
+   the people on his sites (step 1), then Ash or John approve and pay the week (step 2, Approve and pay). Step 1 uses the
+   same functions and the same records as Weekly Hours (dgc_wh_week, dgc_wh_approve, dgc_wh_unapprove into
+   dgc_weekly_hours_approval), so every approval made in Weekly Hours still counts here. Who sees whom is decided by the
+   database. None of this changes the hours or the pay: those are still worked out by buildWeek alone. */
+const approverWords = () => ((S.W && S.W.approvers) || []).filter(p => p.active).map(p => p.name.split(' ')[0]).join(' or ') || 'an approver';
+function whMe() { return (S.wh && S.wh.me) || {}; }
+function checkInfo(p) {
+  const appr = (p.approvals || []).filter(a => a.live !== false), hist = p.history || [];
+  const lastUn = hist.filter(h => h.action === 'unapproved').slice(-1)[0] || null;
+  return { appr, approved: appr.length > 0, hist, unapproved: !appr.length && !!lastUn };
+}
+/* the people on screen who are on the check list, with their step 1 state; "needs" = hours or a timesheet this week */
+function checkRows(B) {
+  if (!S.wh) return [];
+  const by = {}; (S.wh.people || []).forEach(p => { by[p.id] = p; });
+  return B.rows.filter(r => by[r.s.id]).map(r => {
+    const p = by[r.s.id], c = checkInfo(p);
+    return { r, p, c, needs: r.days.some(x => x.kind === 'hours' || (x.timesheets || []).length), approved: c.approved };
+  });
+}
+const checkFor = (B, sid) => checkRows(B).find(x => x.r.s.id === sid) || null;
+const canCheckWeek = () => !!(S.wh && !S.asPm && !whMe().viewAs && S.wh.weekStart <= todayIso());
+function canUncheck(c) {
+  const me = whMe();
+  return !!(c && c.approved && !S.asPm && !me.viewAs && (me.role === 'director' || c.c.appr.some(a => a.manager === me.email)));
+}
+const checkWhen = ts => { try { return new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }).replace(',', ''); } catch (e) { return ts; } };
+function whName(em) {
+  const m = ((S.wh && S.wh.managers) || []).find(x => x.email === em);
+  if (m) return m.shortName || m.name;
+  if (S.wh && S.wh.me && S.wh.me.email === em) return S.wh.me.shortName || S.wh.me.name || em;
+  return /@/.test(String(em || '')) ? nameOf(em) : String(em || '');
+}
+function histLineHTML(c) {
+  if (!c.c.hist.length) return '';
+  const word = { approved: 'Approved', 're-approved': 'Approved again', unapproved: 'Unapproved' };
+  return '<div class="hm-hist">' + c.c.hist.map(h => esc((word[h.action] || h.action) + ' by ' + whName(h.by) + ' ' + checkWhen(h.at) + (h.reason ? ': ' + h.reason : ''))).join(' &middot; ') + '</div>';
+}
+/* one line for Approve and pay (step 2): where step 1 is up to */
+function checkLineHTML(B) {
+  if (!S.whOn) return '';
+  if (!S.wh) return `<span class="small sev-warn" style="flex-basis:100%"><b>Step 1, the project managers' check:</b> couldn't be read (${esc(S.whErr || 'not loaded')}). Press Refresh.</span>`;
+  const cs = checkRows(B).filter(c => c.needs), miss = cs.filter(c => !c.approved);
+  return `<span class="small" style="flex-basis:100%"><b>Step 1, the project managers' check:</b> ${cs.length - miss.length} of ${cs.length} checked${miss.length ? `. Not checked yet: ${esc(miss.map(c => c.r.s.name).join(', '))}.${B.approved ? '' : ' They are listed in the tick-off box when you approve.'}` : cs.length ? '. Everyone checked.' : '.'} <button class="btn sm" type="button" data-view="office">See the check</button></span>`;
+}
+/* the step 1 status on the hours tab: the same meaning as Weekly Hours' status line */
+function checkStatusHTML(B, shownCount) {
+  if (!S.whOn) return '';
+  if (!S.wh) return `<div class="hm-status s-late noprint"><span class="dot" aria-hidden="true"></span><span><b>Step 1, the project managers' check, couldn't be read:</b> ${esc(S.whErr || 'not loaded')}. Press Refresh.</span></div>`;
+  const d = S.wh, me = d.me || {}, started = d.weekStart <= todayIso(), late = Date.now() > Date.parse(d.deadline);
+  const cs = checkRows(B).filter(c => c.needs), done = cs.filter(c => c.approved).length, notDone = cs.length - done;
+  const by = 'the end of ' + fmtLong(addDays(B.start, 7));
+  let st = 'wait', txt;
+  if (!started) txt = "This week hasn't started yet.";
+  else if (!cs.length) { st = 'ok'; txt = 'Nobody to check this week.'; }
+  else if (!notDone) { st = 'ok'; txt = `<b>All ${cs.length} checked and approved.</b> Thank you.`; }
+  else if (late) { st = 'late'; txt = `<b>${notDone} of ${cs.length} not approved.</b> This should have been done by ${esc(by)}.`; }
+  else txt = `<b>${notDone} of ${cs.length} still to check.</b> Check them and press Approve by ${esc(by)}.`;
+  const who = me.viewAs ? `Viewing as ${esc(me.name || me.email)}: ${me.lead ? 'everyone' : 'the people on his sites'}. Nothing can be approved while viewing as someone.`
+    : me.lead ? 'You see everyone. Each project manager sees the people on his sites and approves them on Monday.'
+    : 'These are the people on your sites this week: booked on a job you run on the Deployment board, who put one of your jobs on their timesheet, or whose line manager you are.';
+  return `<div class="hm-status s-${st} noprint" role="status"><span class="dot" aria-hidden="true"></span><span><span class="hm-step">Step 1, the project managers' check</span> ${txt}</span>
+      <span class="counts"><b>${cs.length}</b> with hours &middot; <b>${done}</b> approved${notDone ? ` &middot; <b>${notDone}</b> to check` : ''}</span></div>
+    <p class="hm-info noprint">${INFO_SVG}<span>Two steps. <b>1.</b> The project managers check the hours here and press Approve for the people on their sites, by the end of Monday. <b>2.</b> ${esc(approverWords())} then approve and pay the week${S.pmMode || S.asPm ? '' : ' (Approve and pay)'}. ${who}</span></p>`;
+}
+const INFO_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>';
+/* By site (John and the directors), as in Weekly Hours */
+function sitesHTML(B) {
+  if (!S.wh || !whMe().lead) return '';
+  const by = {};
+  checkRows(B).filter(c => c.needs).forEach(c => {
+    const jobs = [...(c.p.booked || []), ...(c.p.enteredJobs || [])], seen = new Set();
+    jobs.forEach(j => { if (seen.has(j.job)) return; seen.add(j.job); (by[j.job] = by[j.job] || { pm: j.pm || [], people: [] }).people.push(c); });
+    if (!jobs.length) (by['No site booked or matched'] = by['No site booked or matched'] || { pm: [], people: [] }).people.push(c);
+  });
+  const keys = Object.keys(by).sort((a, b) => a.localeCompare(b));
+  if (!keys.length) return '';
+  const open = keys.filter(k => by[k].people.some(c => !c.approved)).length;
+  return `<details class="hm-sites noprint"><summary>By site: ${keys.length} site${keys.length === 1 ? '' : 's'}${open ? ', ' + open + ' with people not approved' : ', all approved'}</summary>
+    ${keys.map(k => { const s = by[k], na = s.people.filter(c => !c.approved);
+      return `<div class="hm-siterow"><b>${esc(k)}</b><span>${s.pm.length ? 'Project manager: ' + esc(s.pm.join(', ')) : 'No project manager on the Deployment board, so John checks it'}</span><span>${s.people.length} ${s.people.length === 1 ? 'person' : 'people'}</span>${na.length ? `<span class="pill draft">Not approved: ${esc(na.map(c => c.r.s.name).join(', '))}</span>` : '<span class="pill ok">Approved</span>'}</div>`; }).join('')}</details>`;
+}
+function checkCellHTML(c, late) {
+  if (!c) return '<span class="muted small">Not on the check list</span>';
+  let st;
+  if (c.approved) { const a = c.c.appr[c.c.appr.length - 1]; st = `<span class="hm-pb"><span class="hm-pill ok">Approved</span><span class="hm-by">${esc(whName(a.by))}, ${esc(checkWhen(a.at))}</span></span>`; }
+  else if (!c.needs) st = '<span class="hm-pill">No hours</span>';
+  else if (c.c.unapproved) st = `<span class="hm-pill ${late ? 'late' : 'wait'}">Unapproved</span>`;
+  else st = late ? '<span class="hm-pill late">Not approved</span>' : '<span class="hm-pill wait">To check</span>';
+  const can = canCheckWeek();
+  const btn = (can && c.needs && !c.approved ? `<button class="btn sm go" type="button" data-hmappr="${esc(c.r.s.id)}">${c.c.unapproved ? 'Approve again' : 'Approve'}</button>` : '')
+    + (can && canUncheck(c) ? `<button class="btn sm" type="button" data-hmunappr="${esc(c.r.s.id)}">Unapprove</button>` : '');
+  return `<div class="hm-stw">${st}${btn}</div>${c.c.hist.length > 1 || c.c.unapproved ? histLineHTML(c) : ''}`;
+}
+/* the totals row for the people shown (a filter is on): the same sums as officeTable's, over fewer people */
+function shownTotals(B, t, O) {
+  const sum = f => O.reduce((a, o) => a + num(f(o)), 0);
+  const dayT = B.dates.map((_, i) => sum(o => o.r.days[i].paid));
+  const ot = t.head.includes('OT'), adj = t.adj, pay = t.pay, tot = sum(o => o.r.total), adjH = sum(o => o.r.adjHours);
+  return [`Total, ${O.length} shown`, ...dayT.map(x => x ? hrs(x) : ''), ...(ot ? [sum(o => o.r.ot) ? hrs(sum(o => o.r.ot)) : ''] : []), hrs(tot), ...(adj ? [(adjH > 0 ? '+' : '') + hrs(adjH), hrs(r2(tot + adjH))] : []), ...(pay ? ['', gbp(sum(o => o.r.gross)), sum(o => o.r.advances) ? gbp(sum(o => o.r.advances)) : ''] : []), ''];
+}
 function officeHTML(B, me) {
-  const t = officeTable(B), checks = officeChecks(B), approved = B.approved, canOut = true, staff = !!(me.approve || me.director);
-  const notOver = addDays(B.start, 6) >= todayIso();
+  const t = officeTable(B), checks = officeChecks(B), approved = B.approved, canOut = true, staff = !!(me.approve || me.director || me.pm);
+  const notOver = addDays(B.start, 6) >= todayIso(), pmView = S.pmMode || !!S.asPm;
+  const late = !!(S.wh && Date.now() > Date.parse(S.wh.deadline));
+  const CR = {}; checkRows(B).forEach(c => { CR[c.r.s.id] = c; });
+  const flagged = sid => B.anomalies.some(a => a.staffId === sid && a.sev !== 'info');
+  const keep = o => S.whFilter === 'open' ? !!(CR[o.r.s.id] && CR[o.r.s.id].needs && !CR[o.r.s.id].approved) : S.whFilter === 'flag' ? flagged(o.r.s.id) : true;
+  const shownIdx = t.O.map((o, i) => keep(o) ? i : -1).filter(i => i >= 0);
+  const filtered = shownIdx.length !== t.O.length;
+  const payLine = pmView ? (approved ? `Step 2, pay: approved by ${nameOf(S.W.approval.by)} on ${fmtWhen(S.W.approval.at)}.` : `Step 2, pay: not approved yet. After the check, ${approverWords()} approve the week for pay.`)
+    : (S.whOn ? 'Step 2, approve and pay: ' : '') + officeStatusText(B);
   let h = `<div class="card" id="officeSheet"><div class="bar"><h2 class="ofc-h">${esc(officeTitle(B))}</h2></div>
     <p class="ofc-pay">${esc(officePayLine(B))}<span class="printonly"> ${esc(freshText(S.W, B))}</span></p>
-    <div class="ofc-status ${approved ? 'ok' : 'wait'}"><b>${esc(officeStatusText(B))}</b>${notOver && !approved ? ` <span class="small">The week isn't over yet (it ends ${esc(dayMonYear(addDays(B.start, 6)))}).</span>` : ''}${checks.length ? ` <span class="small">${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check, under the hours.</span>` : ''}
-      ${!approved && me.approve ? `<div class="noprint" style="margin-top:8px"><button class="btn go" type="button" data-view="dgc">Go to approve the hours</button></div>` : ''}</div>`;
+    ${S.asPm ? `<div class="hm-viewas noprint"><b>Viewing as ${esc(whMe().name || S.asPm)}:</b> this is the hours screen he sees (his people, no money). Nothing can be approved while viewing as someone. <button class="btn sm" type="button" data-act="hm-asme">Back to my view</button></div>` : ''}
+    <div class="ofc-status ${approved ? 'ok' : 'wait'}"><b>${esc(payLine)}</b>${notOver && !approved ? ` <span class="small">The week isn't over yet (it ends ${esc(dayMonYear(addDays(B.start, 6)))}).</span>` : ''}${checks.length ? ` <span class="small">${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check, under the hours.</span>` : ''}
+      ${!approved && me.approve && !pmView ? `<div class="noprint" style="margin-top:8px"><button class="btn go" type="button" data-view="dgc">Go to approve the hours</button></div>` : ''}</div>`;
+  h += checkStatusHTML(B);
   /* 2.11 (Ash, 22 Oct 2026: hours first): the things to check go under the hours, not above them */
   const checksBox = checks.length ? `<div class="ofc-checks" id="ofcChecks"><b>${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check before paying:</b><ul>${checks.map(x => `<li class="sev-${x.sev}"><b>${esc(x.name || 'General')}</b>: ${esc(x.text)}</li>`).join('')}</ul></div>` : (staff ? `<p class="small muted">Nothing flagged amber in the week.</p>` : '');
-  h += `<div class="ofc-tools noprint">${canOut ? `<button class="btn primary" type="button" data-act="ofc-print">Print</button><button class="btn" type="button" data-act="ofc-excel">Download Excel</button><button class="btn" type="button" data-act="ofc-csv">Download CSV</button><button class="btn" type="button" data-act="ofc-copy">Copy</button>`
+  const allOpen = canCheckWeek() ? shownIdx.map(i => CR[t.O[i].r.s.id]).filter(c => c && c.needs && !c.approved) : [];
+  const asList = (S.wh && S.wh.me && S.wh.me.realDirector && (S.wh.managers || []).length && !S.pmMode) ? S.wh.managers : [];
+  h += `<div class="ofc-tools noprint">${canOut ? (pmView ? `<button class="btn primary" type="button" data-act="ofc-print">Print</button>` : `<button class="btn primary" type="button" data-act="ofc-print">Print</button><button class="btn" type="button" data-act="ofc-excel">Download Excel</button><button class="btn" type="button" data-act="ofc-csv">Download CSV</button><button class="btn" type="button" data-act="ofc-copy">Copy</button>`)
       : '<span class="muted">Print, Download and Copy open once the week is approved.</span>'}
     ${B.money ? `<label class="small" style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" id="officePay"${S.officePay ? ' checked' : ''}> Add the rate and gross pay</label>` : ''}</div>`;
-  h += `<div class="scroll" style="margin-top:10px"><table class="t ofc" id="officeTable"><thead><tr>${t.head.map((x, i) => `<th class="${i === 0 || i === t.head.length - 1 ? 'l' : 'c'}${i >= 1 && i <= 7 && !isWeekday(B.dates[i - 1]) ? ' wk' : ''}">${i >= 1 && i <= 7 ? `${esc(dayName(B.dates[i - 1]))}<span class="dd">${esc(fmtDay(B.dates[i - 1]))}</span>` : esc(x)}</th>`).join('')}</tr></thead><tbody>`;
-  t.O.forEach((o, ri) => {
-    const row = t.rows[ri];
+  if (S.wh) h += `<div class="hm-toolbar noprint"><div class="hm-filters" role="group" aria-label="Show">
+      <button type="button" data-hmf="all" aria-pressed="${S.whFilter === 'all'}">Everyone</button><button type="button" data-hmf="open" aria-pressed="${S.whFilter === 'open'}">Not approved</button><button type="button" data-hmf="flag" aria-pressed="${S.whFilter === 'flag'}">Something to check</button></div>
+      ${asList.length || S.asPm ? `<label class="small hm-as">See it as <select id="hmAs"><option value="">My own view</option>${(asList.length ? asList : []).map(m => `<option value="${esc(m.email)}"${S.asPm === m.email ? ' selected' : ''}>${esc(m.name)}${m.role === 'lead' ? ' (sees everyone)' : ''}</option>`).join('')}</select></label>` : ''}
+      <span class="push"></span>${allOpen.length ? `<button class="btn go" type="button" data-act="hm-appr-all">Approve all ${allOpen.length} shown</button>` : ''}</div>
+    ${sitesHTML(B)}`;
+  const checkCol = !!S.wh, nH = t.head.length;
+  h += `<div class="scroll hm-scroll" style="margin-top:10px"><table class="t ofc" id="officeTable"><thead><tr>${t.head.map((x, i) => (checkCol && i === nH - 1 ? '<th class="l noprint hm-chk">Check</th>' : '') + `<th class="${i === 0 || i === nH - 1 ? 'l' : 'c'}${i >= 1 && i <= 7 && !isWeekday(B.dates[i - 1]) ? ' wk' : ''}">${i >= 1 && i <= 7 ? `${esc(dayName(B.dates[i - 1]))}<span class="dd">${esc(fmtDay(B.dates[i - 1]))}</span>` : esc(x)}</th>`).join('')}</tr></thead><tbody>`;
+  shownIdx.forEach(ri => {
+    const o = t.O[ri], row = t.rows[ri], c = CR[o.r.s.id], sid = esc(o.r.s.id);
+    const sub = c ? ((c.p.booked || []).length ? 'Booked: ' + c.p.booked.map(b => b.job).join(', ') : 'Not booked on the board') : '';
     h += '<tr>' + row.map((v, i) => {
-      if (i === 0) return `<td class="name">${esc(v)}</td>`;
-      if (i === row.length - 1) return `<td class="notes">${o.notes.map(n => `<div>${esc(n)}</div>`).join('')}</td>`;
-      if (i >= 1 && i <= 7) { const x = o.r.days[i - 1]; const cls = ['c', !isWeekday(x.date) ? 'wk' : '', x.kind === 'H' || x.kind === 'BH' ? 'lv' : '', x.flags.includes('missing') ? 'miss' : '', x.flags.some(f => ['leave', 'long', 'dayworks', 'twice'].includes(f)) ? 'flag' : '', x.flags.includes('changed') ? 'chg' : '', x.fixed ? 'fixed' : ''].filter(Boolean).join(' '); return `<td class="${cls}">${esc(v)}</td>`; }
+      if (i === 0) return `<td class="name"><button type="button" class="hm-pn" data-hmperson="${sid}" title="Tap for ${esc(v)}'s details"><b>${esc(v)}</b>${sub ? `<small class="noprint">${esc(sub)}</small>` : ''}</button></td>`;
+      if (i === row.length - 1) return (checkCol ? `<td class="l noprint hm-chk">${checkCellHTML(c, late)}</td>` : '') + `<td class="notes">${o.notes.map(n => `<div>${esc(n)}</div>`).join('')}</td>`;
+      if (i >= 1 && i <= 7) { const x = o.r.days[i - 1]; const cls = ['c', !isWeekday(x.date) ? 'wk' : '', x.kind === 'H' || x.kind === 'BH' ? 'lv' : '', x.flags.includes('missing') ? 'miss' : '', x.flags.some(f => ['leave', 'long', 'dayworks', 'twice'].includes(f)) ? 'flag' : '', x.flags.includes('changed') ? 'chg' : '', x.fixed ? 'fixed' : ''].filter(Boolean).join(' ');
+        return `<td class="${cls}"><button type="button" class="hm-dc" data-hmday="${sid}|${esc(x.date)}" aria-label="${esc(o.r.s.name + ', ' + dayName(x.date) + ' ' + fmtDay(x.date) + ': ' + (v || 'nothing'))}">${esc(v) || '&nbsp;'}</button></td>`; }
       return `<td class="c${t.head[i] === 'Total hours' || t.head[i] === 'Hours to pay' ? ' big' : ''}">${esc(v)}</td>`;
     }).join('') + '</tr>';
   });
-  h += `<tr class="tot">${t.tot.map((v, i) => i === 0 ? `<td class="name">${esc(v)}</td>` : `<td class="${i === t.tot.length - 1 ? 'notes' : 'c'}">${esc(v)}</td>`).join('')}</tr></tbody></table></div>
-    <p class="small muted">${B.rows.length} people. H = paid holiday (8h), B = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime${B.T.ot > 0 ? ' (OT = overtime hours)' : ''}.${staff ? ' Amber = check it; red = changed after approval.' : ''}${t.adj ? ' A correction pays hours from an earlier week in this run; Hours to pay = Total hours plus the correction.' : ''} John and Andy are salaried and kept off the hours, as on the Staff screen.${t.pay ? ' Gross pay is hours times the rate, plus any bonus and correction, before tax and NI.' : ''}</p>${checksBox}</div>`;
+  if (!shownIdx.length) h += `<tr><td class="l" colspan="${nH + (checkCol ? 1 : 0)}"><span class="muted">Nobody here.</span></td></tr>`;
+  const tot = filtered ? shownTotals(B, t, shownIdx.map(i => t.O[i])) : t.tot;
+  h += `<tr class="tot">${tot.map((v, i) => (checkCol && i === tot.length - 1 ? '<td class="noprint hm-chk"></td>' : '') + (i === 0 ? `<td class="name">${esc(v)}</td>` : `<td class="${i === tot.length - 1 ? 'notes' : 'c'}">${esc(v)}</td>`)).join('')}</tr></tbody></table></div>
+    <div class="hm-legend noprint"><b>Key</b><span class="k"><span class="sw lv">H</span>paid holiday (8h)</span><span class="k"><span class="sw lv">B</span>bank holiday (8h)</span><span class="k"><span class="sw">U</span>unpaid leave</span><span class="k"><span class="sw miss">?</span>no hours on a working day</span>${staff ? '<span class="k"><span class="sw flag">8</span>amber: check it (tap the day to see why)</span><span class="k"><span class="sw chg">8</span>red: changed after the week was approved</span>' : ''}<span class="k"><span class="sw fixed">8</span>blue: corrected after approval, paid in a later pay run</span><span class="k">Tap a name for the details, or a day for what was entered.</span></div>
+    <p class="small muted">${B.rows.length} people${filtered ? `, ${shownIdx.length} shown` : ''}. H = paid holiday (8h), B = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime${B.T.ot > 0 ? ' (OT = overtime hours)' : ''}.${staff ? ' Amber = check it; red = changed after approval.' : ''}${t.adj ? ' A correction pays hours from an earlier week in this run; Hours to pay = Total hours plus the correction.' : ''} John and Andy are salaried and kept off the hours, as on the Staff screen.${t.pay ? ' Gross pay is hours times the rate, plus any bonus and correction, before tax and NI.' : ''}</p>${checksBox}</div>`;
   return h;
+}
+/* the panels: one person, one day, approve and unapprove (from Weekly Hours 0.3) */
+function hmShow(html) {
+  let sh = document.getElementById('hmSheet');
+  if (!sh) { sh = document.createElement('div'); sh.id = 'hmSheet'; sh.className = 'hm-sheet'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.innerHTML = '<div class="hm-sheet-in" id="hmSheetBody"></div>'; document.body.appendChild(sh);
+    sh.addEventListener('click', e => { if (e.target === sh) hmClose(); }); }
+  const b = document.getElementById('hmSheetBody'); b.innerHTML = html; sh.hidden = false;
+  const f = b.querySelector('button, textarea'); if (f) f.focus();
+}
+function hmClose() { const sh = document.getElementById('hmSheet'); if (sh) sh.hidden = true; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hmClose(); });
+function hmPerson(sid) {
+  const B = S.B, r = B.rows.find(x => x.s.id === sid); if (!r) return;
+  const c = checkFor(B, sid), p = c && c.p;
+  const booked = p ? ((p.booked || []).map(b => esc(b.job) + (b.pm && b.pm.length ? ' (project manager ' + esc(b.pm.join(', ')) + ')' : '')).join('<br>') || 'Not booked on the Deployment board this week.') : '';
+  const typed = [...new Set(r.days.flatMap(x => (x.timesheets || []).map(t => t.site)).filter(Boolean))];
+  const a = c && c.c.appr[c.c.appr.length - 1];
+  hmShow(`<h3 class="hm-h">${esc(r.s.name)}</h3><p class="small muted" style="margin:0 0 6px">${esc(weekEndPaid(B.start))}</p>
+    ${p ? `<div class="hm-kv"><div class="k">Line manager</div>${esc(p.lineManager || 'John')}</div>` : ''}
+    ${r.s.status ? `<div class="hm-kv"><div class="k">Status</div>${esc(r.s.status)}</div>` : ''}
+    ${p ? `<div class="hm-kv"><div class="k">Booked this week (Deployment board)</div>${booked}</div>` : ''}
+    <div class="hm-kv"><div class="k">Put on their timesheet</div>${typed.length ? esc(typed.join(', ')) : 'No timesheets this week.'}</div>
+    <div class="hm-kv"><div class="k">Hours</div>${esc(hrs(r.worked))}h worked${r.leavePaid ? ', plus ' + esc(hrs(r.leavePaid)) + 'h paid holiday or bank holiday' : ''}${r.ot ? ', plus ' + esc(hrs(r.ot)) + 'h overtime' : ''}: <b>${esc(hrs(r.total))}h</b> in total</div>
+    <div class="hm-kv"><div class="k">Step 1, the check</div>${!c ? 'Not on the project managers\' check list.' : c.approved ? 'Approved by ' + esc(whName(a.by)) + ', ' + esc(fmtWhen(a.at)) : !c.needs ? 'Nothing to approve' : c.c.unapproved ? 'Unapproved: check and approve again' : 'Not approved yet'}${c && c.c.hist.length ? histLineHTML(c) : ''}</div>
+    <button class="btn" type="button" data-act="hm-close" style="width:100%;margin-top:10px">Close</button>`);
+}
+function hmDay(sid, date) {
+  const B = S.B, r = B.rows.find(x => x.s.id === sid); if (!r) return;
+  const x = r.days.find(y => y.date === date); if (!x) return;
+  const c = checkFor(B, sid), why = B.anomalies.filter(a => a.staffId === sid && a.date === date);
+  const e = ((S.W && S.W.hours) || []).find(y => y.staffId === sid && y.date === date) || null; /* the grid's own figure, not the one paid */
+  const g = e ? `${e.hours == null ? 'nil' : hrs(e.hours) + 'h'}${e.updatedBy || e.createdBy ? ', entered by ' + esc(nameOf(e.updatedBy || e.createdBy)) : ''}${e.note ? '. Note: ' + esc(e.note) : ''}` : 'Nothing on the hours grid.';
+  const ts = (x.timesheets || []).map(t => `<b>${hrs(t.hours)}h</b>, ${esc(t.site || 'no site')}${t.start ? ', ' + esc(t.start) + ' to ' + esc(t.finish || '?') : ''}${t.lunch ? ', ' + esc(t.lunch) + ' min lunch' : ''}`).join('<br>') || 'No timesheet for this day.';
+  const counted = x.kind === 'hours' ? hrs(x.value) + 'h' : x.kind === 'H' ? 'Paid holiday, 8h' : x.kind === 'BH' ? 'Bank holiday, 8h' : x.kind === 'U' ? 'Unpaid leave' : x.flags.includes('missing') ? 'Nothing: no hours on a working day.' : 'No hours.';
+  const ch = c ? (c.p.changes || []).filter(y => y.date === date) : [];
+  const word = { added: 'Added', changed: 'Changed', removed: 'Removed' };
+  const canSee = !S.pmMode && !S.asPm;
+  hmShow(`<h3 class="hm-h">${esc(r.s.name)}, ${esc(fmtLong(date))}</h3>
+    ${why.map(w => `<div class="hm-why sev-${w.sev}">${esc(w.text)}</div>`).join('')}
+    <div class="hm-kv"><div class="k">Counted for pay</div><b>${esc(counted)}</b>${(x.entry && x.entry.fromTimesheet) ? ' <span class="small muted">(what they put on the Timesheet app is paid, unless a manager picked another figure)</span>' : ''}</div>
+    <div class="hm-kv"><div class="k">Hours grid (Staff screen)</div>${g}</div>
+    <div class="hm-kv"><div class="k">Their timesheet</div>${ts}</div>
+    ${x.leave ? `<div class="hm-kv"><div class="k">Leave</div>${esc(x.leave.type)}, ${esc(fmtDay(x.leave.from))} to ${esc(fmtDay(x.leave.to))}</div>` : ''}
+    ${(x.dayworks || []).length ? `<div class="hm-kv"><div class="k">Dandara dayworks sheet</div>${x.dayworks.map(y => `${hrs(y.billedHours != null ? y.billedHours : y.hours)}h, ${esc(y.site || '')}`).join('<br>')}</div>` : ''}
+    ${ch.length ? `<div class="hm-kv"><div class="k">Changes to the hours</div>${ch.map(y => `<div>${esc((word[y.action] || y.action) + ' ' + (y.action === 'added' ? hrs(y.new) + 'h' : y.action === 'removed' ? hrs(y.old) + 'h' : hrs(y.old) + 'h to ' + hrs(y.new) + 'h') + ', ' + fmtWhen(y.at) + ' by ' + whName(y.by) + (y.via ? ', ' + y.via : ''))}</div>`).join('')}</div>` : ''}
+    <p class="small muted">To change hours, use the Staff screen in the Job Planner.${B.approved ? ' This week is already approved for pay, so a wrong day goes onto the next pay run as a correction (Ash or Harry record it on Approve and pay).' : ''}</p>
+    <div class="bar">${canSee ? `<button class="btn primary" type="button" data-act="hm-see" data-name="${esc(r.s.name)}" data-date="${esc(date)}">Timesheet, paper sheet and grid side by side</button>` : ''}<button class="btn" type="button" data-act="hm-close">Close</button></div>`);
+}
+function hmApprove(ids) {
+  const B = S.B, people = B.rows.filter(r => ids.includes(r.s.id));
+  if (!people.length || !canCheckWeek()) return;
+  const flagged = people.filter(r => B.anomalies.some(a => a.staffId === r.s.id && a.sev !== 'info')).map(r => r.s.name);
+  hmShow(`<h3 class="hm-h">Approve the hours for ${people.length === 1 ? esc(people[0].s.name) : people.length + ' people'}</h3>
+    <p>${esc(weekEndPaid(B.start))}.${people.length > 1 ? ' ' + esc(people.map(r => r.s.name).join(', ')) + '.' : ''}</p>
+    <p class="small muted">This is step 1, the project managers' check. ${esc(approverWords())} still approve and pay the week afterwards.</p>
+    ${flagged.length ? `<div class="hm-why sev-warn">Something to check first: ${esc(flagged.join(', '))}. Tap an amber day to see why.</div>` : ''}
+    <p class="small muted">Kept on record with who and when. If it turns out wrong, press Unapprove: the approval and the Unapprove are both kept.</p>
+    <label for="hmNote" style="font-weight:700">Note (optional)</label><textarea id="hmNote" class="hm-note" placeholder="For example: Tuesday checked with him, he was at the yard"></textarea>
+    <p class="msg err" id="hmErr" role="alert"></p>
+    <div class="bar"><button class="btn go" type="button" data-act="hm-appr-go" data-ids="${esc(ids.join(','))}">Approve</button><button class="btn" type="button" data-act="hm-close">Cancel</button></div>`);
+}
+function hmUnapprove(sid) {
+  const B = S.B, c = checkFor(B, sid); if (!canUncheck(c) || !canCheckWeek()) return;
+  const a = c.c.appr[c.c.appr.length - 1];
+  hmShow(`<h3 class="hm-h">Unapprove ${esc(c.r.s.name)}</h3>
+    <p>${esc(weekEndPaid(B.start))}. Approved by ${esc(whName(a.by))}, ${esc(fmtWhen(a.at))}.</p>
+    ${B.approved ? `<div class="hm-why sev-warn">This week is already approved for pay. Unapproving takes back the project manager's check only; the pay run is not changed. If the hours were wrong, a director records a correction on Approve and pay: it goes onto the next pay run.</div>` : ''}
+    <p class="small muted">Nothing is deleted: the approval stays on record, with this Unapprove beside it (who, when, where and why). Then change the hours if needed and approve again.</p>
+    <label for="hmWhy" style="font-weight:700">Why (optional)</label><textarea id="hmWhy" class="hm-note" placeholder="For example: wrong hours on Friday"></textarea>
+    <p class="msg err" id="hmErr" role="alert"></p>
+    <div class="bar"><button class="btn primary" type="button" data-act="hm-unappr-go" data-id="${esc(sid)}">Unapprove</button><button class="btn" type="button" data-act="hm-close">Cancel</button></div>`);
+}
+async function hmApproveGo(btn) {
+  const ids = String(btn.dataset.ids || '').split(',').filter(Boolean), er = document.getElementById('hmErr');
+  btn.disabled = true; btn.textContent = 'Approving...';
+  try {
+    const res = await rpc('dgc_wh_approve', { p_start: S.wh.weekStart, p_staff: ids, p_note: (document.getElementById('hmNote') || {}).value || null });
+    hmClose(); await reload(true);
+    say(res && res.refused && res.refused.length ? res.refused.length + ' of them are not on your sites, so they were left for John.' : 'Approved (step 1). ' + approverWords() + ' approve and pay the week.', res && res.refused && res.refused.length ? 'err' : 'ok');
+  } catch (e) { if (er) er.textContent = String(e.message || e).replace(/^Weekly Hours: /, ''); btn.disabled = false; btn.textContent = 'Approve'; }
+}
+async function hmUnapproveGo(btn) {
+  const er = document.getElementById('hmErr');
+  btn.disabled = true; btn.textContent = 'Unapproving...';
+  try {
+    await rpc('dgc_wh_unapprove', { p_start: S.wh.weekStart, p_staff: [btn.dataset.id], p_reason: (document.getElementById('hmWhy') || {}).value || null });
+    hmClose(); await reload(true); say('Unapproved. The approval and the Unapprove are both kept.', 'ok');
+  } catch (e) { if (er) er.textContent = String(e.message || e).replace(/^Weekly Hours: /, ''); btn.disabled = false; btn.textContent = 'Unapprove'; }
 }
 function officeFileName(ext) { return `DGC and Silverdale hours w-e ${addDays(S.start, 6)}${S.B.approved ? '' : ' UNAPPROVED'}.${ext}`; }
 function officeOk() {
@@ -1485,18 +1786,18 @@ function weekSig(W, C) { return JSON.stringify([(W.hours || []).map(x => [x.id, 
 function accIdle() {
   const a = document.activeElement;
   return !S.busy && !S.corr && !S.approveAsk && !S.reopenAsk && S.editRate == null && S.editSalary == null && S.editTax == null && !S.editPaySet
-    && !document.querySelector('.tsp-back') && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id !== 'officePay');
+    && !document.querySelector('.tsp-back') && !document.querySelector('#hmSheet:not([hidden])') && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id !== 'officePay');
 }
 async function quietRefresh() {
   if (document.hidden || !S.W || !S.me || !accIdle()) return;
   if (S.day && S.day !== todayIso()) { S.day = todayIso(); S.fc = null; if (!S.picked && S.start !== defaultWeek(S.view)) return goWeek(defaultWeek(S.view), true); render(); }
   const start = S.start;
   try {
-    const [W, C] = await Promise.all([rpc('acc_week', { p_start: start }), rpc('acc_corrections_for', { p_start: start }).catch(e => ({ paidHere: [], madeHere: [], checks: [], error: e.message }))]);
+    const [W, C, wh] = await loadWeekData(start);
     if (start !== S.start || !accIdle()) return;
     S.loadedAt = Date.now();
-    const sig = weekSig(W, C);
-    if (sig !== S.sig) { W.corrections = C; S.W = W; S.sig = sig; S.fc = null; const y = window.scrollY; render(); window.scrollTo(0, y); }
+    const sig = weekSig(W, C) + whSig(wh);
+    if (sig !== S.sig) { W.corrections = C; S.W = W; takeWh(wh); S.sig = sig; S.fc = null; const y = window.scrollY; render(); window.scrollTo(0, y); }
     else { const el = $('#accChecked'); if (el) el.textContent = 'Checked ' + new Date(S.loadedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ', and again every few minutes.'; }
   } catch (e) { /* the next try will do */ }
 }
@@ -1553,11 +1854,24 @@ function applyPendingCorr() {
   S.corr = { staffId: c.staffId, date: c.date, oldHours: corrPaid(c.staffId, c.date), newHours: c.newHours, reason: c.reason, evidence: '' };
   render(); const f = $('#corrForm'); if (f) f.scrollIntoView({ block: 'center' });
 }
+/* 2.12: one place that reads a week. A project manager without Accounts (or a director using See it as) gets
+   acc_pm_week: only his people, no money at all. Everyone who does the project managers' check (step 1) also gets
+   dgc_wh_week, the same answer Weekly Hours used, for the Check column. Nothing here changes how the hours add up. */
+const NO_CORR = e => ({ paidHere: [], madeHere: [], checks: [], error: e && e.message });
+async function loadWeekData(start) {
+  const pm = S.pmMode || !!S.asPm;
+  const [W, C, wh] = await Promise.all([
+    pm ? rpc('acc_pm_week', { p_start: start, p_as: S.asPm }) : rpc('acc_week', { p_start: start }),
+    pm ? Promise.resolve(NO_CORR()) : rpc('acc_corrections_for', { p_start: start }).catch(NO_CORR),
+    S.whOn ? rpc('dgc_wh_week', { p_start: start, p_as: S.asPm }).catch(e => ({ __err: e.message || 'not read' })) : Promise.resolve(null)]);
+  return [W, C, wh];
+}
+function takeWh(wh) { if (wh && wh.__err) { S.wh = null; S.whErr = wh.__err; } else { S.wh = wh; S.whErr = ''; } S.whReady = true; }
+const whSig = wh => wh && !wh.__err ? JSON.stringify((wh.people || []).map(p => [p.id, (p.approvals || []).length, (p.history || []).length])) : '';
 async function reload(keepMsg) {
   try {
-    const [W, C] = await Promise.all([rpc('acc_week', { p_start: S.start }),
-      rpc('acc_corrections_for', { p_start: S.start }).catch(e => ({ paidHere: [], madeHere: [], checks: [], error: e.message }))]);
-    W.corrections = C; S.W = W; S.sig = weekSig(W, C); S.loadedAt = Date.now(); if (!keepMsg) S.msg = ''; render();
+    const [W, C, wh] = await loadWeekData(S.start);
+    W.corrections = C; S.W = W; takeWh(wh); S.sig = weekSig(W, C) + whSig(wh); S.loadedAt = Date.now(); if (!keepMsg) S.msg = ''; render();
     applyPendingCorr();
   }
   catch (e) { $('#app').innerHTML = `<div class="card"><h2>Couldn't load the week</h2><p>${esc(e.message)}</p><button class="btn" type="button" data-act="retry">Try again</button></div>`; }
@@ -1574,6 +1888,19 @@ document.addEventListener('click', async ev => {
   const d = t.dataset;
   if (d.tsName) { ev.stopPropagation(); openTimesheet(d.tsName, d.tsDate); return; }
   if (t.matches('tr.person')) { const id = d.person; S.open.has(id) ? S.open.delete(id) : S.open.add(id); render(); return; }
+  /* 2.12: step 1, the project managers' check */
+  if (d.hmperson) { hmPerson(d.hmperson); return; }
+  if (d.hmday) { const i = d.hmday.indexOf('|'); hmDay(d.hmday.slice(0, i), d.hmday.slice(i + 1)); return; }
+  if (d.hmappr) { hmApprove([d.hmappr]); return; }
+  if (d.hmunappr) { hmUnapprove(d.hmunappr); return; }
+  if (d.hmf) { S.whFilter = d.hmf; render(); return; }
+  if (d.act === 'hm-close') { hmClose(); return; }
+  if (d.act === 'hm-see') { hmClose(); openTimesheet(d.name, d.date); return; }
+  if (d.act === 'hm-appr-all') { const ids = [...document.querySelectorAll('#officeTable [data-hmappr]')].map(b => b.dataset.hmappr); if (ids.length) hmApprove(ids); return; }
+  if (d.act === 'hm-appr-go') return hmApproveGo(t);
+  if (d.act === 'hm-unappr-go') return hmUnapproveGo(t);
+  if (d.act === 'hm-asme') { S.asPm = null; S.whFilter = 'all'; return reload(); }
+  if (d.view && d.view !== 'office' && (S.pmMode || S.asPm)) return;
   if (d.view) { S.view = d.view; window.scrollTo(0, 0); if (!S.picked && S.start !== defaultWeek(S.view)) return goWeek(defaultWeek(S.view), true); render(); return; } /* 2.11: no week picked yet, so the hours show the week being worked and the pay the next payday */
   if (d.week) return goWeek(d.week);
   if (d.taxedit) { S.editTax = d.taxedit; render(); return; }
@@ -1666,6 +1993,7 @@ document.addEventListener('click', async ev => {
 document.addEventListener('change', ev => {
   const t = ev.target;
   if (t.id === 'officePay') { S.officePay = t.checked; render(); return; }
+  if (t.id === 'hmAs') { S.asPm = t.value || null; S.whFilter = 'all'; S.view = 'office'; reload(); return; }
   if (t.id === 'gateOk') { S.gateOk = t.checked; const b = $('#approveYes'); if (b) b.disabled = !t.checked; return; }
   if (t.id === 'cfPerson' || t.id === 'cfDay') { corrFromForm(); render(); const f = $('#corrForm'); if (f) f.scrollIntoView({ block: 'center' }); return; }
 });
@@ -1684,8 +2012,18 @@ window.addEventListener('hashchange', () => { S.pendingCorr = correctFromHash() 
   }
   try { S.me = await rpc('acc_me'); }
   catch (e) { $('#app').innerHTML = `<div class="card"><h2>Accounts</h2><p>${esc(e.message)}</p></div>`; return; }
+  /* 2.12 (Ash, 22 Oct 2026: "Merge Weekly Hours into Accounts, so there's one hours screen and one approval"): the
+     project managers' check (step 1) is on the hours tab. Who does it is decided by the database (dgc_wh_who): John and the
+     directors for everyone, each project manager for the people on his sites. A project manager with no Accounts login gets
+     the hours tab only, his people only and no money (acc_pm_week). */
+  try { S.who = await rpc('dgc_wh_who', { p_as: null }); } catch (e) { S.who = null; }
+  S.whOn = !!(S.who && (S.who.lead || S.who.manager));
+  if ((!S.me || !S.me.hours) && S.whOn) {
+    S.pmMode = true;
+    S.me = { email: S.who.email, name: S.who.name, role: 'pm', hours: true, money: false, approve: false, director: false, pm: true };
+  }
   if (!S.me || !S.me.hours) {
-    $('#app').innerHTML = `<div class="card"><h2>Accounts</h2><p>This login (${esc((S.me && S.me.email) || 'not signed in')}) can't open Accounts.</p><p class="muted">Accounts is for the directors, the hours approvers, and people with the Accounts app and "Can see money" both switched on. Ask Ash or Harry if you need it.</p><button class="btn" type="button" onclick="logout()">Sign out</button></div>`;
+    $('#app').innerHTML = `<div class="card"><h2>Accounts</h2><p>This login (${esc((S.me && S.me.email) || 'not signed in')}) can't open Accounts.</p><p class="muted">Accounts is for the directors, the hours approvers, the project managers (for the people on their sites) and people with the Accounts app and "Can see money" both switched on. Ask Ash or Harry if you need it.</p><button class="btn" type="button" onclick="logout()">Sign out</button></div>`;
     return;
   }
   /* Ash, 22 Oct 2026: "I want it preset to hours for everyone, so the first one that comes up is hours for DGC and
@@ -1695,7 +2033,7 @@ window.addEventListener('hashchange', () => { S.pendingCorr = correctFromHash() 
   const fromHash = pickStartFromHash();
   S.pendingCorr = correctFromHash();
   S.focusApprove = /approve/.test(location.hash);
-  S.view = (S.focusApprove || S.pendingCorr) && (S.me.approve || S.me.director) ? 'dgc' : 'office';
+  S.view = (S.focusApprove || S.pendingCorr) && (S.me.approve || S.me.director) && !S.pmMode ? 'dgc' : 'office';
   S.picked = !!fromHash; S.day = todayIso();
   S.start = fromHash || defaultWeek(S.view);
   await loadPaySet();
