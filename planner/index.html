@@ -835,7 +835,7 @@ body.tl-viewonly #modal-title::after{content:" (view only)";font-weight:600;colo
 
 <script>
 // ── Constants ──────────────────────────────────────────────
-const VERSION = 'v3.19';
+const VERSION = 'v3.20';
 const BUILD   = 'Sep 2026';
 const SB_URL  = 'https://vigdtpcgeqenznuakdwz.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ2R0cGNnZXFlbnpudWFrZHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MTI1MzQsImV4cCI6MjEwMjk4ODUzNH0.9hjdS6ATFVaYwwKcZQqTpQxbIuSDrxbO07r4MmXXadQ';
@@ -2340,11 +2340,13 @@ async function plannerAccess(s, tries) {
     const me = await r.json();
     window.SD_PLANNER_ME = me;
     _plAccess.staffhours = !!me.staff; _plAccess.daywork = !!me.dayworks; _plAccess.starters = !!me.staff; _plAccess.known = true;
-    ['staffhours', 'daywork', 'starters'].forEach(t => { const b = document.getElementById('nav-' + t); if (b) b.hidden = !_plAccess[t]; });
+    /* 22 Oct 2026 (Ash): New starters and DGC OS are taken off the Job Planner; they're apps on the main Silverdale app (os.dgc.im). */
+    ['staffhours', 'daywork'].forEach(t => { const b = document.getElementById('nav-' + t); if (b) b.hidden = !_plAccess[t]; });
     if (_plPendingTab && _plAccess[_plPendingTab]) { const t = _plPendingTab; _plPendingTab = null; showTab(t, document.getElementById('nav-' + t)); }
   } catch (e) { if ((tries || 0) < 3) setTimeout(() => plannerAccess(getStoredSession(), (tries || 0) + 1), 30000); }
 }
 function showTab(name, btn) {
+  if (name === 'starters' || name === 'dgcos') return; /* taken off 22 Oct 2026 (Ash): use the Silverdale app instead */
   if ((name === 'staffhours' || name === 'daywork' || name === 'starters') && !_plAccess[name]) { if (!_plAccess.known) _plPendingTab = name; return; }
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
