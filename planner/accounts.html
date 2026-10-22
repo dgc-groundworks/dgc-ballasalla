@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Accounts</title>
 <link rel="icon" href="dgc-icon.png">
+<!-- an app on the home screen (Ash, 22 Oct 2026): iPhone Share > Add to Home Screen; Android Chrome menu > Install app -->
+<link rel="manifest" href="accounts-manifest.json">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="theme-color" content="#1a1d27">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="DGC Hours">
 <script src="theme.js"></script>
 <script>try { if (window.self !== window.top) document.documentElement.classList.add("framed"); } catch (e) { document.documentElement.classList.add("framed"); }</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
@@ -175,7 +183,13 @@ table.t.ofc td.notes div + div { margin-top: 2px; }
   <a href="./" style="margin-left:auto;color:var(--text);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px">&larr; Back to the Job Planner</a>
 </div>
 <script>/* opened on its own (not inside the Job Planner): show a way back (Ash, 12 Oct 2026) */
-try { if (window.top === window) document.getElementById("plBackBar").hidden = false; } catch (e) {}</script>
+try {
+  const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  /* opened as a home-screen app: no "back to the Job Planner" bar, and register the Planner's service worker so Android offers Install */
+  if (window.top === window && !standalone) document.getElementById("plBackBar").hidden = false;
+  if (standalone) document.getElementById("plBackBar").style.setProperty("display", "none", "important");
+  if (window.top === window && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+} catch (e) {}</script>
 
 <main id="app"><p class="muted">Loading Accounts...</p></main>
 
@@ -185,7 +199,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.9 (22 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.10 (22 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',

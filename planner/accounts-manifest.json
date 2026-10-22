@@ -1,0 +1,14 @@
+{
+  "name": "DGC Hours",
+  "short_name": "DGC Hours",
+  "description": "This week's staff hours for the office: who, which days, how many, holidays and overtime",
+  "start_url": "/dgc-ballasalla/planner/accounts.html",
+  "scope": "/dgc-ballasalla/planner/",
+  "display": "standalone",
+  "background_color": "#1a1d27",
+  "theme_color": "#1a1d27",
+  "icons": [
+    { "src": "/dgc-ballasalla/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/dgc-ballasalla/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
