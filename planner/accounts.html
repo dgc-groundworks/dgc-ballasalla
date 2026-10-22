@@ -185,7 +185,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.8 (20 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.9 (22 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -1324,16 +1324,17 @@ function officeRows(B) {
 }
 /* the sheet as plain rows, one source for the page, Excel, CSV and Copy */
 function officeTable(B) {
-  const pay = !!(B.money && S.officePay), adj = B.adjAll.length > 0, O = officeRows(B);
-  const cell = x => x.kind === 'hours' ? hrs(x.value) : (x.kind === 'H' || x.kind === 'BH' || x.kind === 'U') ? x.kind : x.flags.includes('missing') ? '?' : '';
-  const head = ['Name', ...B.dates.map(d => dayName(d) + ' ' + fmtDay(d)), 'Total hours', ...(adj ? ['Correction (earlier week)', 'Hours to pay'] : []), ...(pay ? ['Rate', 'Gross pay', 'Advances paid'] : []), 'Notes'];
-  const rows = O.map(o => [o.r.s.name, ...o.r.days.map(cell), hrs(o.r.total), ...(adj ? [o.r.adjHours ? (o.r.adjHours > 0 ? '+' : '') + hrs(o.r.adjHours) : '', hrs(o.toPay)] : []),
+  const pay = !!(B.money && S.officePay), adj = B.adjAll.length > 0, O = officeRows(B), ot = B.T.ot > 0; /* an OT column only in a week that has overtime (Ash, 22 Oct 2026) */
+  const cell = x => x.kind === 'hours' ? hrs(x.value) : x.kind === 'BH' ? 'B' : (x.kind === 'H' || x.kind === 'U') ? x.kind : x.flags.includes('missing') ? '?' : '';
+  const head = ['Name', ...B.dates.map(d => dayName(d) + ' ' + fmtDay(d)), ...(ot ? ['OT'] : []), 'Total hours', ...(adj ? ['Correction (earlier week)', 'Hours to pay'] : []), ...(pay ? ['Rate', 'Gross pay', 'Advances paid'] : []), 'Notes'];
+  const rows = O.map(o => [o.r.s.name, ...o.r.days.map(cell), ...(ot ? [o.r.ot ? hrs(o.r.ot) : ''] : []), hrs(o.r.total), ...(adj ? [o.r.adjHours ? (o.r.adjHours > 0 ? '+' : '') + hrs(o.r.adjHours) : '', hrs(o.toPay)] : []),
     ...(pay ? [o.r.rate ? gbp(o.r.rate) : 'none', gbp(o.r.gross), o.r.advances ? gbp(o.r.advances) : ''] : []), o.notes.join('; ')]);
   const T = B.T;
-  const tot = ['Totals', ...B.dayTotals.map(t => t ? hrs(t) : ''), hrs(T.total), ...(adj ? [(T.adjHours > 0 ? '+' : '') + hrs(T.adjHours), hrs(r2(T.total + T.adjHours))] : []), ...(pay ? ['', gbp(T.gross), T.advances ? gbp(T.advances) : ''] : []), ''];
+  const tot = ['Totals', ...B.dayTotals.map(t => t ? hrs(t) : ''), ...(ot ? [T.ot ? hrs(T.ot) : ''] : []), hrs(T.total), ...(adj ? [(T.adjHours > 0 ? '+' : '') + hrs(T.adjHours), hrs(r2(T.total + T.adjHours))] : []), ...(pay ? ['', gbp(T.gross), T.advances ? gbp(T.advances) : ''] : []), ''];
   return { head, rows, tot, O, pay, adj };
 }
-function officeChecks(B) { return B.anomalies.filter(x => x.sev !== 'info'); }
+/* the things to check are for the approvers and directors; the office just gets the hours and whether they are approved */
+function officeChecks(B) { const me = S.me || {}; return (me.approve || me.director) ? B.anomalies.filter(x => x.sev !== 'info') : []; }
 function officeStatusText(B) {
   const W = S.W, a = W.approval, who = (W.approvers || []).filter(p => p.active).map(p => p.name.split(' ')[0]).join(' or ') || 'an approver';
   const run = payRunOf(B.start);
@@ -1341,12 +1342,12 @@ function officeStatusText(B) {
     : 'NOT APPROVED YET: these hours can still change. Wait for ' + who + ' to approve the week before paying from it.';
 }
 function officeHTML(B, me) {
-  const t = officeTable(B), checks = officeChecks(B), approved = B.approved, canOut = approved || me.approve || me.director;
+  const t = officeTable(B), checks = officeChecks(B), approved = B.approved, canOut = true, staff = !!(me.approve || me.director);
   const notOver = addDays(B.start, 6) >= todayIso();
   let h = `<div class="card" id="officeSheet"><div class="bar"><h2 style="margin:0;font-size:1.25rem">Hours for the office: ${esc(fmtLong(B.start))} to ${esc(fmtLong(addDays(B.start, 6)))}</h2></div>
     <p class="small" style="margin:4px 0 0"><span class="printonly">${esc(freshText(S.W, B))} </span>Pay run ${esc(fmtLong(payRunOf(B.start)))}.</p>
     <div class="ofc-status ${approved && !checks.length ? 'ok' : 'wait'}"><b>${esc(officeStatusText(B))}</b>${notOver && !approved ? `<div class="small">This week isn't over yet (it ends ${esc(fmtLong(addDays(B.start, 6)))}).</div>` : ''}
-      ${checks.length ? `<div style="margin-top:8px"><b>${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check before paying:</b><ul>${checks.map(x => `<li class="sev-${x.sev}"><b>${esc(x.name || 'General')}</b>: ${esc(x.text)}</li>`).join('')}</ul></div>` : `<div class="small" style="margin-top:4px">Nothing flagged amber this week.</div>`}
+      ${checks.length ? `<div style="margin-top:8px"><b>${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check before paying:</b><ul>${checks.map(x => `<li class="sev-${x.sev}"><b>${esc(x.name || 'General')}</b>: ${esc(x.text)}</li>`).join('')}</ul></div>` : (staff ? `<div class="small" style="margin-top:4px">Nothing flagged amber this week.</div>` : '')}
       ${!approved && me.approve ? `<div class="noprint" style="margin-top:8px"><button class="btn go" type="button" data-view="dgc">Go to approve the hours</button></div>` : ''}</div>`;
   h += `<div class="ofc-tools noprint">${canOut ? `<button class="btn primary" type="button" data-act="ofc-print">Print</button><button class="btn" type="button" data-act="ofc-excel">Download Excel</button><button class="btn" type="button" data-act="ofc-csv">Download CSV</button><button class="btn" type="button" data-act="ofc-copy">Copy</button>`
       : '<span class="muted">Print, Download and Copy open once the week is approved.</span>'}
@@ -1362,14 +1363,13 @@ function officeHTML(B, me) {
     }).join('') + '</tr>';
   });
   h += `<tr class="tot">${t.tot.map((v, i) => i === 0 ? `<td class="name">${esc(v)}</td>` : `<td class="${i === t.tot.length - 1 ? 'notes' : 'c'}">${esc(v)}</td>`).join('')}</tr></tbody></table></div>
-    <p class="small muted">${B.rows.length} people. H = paid holiday (8h), BH = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime. Amber = check it; red = changed after approval.${t.adj ? ' A correction pays hours from an earlier week in this run; Hours to pay = Total hours plus the correction.' : ''} John and Andy are salaried and kept off the hours, as on the Staff screen.${t.pay ? ' Gross pay is hours times the rate, plus any bonus and correction, before tax and NI.' : ''}</p></div>`;
+    <p class="small muted">${B.rows.length} people. H = paid holiday (8h), B = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime${B.T.ot > 0 ? ' (OT = overtime hours)' : ''}.${staff ? ' Amber = check it; red = changed after approval.' : ''}${t.adj ? ' A correction pays hours from an earlier week in this run; Hours to pay = Total hours plus the correction.' : ''} John and Andy are salaried and kept off the hours, as on the Staff screen.${t.pay ? ' Gross pay is hours times the rate, plus any bonus and correction, before tax and NI.' : ''}</p></div>`;
   return h;
 }
 function officeFileName(ext) { return `Hours for the office ${S.start} to ${addDays(S.start, 6)}${S.B.approved ? '' : ' UNAPPROVED'}.${ext}`; }
 function officeOk() {
   const me = S.me || {};
-  if (!(S.B.approved || me.approve || me.director)) { say('This opens once the week is approved.', 'err'); return false; }
-  return true;
+  return true; /* Ash, 22 Oct 2026: show the hours whether they've been approved or not; the status and UNAPPROVED are on the page and in the file */
 }
 async function officeExcel() {
   if (!officeOk() || S.busy) return; S.busy = true;
@@ -1390,7 +1390,7 @@ async function officeExcel() {
     t.rows.forEach(r => { const x = ws.addRow(r.map((v, i) => i === 0 || i === N - 1 ? v : asNum(v))); x.eachCell({ includeEmpty: true }, (c, i) => { c.alignment = { horizontal: i === 1 || i === N ? 'left' : 'center', vertical: 'top', wrapText: i === N }; c.border = { bottom: { style: 'thin', color: { argb: 'FFAFC2D2' } } }; if (t.pay && /Rate|Gross|Advances/.test(t.head[i - 1])) c.numFmt = '"£"#,##0.00'; }); });
     const tr = ws.addRow(t.tot.map((v, i) => i === 0 || i === N - 1 ? v : asNum(v))); tr.font = { bold: true }; tr.eachCell({ includeEmpty: true }, (c, i) => { c.border = { top: { style: 'medium' } }; c.alignment = { horizontal: i === 1 ? 'left' : 'center' }; if (t.pay && /Gross|Advances/.test(t.head[i - 1])) c.numFmt = '"£"#,##0.00'; });
     ws.addRow([]);
-    line('H = paid holiday (8h), BH = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime.' + (t.adj ? ' Hours to pay = Total hours plus corrections from earlier weeks.' : ''), { size: 9, italic: true, color: { argb: 'FF4A657E' } });
+    line('H = paid holiday (8h), B = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime.' + (t.adj ? ' Hours to pay = Total hours plus corrections from earlier weeks.' : ''), { size: 9, italic: true, color: { argb: 'FF4A657E' } });
     ws.getColumn(1).width = 24; for (let i = 2; i < N; i++) ws.getColumn(i).width = i <= 8 ? 9 : 12; ws.getColumn(N).width = 60;
     const blob = new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     downloadBlob(blob, officeFileName('xlsx')); say('Downloaded ' + officeFileName('xlsx') + '.', 'ok');
@@ -1641,7 +1641,7 @@ window.addEventListener('hashchange', () => { S.pendingCorr = correctFromHash() 
   S.pendingCorr = correctFromHash();
   S.focusApprove = /approve/.test(location.hash);
   /* default: the pay week just gone (the one being paid next), unless asked for another (2.7, 18 Oct 2026) */
-  S.start = fromHash || weekJustGone();
+  S.start = fromHash || (S.view === 'office' ? mondayOf(todayIso()) : weekJustGone()); /* the office view opens on this week's hours (Ash, 22 Oct 2026) */
   await loadPaySet();
   await reload(); await refreshHandle();
 })();
