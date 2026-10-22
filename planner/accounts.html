@@ -136,10 +136,21 @@ table.fct.ev td .pill { margin-top: 3px; }
 .ofc-status { padding: 12px 14px; border-radius: 10px; margin-top: 10px; font-size: 1rem; border: 2px solid var(--border); }
 .ofc-status.wait { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
 .ofc-status.ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
-.ofc-status ul { margin: 6px 0 0; padding-left: 20px; }
-.ofc-status li { margin: 3px 0; }
-table.t.ofc { font-size: 1rem; }
-table.t.ofc th, table.t.ofc td { padding: 8px 10px; }
+.ofc-status ul, .ofc-checks ul { margin: 6px 0 0; padding-left: 20px; }
+.ofc-status li, .ofc-checks li { margin: 3px 0; }
+.ofc-checks { margin-top: 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--warn) 60%, var(--border)); font-size: .92rem; }
+table.t.ofc { font-size: 1.05rem; }
+table.t.ofc th, table.t.ofc td { padding: 11px 12px; }
+table.t.ofc tbody tr:nth-child(even):not(.tot) td { background: color-mix(in srgb, var(--panel2) 55%, var(--panel)); }
+table.t.ofc th .dd { display: block; font-weight: 500; font-size: .78rem; }
+.ofc-h { margin: 0; font-size: 1.35rem; }
+.ofc-pay { margin: 4px 0 0; font-size: .95rem; color: var(--muted); }
+.titlebar .seg button { padding: 9px 14px; font-size: .92rem; }
+.wkbar h2 { font-size: 1.1rem; }
+.wkbtns { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.wkbtns .btn.on { border-color: var(--accent); color: var(--accent); }
+.pill.pday { color: var(--accent); }
+.wkline { margin: 4px 0 0; }
 table.t.ofc th { font-size: .85rem; }
 table.t.ofc td.name { font-size: 1.02rem; }
 table.t.ofc td.big { font-weight: 800; font-size: 1.1rem; }
@@ -165,7 +176,7 @@ table.t.ofc td.notes div + div { margin-top: 2px; }
 }
 @media (max-width: 480px) { table.fct.ev .evni { white-space: normal; } table.fct.ev .evmix, table.fct.ev .evmore { display: none; } table.fct.ev .pill { white-space: normal; } table.fct.ev th:first-child, table.fct.ev td.l { width: auto; } }
 @media (max-width: 480px) { table.fct { font-size: .72rem; } table.fct th, table.fct td { padding: 5px 3px; } table.fct th { white-space: normal; vertical-align: bottom; } table.fct td.l, table.fct th.l { min-width: 0; width: 34%; } table.fct.open td.l, table.fct.open th.l { min-width: 150px; } }
-@media (max-width: 640px) { main { padding: 10px 16px 50px; } .titlebar .seg button { padding: 6px 8px; } #hoursTable td.c { min-width: 44px; } .anom { flex-direction: column; gap: 0; } .anom .who { min-width: 0; } }
+@media (max-width: 640px) { main { padding: 10px 16px 50px; } .titlebar .seg button { padding: 8px 9px; font-size: .85rem; } table.t.ofc th, table.t.ofc td { padding: 9px 8px; } .ofc-h { font-size: 1.15rem; } #hoursTable td.c { min-width: 44px; } .anom { flex-direction: column; gap: 0; } .anom .who { min-width: 0; } }
 </style>
 </head>
 <body>
@@ -185,7 +196,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.9 (22 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.11 (22 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -211,7 +222,9 @@ function isoFromVal(t) { return new Date(t).toISOString().slice(0, 10); }
 const addDays = (iso, n) => isoFromVal(valFromIso(iso) + n * 86400000);
 const dow = iso => new Date(valFromIso(iso)).getUTCDay();
 const isWeekday = iso => { const d = dow(iso); return d >= 1 && d <= 5; };
-function todayIso() { const d = new Date(); return isoFromVal(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); }
+/* localhost ?test=1 only: &today=YYYY-MM-DD pretends it is that day, to check Sunday, Monday and Tuesday (2.11) */
+const FAKE_TODAY = (() => { if (!TEST) return null; const q = new URLSearchParams(location.search).get('today') || ''; return /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : null; })();
+function todayIso() { if (FAKE_TODAY) return FAKE_TODAY; const d = new Date(); return isoFromVal(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); }
 function mondayOf(iso) { const d = dow(iso); return addDays(iso, -((d + 6) % 7)); }
 /* The pay week just gone (Ash, 18 Oct 2026: "this week's hours, which I can just give to the girl in the office"):
    the latest Monday to Sunday week that has reached its Sunday. On Sunday 18 Oct that is Mon 12 to Sun 18 Oct (paid on
@@ -222,7 +235,33 @@ const dayName = iso => new Date(valFromIso(iso)).toLocaleDateString('en-GB', { w
 const fmtDay = iso => { const d = new Date(valFromIso(iso)); return d.getUTCDate() + ' ' + d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }); };
 const fmtLong = iso => new Date(valFromIso(iso)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const fmtWhen = ts => ts ? new Date(ts).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-const weekLabel = s => fmtDay(s) + ' to ' + fmtDay(addDays(s, 6)) + ' ' + addDays(s, 6).slice(0, 4);
+/* Paydays (Ash, 22 Oct 2026: "just do the week ending ... Do it from payday. This week would be the payday if it was this
+   week"). A Monday to Sunday week is paid on the weekly pay day after its Sunday: payRunOf(start) = start + 6 days + the pay
+   weekday (Tuesday: acc_settings 'salary_run', weekday 2), so the week ending Sun 25 Oct 2026 is paid on Tue 27 Oct 2026.
+   "This week" is only said of a payday that falls in today's Monday to Sunday week. Words only: no sum changes here. */
+function nextPayWeek(today) { const t = today || todayIso(); let m = addDays(mondayOf(t), -14); while (payRunOf(m) < t) m = addDays(m, 7); return m; } /* the week paid on the next payday (today counts) */
+const lastPayWeek = today => addDays(nextPayWeek(today), -7);
+const dayMonYear = iso => dayName(iso) + ' ' + fmtDay(iso) + ' ' + iso.slice(0, 4);
+const paidOn = s => dayName(payRunOf(s)) + ' ' + fmtDay(payRunOf(s));
+/* "Mon 19 to Sun 25 Oct 2026", "Mon 26 Oct to Sun 1 Nov 2026" */
+function fmtRange(s) {
+  const e = addDays(s, 6), sameM = s.slice(0, 7) === e.slice(0, 7), sameY = s.slice(0, 4) === e.slice(0, 4);
+  return dayName(s) + ' ' + (sameM ? String(new Date(valFromIso(s)).getUTCDate()) : fmtDay(s) + (sameY ? '' : ' ' + s.slice(0, 4))) + ' to ' + dayMonYear(e);
+}
+const weekEndPaid = s => 'Week ending ' + dayMonYear(addDays(s, 6)) + ', paid ' + paidOn(s);   /* "Week ending Sun 25 Oct 2026, paid Tue 27 Oct" */
+const weekLabel = s => 'the week ending ' + dayMonYear(addDays(s, 6)) + ' (paid ' + paidOn(s) + ')';
+function paydayWord(s, today) {
+  const t = today || todayIso(), run = payRunOf(s), inWeek = mondayOf(run) === mondayOf(t);
+  if (run === t) return 'Payday today';
+  if (s === nextPayWeek(t)) return inWeek ? "This week's payday" : 'Next payday';
+  if (s === lastPayWeek(t)) return inWeek ? 'Last payday, earlier this week' : 'Last payday';
+  if (s === addDays(nextPayWeek(t), 7)) return 'The payday after next';
+  return run > t ? 'A later payday' : 'An earlier payday';
+}
+/* which week opens when nobody has picked one (2.11): the week paid on the next payday, in every view. From Wednesday to
+   Sunday that is the week being worked now (Mon 19 to Sun 25 Oct on Thu 22 Oct, paid Tue 27 Oct); on Monday and on payday
+   Tuesday it is the week just finished, which is being approved and paid. */
+const defaultWeek = view => nextPayWeek();
 const norm = s => String(s || '').trim().toLowerCase();
 const isTest = name => /^test\b/i.test(name || '');
 
@@ -369,7 +408,7 @@ function buildWeek(W) {
     /* ---- anomalies ---- */
     const off = s.status === 'Off Work';
     const startD = s.startDate || '0000', leftD = s.dateLeft || '9999';
-    if (off && !worked) flag(s, 'info', 'Marked "Off Work' + (s.offWorkType ? ': ' + s.offWorkType : '') + '" in the Planner: no hours expected this week.');
+    if (off && !worked) flag(s, 'info', 'Marked "Off Work' + (s.offWorkType ? ': ' + s.offWorkType : '') + '" in the Planner: no hours expected that week.');
     days.forEach(x => {
       const d = x.date, label = dayName(d) + ' ' + fmtDay(d);
       if (x.entry && x.entry.id && isAccepted(x.entry.note)) { x.accepted = true; return; }
@@ -600,7 +639,7 @@ function everyoneHTML(A, weeks, est) {
     hourly: A, sal: xs.length ? payScale(SM, 12 / 52) : null, hourlyFig: 'Estimate', mix: xs.length ? salFigMix(xs, x => x.actual) : '', n: xs.length });
   weeks.forEach(w => {
     const run = addDays(w.mon, 6 + wd);
-    lines.push({ label: w.label, date: fmtDay(w.mon) + ' to ' + fmtDay(w.sun) + ', paid ' + dayName(run) + ' ' + fmtDay(run) + (w.sal.length ? ', with the salaries' : ''), sub: w.sal.length ? 'the month-end pay run (salaries ' + salRunWords(w.sal).replace(/, in the .*$/, '') + ')' : '',
+    lines.push({ label: w.label, date: 'week ending ' + dayName(w.sun) + ' ' + fmtDay(w.sun) + ' (' + fmtRange(w.mon) + ')' + (w.sal.length ? ', with the salaries' : ''), sub: w.sal.length ? 'the month-end pay run (salaries ' + salRunWords(w.sal).replace(/, in the .*$/, '') + ')' : '',
       hourly: w.hourly, sal: w.sal.length ? w.S2 : null, hourlyFig: w.partly ? 'Partly actual' : 'Estimate', mix: w.sal.length ? salFigMix(w.sal, x => x.pay.actual) : '', runWeek: !!w.sal.length, n: new Set(w.sal.map(x => x.s.id)).size });
   });
   lines.push({ label: 'A normal month', sub: 'hourly staff: the average week x 52 / 12' + (xs.length ? '; salaries: one normal month' : ''),
@@ -617,11 +656,17 @@ function everyoneHTML(A, weeks, est) {
   const R = ratesFor(todayIso()), psX = xs.filter(x => x.actual);
   const psNames = psX.length ? [psX.map(x => x.s.name.split(' ')[0]).join(' and ') + [...new Set(psX.map(x => x.s.payslip && x.s.payslip.period ? ', ' + x.s.payslip.period.split(' ')[0] : ''))].join('')] : [];
   const toggle = `<button class="btn sm" type="button" data-act="fc-break" aria-expanded="${open}">${open ? 'Hide the breakdown' : 'Show the breakdown'}</button>`;
-  return `<div class="card" id="everyoneCard"><div class="bar"><h2 style="margin:0">Everyone's pay</h2>${est}<span class="push small muted">hourly and salaried staff, every company</span></div>
-    <div class="scroll"><table class="t fct ev${open ? ' open' : ''}"><thead><tr><th class="l"></th><th>Money to staff</th><th>Tax and NI to pay</th><th>Total cost</th>${open ? '<th>Gross pay</th><th>Income tax</th><th>Employee NI</th><th>Employer NI</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>
+  return `<div class="card" id="everyoneCard"><div class="bar"><h2 style="margin:0">Everyone's pay</h2>${est}<span class="push small muted">hourly and salaried staff, every company, by payday</span></div>
+    ${nextPayNote(S.fc)}<div class="scroll"><table class="t fct ev${open ? ' open' : ''}"><thead><tr><th class="l"></th><th>Money to staff</th><th>Tax and NI to pay</th><th>Total cost</th>${open ? '<th>Gross pay</th><th>Income tax</th><th>Employee NI</th><th>Employer NI</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>
     ${xs.length ? `<p class="small" id="salNiLine">Salaried staff's NI in a normal month: employee ${gbp(SM.eeNI)}, employer ${gbp(SM.erNI)}, together <b>${gbp(SM.eeNI + SM.erNI)}</b>. It is part of Tax and NI to pay above, with their income tax of ${gbp(SM.tax)}.</p>` : ''}
     <p class="small muted">Money to staff is what goes out the door to them (gross pay less income tax and employee NI). Tax and NI to pay is their income tax and employee NI plus the company's employer NI. Total cost is the two added together. <b>Payslip</b> = the figures on the last real payslip${psNames.length ? ' (' + esc(psNames.join(' and ')) + ')' : ''}. <b>Contract</b> = the salary in the contract, with tax and NI estimated. <b>Estimate</b> = worked out by this page on the Isle of Man ${esc(R.year)} tax and NI rates (see Rates), not a payslip.</p>
     ${toggle}</div>`;
+}
+/* Monday and Tuesday (2.11): the next payday pays last week, which is before the first row above, so say where it is */
+function nextPayNote(F) {
+  const nw = nextPayWeek();
+  if (!F || nw >= F.thisMon) return '';
+  return `<p class="small" id="nextPayNote"><b>${esc(paydayWord(nw))}: ${esc(dayMonYear(payRunOf(nw)))}</b>, for the ${esc(weekEndPaid(nw).replace(/^Week/, 'week').replace(/, paid .*$/, ''))}. Its real figures are in the week below${S.start === nw ? '' : ` <button class="btn sm" type="button" data-week="${nw}">Open it</button>`}. The rows above start with the week being worked now.</p>`;
 }
 function forecastHTML(est) {
   /* Ash, 13 Oct 2026: "key information at the top", "two numbers for each of the next 4 weeks", plus salaries in the
@@ -638,10 +683,11 @@ function forecastHTML(est) {
   if (!n) return top + '<p class="muted">No approved weeks yet to average.</p></div>';
 
   /* ---- the next 4 weeks ---- */
-  const names = ['This week', 'Next week', 'The week after', 'The week after that'];
+  /* 2.11: the same four Monday to Sunday weeks as before (from the week being worked now), each named by its payday */
   const curB = F.cur ? buildWeek(F.cur) : null;
-  const weeks = names.map((label, i) => {
-    const mon = addDays(F.thisMon, i * 7), sun = addDays(mon, 6);
+  const weeks = [0, 1, 2, 3].map(i => {
+    const mon = addDays(F.thisMon, i * 7), sun = addDays(mon, 6), pw = paydayWord(mon);
+    const label = (/^(Next payday|This week's payday|Payday today)$/.test(pw) ? pw + ', ' : 'Payday ') + paidOn(mon);
     let hourly = { ...A }, how = 'the average week', partly = false;
     if (i === 0 && curB) {
       const wd = curB.dates.map((d, j) => ({ d, j })).filter(o => isWeekday(o.d));
@@ -670,7 +716,7 @@ function forecastHTML(est) {
       <div class="kpi"><div class="k">Tax and NI to pay</div><div class="v">${gbp(taxNI(A))}</div><div class="s">to the Treasury</div></div>
       <div class="kpi"><div class="k">Total cost</div><div class="v">${gbp(A.cost)}</div><div class="s">the two added together</div></div>
       <div class="kpi"><div class="k">Hours paid</div><div class="v">${hrs(A.total)}h</div><div class="s">a week</div></div></div>
-    <p class="small muted">Based on the average of the last ${n} ${F.draft ? 'weeks with hours. None are approved yet, so these are UNAPPROVED figures' : 'approved week' + (n > 1 ? 's' : '')} (${F.basis.slice().reverse().map(w => esc(fmtDay(w))).join(', ')}). Salaries are added in the next 4 weeks below.</p>
+    <p class="small muted">Based on the average of the last ${n} ${F.draft ? 'weeks with hours. None are approved yet, so these are UNAPPROVED figures' : 'approved week' + (n > 1 ? 's' : '')} (${F.basis.slice().reverse().map(w => esc(fmtDay(w))).join(', ')}). Salaries are added in the next 4 paydays below.</p>
     ${salAvgHTML(A)}
     ${open ? `<div class="fc4 fcb"><span>Gross pay</span><span>${gbp(A.gross)}</span><span>Income tax</span><span>${gbp(A.tax)}</span><span>Employee NI</span><span>${gbp(A.eeNI)}</span><span>Employer NI</span><span>${gbp(A.erNI)}</span></div>
       <p class="small muted">Money to staff is gross pay less income tax and employee NI. Tax and NI to pay is income tax plus employee and employer NI. Total cost is gross pay plus employer NI. Up to ${FC_WEEKS} approved weeks are used${n < FC_WEEKS ? `; only ${n} ${n > 1 ? 'are' : 'is'} approved on the Monday weeks so far (they started on 14 Sep 2026)` : ''}.</p>` : ''}
@@ -681,17 +727,17 @@ function forecastHTML(est) {
   const cells = o => `<td>${gbp(o.net)}</td><td>${gbp(taxNI(o))}</td><td>${gbp(o.cost)}</td>` + (open ? `<td>${gbp(o.gross)}</td><td>${gbp(o.tax)}</td><td>${gbp(o.eeNI)}</td><td>${gbp(o.erNI)}</td>` : '');
   let rows = '';
   weeks.forEach(w => {
-    const head = `<b>${esc(w.label)}</b> <span class="small muted">${esc(fmtDay(w.mon))} to ${esc(fmtDay(w.sun))}</span><div class="small ${w.partly ? 'fcp' : 'muted'}">${w.partly ? 'Partly actual' : 'Estimate'}</div>`
+    const head = `<b>${esc(w.label)}</b> <span class="small muted">week ending ${esc(dayName(w.sun) + ' ' + fmtDay(w.sun))}</span><div class="small ${w.partly ? 'fcp' : 'muted'}">${w.partly ? 'Partly actual' : 'Estimate'}</div>`
       + (open ? `<div class="small muted">Hourly staff from ${esc(w.how)}, about ${hrs(w.hourly.total)}h.</div>` : '');
     if (!w.sal.length) { rows += `<tr class="wt"><td class="l">${head}</td>${cells(w.tot)}</tr>`; return; }
     rows += `<tr class="in"><td class="l">${head}${open ? '' : '<div class="small muted">Hourly staff</div>'}</td>${cells(w.hourly)}</tr>`
       + `<tr class="in sal"><td class="l">+ salaries <span class="small muted">(${esc(salRunWords(w.sal))})</span>${open ? `<div class="small muted">${w.sal.map(x => esc(x.s.name) + ' (' + esc(companyName(x.s.company)) + ', ' + esc(figWord(x)) + (x.pay.part ? ', part month' : '') + ')').join('; ')}</div>` : ''}</td>${cells(w.S2)}</tr>`
       + `<tr class="wt"><td class="l">Week total, with salaries</td>${cells(w.tot)}</tr>`;
   });
-  h += `<div class="card"><div class="bar"><h2 style="margin:0">The next 4 weeks</h2>${est}<span class="push small muted">hourly staff and salaries</span></div>
+  h += `<div class="card"><div class="bar"><h2 style="margin:0">The next 4 paydays</h2>${est}<span class="push small muted">hourly staff and salaries, from the week being worked now</span></div>
     <div class="scroll"><table class="t fct${open ? ' open' : ''}"><thead><tr><th class="l">Week</th><th>Money to staff</th><th>Tax and NI to pay</th><th>Total cost</th>${open ? '<th>Gross pay</th><th>Income tax</th><th>Employee NI</th><th>Employer NI</th>' : ''}</tr></thead>
-    <tbody>${rows}<tr class="tot"><td class="l">4-week total</td>${cells(all)}</tr></tbody></table></div>
-    <p class="small muted">These are estimates, not payslips, worked out on the Isle of Man tax and NI rates (see Rates below). Estimate rows use the average week above. Partly actual means this week's real hours so far, with the average for the days still to come. Salaries come from the salary list (every company): each person is paid once a month, and the payment is shown in ${esc(PAY_RULES[payRule()])} (${esc(WEEKDAYS[payWeekday()])}s; see How salaries are paid, under Salaried staff).${(S.W.salaries || []).some(x => x.active !== false) ? '' : ' No salaries have been entered yet, so none are included.'}</p>
+    <tbody>${rows}<tr class="tot"><td class="l">4 paydays total</td>${cells(all)}</tr></tbody></table></div>
+    <p class="small muted">These are estimates, not payslips, worked out on the Isle of Man tax and NI rates (see Rates below). Estimate rows use the average week above. Partly actual means the real hours so far in the week being worked now, with the average for the days still to come. Salaries come from the salary list (every company): each person is paid once a month, and the payment is shown in ${esc(PAY_RULES[payRule()])} (${esc(WEEKDAYS[payWeekday()])}s; see How salaries are paid, under Salaried staff).${(S.W.salaries || []).some(x => x.active !== false) ? '' : ' No salaries have been entered yet, so none are included.'}</p>
     ${toggle}</div>`;
   return h;
 }
@@ -712,15 +758,18 @@ function render() {
 
   h += `<div class="bar titlebar"><h1>Accounts</h1><span class="muted small ver">${esc(ACC_VERSION)}${TEST ? ' &middot; TEST DATA' : ''}</span>
     <span class="push"></span>
-    <div class="seg" role="group" aria-label="Which company">${[['office', 'Hours for the office'], ['dgc', 'DGC office (everything)'], ['silverdale', 'Silverdale only']].map(([k, l]) => `<button type="button" data-view="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="seg" role="group" aria-label="Which company">${[['office', 'DGC and Silverdale hours'], ['dgc', 'Approve and pay'], ['silverdale', 'Silverdale only']].map(([k, l]) => `<button type="button" data-view="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <button class="btn sm" type="button" data-act="theme">Light / dark</button></div>`;
   /* ---- an average week and the next 4 weeks, at the top (Ash, 12 Oct 2026, night; moved up 13 Oct 2026) ---- */
   if (B.money && view === 'dgc') { h += forecastHTML(est); if (!S.fc) setTimeout(loadForecast, 0); }
-  h += `<div class="bar" style="margin-top:10px"><button class="btn" type="button" data-act="prev" aria-label="Previous week">&lsaquo;</button>
-    <h2 style="margin:0">Week ${esc(weekLabel(B.start))}</h2>
+  /* 2.11: every week is named by its week ending and its payday; "this week" only for a payday in today's week */
+  const nowWk = mondayOf(todayIso()), nextWk = nextPayWeek(), lastWk = lastPayWeek();
+  h += `<div class="bar wkbar" style="margin-top:10px"><button class="btn" type="button" data-act="prev" aria-label="Previous week">&lsaquo;</button>
+    ${view === 'office' ? '' : `<h2 style="margin:0">${esc(weekEndPaid(B.start))}</h2>`}
     <button class="btn" type="button" data-act="next" aria-label="Next week">&rsaquo;</button>
-    <button class="btn sm" type="button" data-act="last" title="The latest Monday to Sunday week (the one paid next)">Week just gone</button><button class="btn sm" type="button" data-act="this">This week</button>
-    ${(W.unapprovedWeeks || []).filter(w => w !== B.start).length ? `<span class="small muted">Also waiting for approval:</span><span class="chips">${W.unapprovedWeeks.filter(w => w !== B.start).map(w => `<button class="chip" type="button" data-week="${w}">${esc(weekLabel(w))}</button>`).join('')}</span>` : ''}</div>`;
+    <span class="wkbtns"><button class="btn sm${B.start === lastWk ? ' on' : ''}" type="button" data-act="last" title="${esc(weekEndPaid(lastWk))}">Last payday, ${esc(paidOn(lastWk))}</button><button class="btn sm${B.start === nextWk ? ' on' : ''}" type="button" data-act="nextpay" title="${esc(weekEndPaid(nextWk))}">${payRunOf(nextWk) === todayIso() ? 'Payday today' : 'Next payday'}, ${esc(paidOn(nextWk))}</button>${nowWk !== nextWk ? `<button class="btn sm${B.start === nowWk ? ' on' : ''}" type="button" data-act="this" title="${esc(weekEndPaid(nowWk))}">Week being worked</button>` : ''}</span></div>
+    ${view === 'office' ? '' : `<p class="small muted wkline">${esc(fmtRange(B.start))}. <b>${esc(paydayWord(B.start))}.</b></p>`}
+    ${(W.unapprovedWeeks || []).filter(w => w !== B.start).length ? `<div class="bar"><span class="small muted">Also waiting for approval:</span><span class="chips">${W.unapprovedWeeks.filter(w => w !== B.start).map(w => `<button class="chip" type="button" data-week="${w}">${esc(weekEndPaid(w))}</button>`).join('')}</span></div>` : ''}`;
   h += freshHTML(W, B);
   const foot = `<p class="small muted noprint" style="margin-top:14px">${esc(ACC_VERSION)}. Signed in as ${esc(me.name || me.email)}${me.approve ? ' (approver)' : ''}. Pay data is read through Accounts only; the Planner's own tables stay locked.</p>`;
   /* ---- Hours for the office (Ash, 18 Oct 2026): just the hours, to hand to the office for wages ---- */
@@ -736,11 +785,11 @@ function render() {
       h += `<div class="status ok"><b class="big">Approved</b><span>by ${esc(nameOf(a.by))} on ${esc(fmtWhen(a.at))}. These hours have gone to accounts.</span>
         ${W.approvalLog.length > 1 ? `<details class="small" style="flex-basis:100%"><summary>Approval history</summary>${approvalLogHTML(W)}</details>` : ''}
         ${reopenHTML(B, a)}
-        ${B.suggestions.length ? `<span class="small sev-warn" style="flex-basis:100%"><b>${B.suggestions.length} ${B.suggestions.length === 1 ? 'day looks' : 'days look'} wrong in this approved week.</b> If the pay was short or over, ${me.director ? 'use <b>Record a correction</b> below' : 'ask Ash or Harry to record a correction'}: it is paid in the next pay run as its own line, and this week stays exactly as it was sent.</span>` : ''}
-        ${B.fixedHere.length ? `<span class="small" style="flex-basis:100%;color:var(--info)">${B.fixedHere.length} correction${B.fixedHere.length === 1 ? '' : 's'} recorded against this week (see Corrections below).</span>` : ''}</div>`;
+        ${B.suggestions.length ? `<span class="small sev-warn" style="flex-basis:100%"><b>${B.suggestions.length} ${B.suggestions.length === 1 ? 'day looks' : 'days look'} wrong in the approved week on screen.</b> If the pay was short or over, ${me.director ? 'use <b>Record a correction</b> below' : 'ask Ash or Harry to record a correction'}: it is paid in the next pay run as its own line, and the approved week stays exactly as it was sent.</span>` : ''}
+        ${B.fixedHere.length ? `<span class="small" style="flex-basis:100%;color:var(--info)">${B.fixedHere.length} correction${B.fixedHere.length === 1 ? '' : 's'} recorded against the week on screen (see Corrections below).</span>` : ''}</div>`;
     } else {
       h += `<div class="status wait"><b class="big">Waiting for approval</b><span>${me.approve ? 'Check the hours and anything flagged below, then approve them. Accounts only treat them as final once approved.' : esc(((W.approvers || []).filter(p => p.active).map(p => p.name.split(' ')[0]).join(' or ') || 'An approver') + ' still need to approve these hours. The figures below are a draft and may change.')}</span>
-        ${notOver ? `<span class="small" style="flex-basis:100%">This week isn't over yet (it ends ${esc(fmtLong(addDays(B.start, 6)))}).</span>` : ''}
+        ${notOver ? `<span class="small" style="flex-basis:100%">The week isn't over yet (it ends ${esc(dayMonYear(addDays(B.start, 6)))}).</span>` : ''}
         ${me.approve ? (S.approveAsk
           ? `<div class="confirm" style="flex-basis:100%"><b>Approve ${esc(weekLabel(B.start))}?</b> ${B.rows.length} people, ${hrs(B.T.total)} paid hours${gateItems(B).length ? `, <span class="sev-warn">${gateItems(B).length} still to check</span>` : ''}.${gateHTML(B)}<div class="bar" style="margin-top:8px"><button class="btn go" type="button" data-act="approve-yes" id="approveYes"${gateItems(B).length && !S.gateOk ? ' disabled' : ''}>Yes, approve the hours</button><button class="btn" type="button" data-act="approve-no">Cancel</button></div></div>`
           : `<button class="btn go" type="button" data-act="approve" id="approveBtn">Approve the hours</button>`) : ''}
@@ -753,7 +802,7 @@ function render() {
   /* ---- money totals ---- */
   const sal = B.money ? salaryRows(view) : [];
   if (B.money && view === 'dgc') {
-    h += `<div class="card"><div class="bar"><h2 style="margin:0">Pay this week</h2>${est}${draft}<span class="push small muted">Tax year ${esc(B.R.year)}${B.R.missingYear ? ` <span class="pill unv">no ${esc(B.R.wanted)} rates yet: using ${esc(B.R.year)}</span>` : ''}</span></div>
+    h += `<div class="card"><div class="bar"><h2 style="margin:0">Pay on ${esc(dayMonYear(payRunOf(B.start)))}</h2>${est}${draft}<span class="push small muted">Tax year ${esc(B.R.year)}${B.R.missingYear ? ` <span class="pill unv">no ${esc(B.R.wanted)} rates yet: using ${esc(B.R.year)}</span>` : ''}</span></div>
       <div class="cards">
         <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Money to staff</div><div class="v">${gbp(B.T.net)}</div><div class="s">what they receive${B.T.advances ? `; ${gbp(B.T.advances)} already paid as advances, so ${gbp(B.T.toPay)} left to pay` : ''}</div></div>
         <div class="kpi${approved ? '' : ' draftmark'}"><div class="k">Tax and NI to pay</div><div class="v">${gbp(B.T.tax + B.T.eeNI + B.T.erNI)}</div><div class="s">income tax ${gbp(B.T.tax)}, employee NI ${gbp(B.T.eeNI)}, employer NI ${gbp(B.T.erNI)}</div></div>
@@ -763,7 +812,7 @@ function render() {
       </div>
       ${salThisRunHTML(B)}
       ${B.R.unverified.length ? `<p class="small sev-warn">[UNVERIFIED] ${B.R.unverified.map(r => esc(r.label)).join('; ')}. See Rates below.</p>` : ''}
-      <p class="small muted">Estimate only, not a payslip. Isle of Man rates for ${esc(B.R.year)} from gov.im (see Rates). Everyone is on the standard single-person allowance unless accounts set their own. Income tax uses a normal week (a day off is averaged out) so a short week doesn't drop anyone into a lower band; NI is worked out on this week's pay. Advances already paid are taken off what's left to pay.</p></div>`;
+      <p class="small muted">Estimate only, not a payslip. Isle of Man rates for ${esc(B.R.year)} from gov.im (see Rates). Everyone is on the standard single-person allowance unless accounts set their own. Income tax uses a normal week (a day off is averaged out) so a short week doesn't drop anyone into a lower band; NI is worked out on the week's pay. Advances already paid are taken off what's left to pay.</p></div>`;
   }
 
 
@@ -792,7 +841,7 @@ function render() {
   if (view === 'dgc') {
     const n = B.anomalies.filter(x => x.sev !== 'info').length;
     h += `<div class="card"><div class="bar"><h2 style="margin:0">Things to check</h2><span class="pill ${n ? 'draft' : 'ok'}">${n ? n + ' flagged' : 'nothing flagged'}</span></div>
-      ${B.anomalies.length ? B.anomalies.map(x => `<div class="anom"><span class="who">${esc(x.name || 'General')}</span><span class="sev-${x.sev}">${esc(x.text)}${x.name && x.date ? seeBtn(x.name, x.date, 'lg') : ''}${corrBtn(B, x.staffId, x.date)}</span></div>`).join('') : '<p class="muted">Nothing unusual this week.</p>'}</div>`;
+      ${B.anomalies.length ? B.anomalies.map(x => `<div class="anom"><span class="who">${esc(x.name || 'General')}</span><span class="sev-${x.sev}">${esc(x.text)}${x.name && x.date ? seeBtn(x.name, x.date, 'lg') : ''}${corrBtn(B, x.staffId, x.date)}</span></div>`).join('') : '<p class="muted">Nothing unusual in the week.</p>'}</div>`;
   }
 
   /* ---- corrections ---- */
@@ -816,11 +865,11 @@ function render() {
   /* ---- dayworks ---- */
   if (view === 'dgc') {
     const dw = W.dayworks || [];
-    h += `<div class="card"><h2>Dayworks and subcontractor sheets this week</h2>${dw.length ? `<div class="scroll"><table class="t"><thead><tr><th class="l">Name</th><th class="l">Day</th><th class="l">Site</th><th class="c">Start to finish</th><th>Hours</th><th>Pay hours that day</th><th class="l">Sent to the client</th><th class="l">Photo</th></tr></thead><tbody>${dw.map(x => {
+    h += `<div class="card"><h2>Dayworks and subcontractor sheets in the week</h2>${dw.length ? `<div class="scroll"><table class="t"><thead><tr><th class="l">Name</th><th class="l">Day</th><th class="l">Site</th><th class="c">Start to finish</th><th>Hours</th><th>Pay hours that day</th><th class="l">Sent to the client</th><th class="l">Photo</th></tr></thead><tbody>${dw.map(x => {
       const row = B.rows.find(r => norm(r.s.name) === norm(x.name)), day = row && row.days.find(d => d.date === x.date), billed = x.billedHours != null ? x.billedHours : x.hours;
       const mismatch = day && num(billed) > day.worked + 0.01;
       return `<tr><td class="l">${esc(x.name)}</td><td class="l">${esc(dayName(x.date) + ' ' + fmtDay(x.date))}</td><td class="l">${esc(x.site || '')}</td><td class="c">${esc((x.start || '') + (x.finish ? ' to ' + x.finish : ''))}</td><td>${hrs(billed)}${x.billedHours != null && num(x.billedHours) !== num(x.hours) ? ` <span class="small muted">(sheet ${hrs(x.hours)})</span>` : ''}</td><td class="${mismatch ? 'sev-warn' : ''}">${day ? hrs(day.worked) : '<span class="muted">not on staff list</span>'}</td><td class="l">${x.sentAt ? 'Yes, ' + esc(fmtWhen(x.sentAt)) : '<span class="muted">Not yet</span>'}</td><td class="l">${seeBtn(x.name, x.date, '')}</td></tr>`;
-    }).join('')}<tr class="tot"><td class="l">Total</td><td></td><td></td><td></td><td>${hrs(dw.reduce((a, x) => a + num(x.billedHours != null ? x.billedHours : x.hours), 0))}</td><td></td><td></td><td></td></tr></tbody></table></div>` : '<p class="muted">No dayworks sheets entered for this week.</p>'}
+    }).join('')}<tr class="tot"><td class="l">Total</td><td></td><td></td><td></td><td>${hrs(dw.reduce((a, x) => a + num(x.billedHours != null ? x.billedHours : x.hours), 0))}</td><td></td><td></td><td></td></tr></tbody></table></div>` : '<p class="muted">No dayworks sheets entered for the week.</p>'}
       <p class="small muted">From the Job Planner's Dayworks screen (sheets charged to the client). These hours are part of the pay hours above, not extra pay.</p></div>`;
   }
 
@@ -878,7 +927,7 @@ function gateItems(B) {
 }
 function gateHTML(B) {
   const items = gateItems(B);
-  if (!items.length) return '<p class="small muted" style="margin:6px 0 0">Nothing is flagged amber or "?" this week.</p>';
+  if (!items.length) return '<p class="small muted" style="margin:6px 0 0">Nothing is flagged amber or "?" in the week.</p>';
   return `<div class="gate"><b>Check these before approving.</b> Once approved the hours go to accounts; a mistake found later has to be paid as a correction in a later week.
     <ul>${items.map(x => `<li><b>${esc(x.name)}</b>, ${esc(x.text)}${seeBtn(x.name, x.date, '')}</li>`).join('')}</ul>
     <label><input type="checkbox" id="gateOk"${S.gateOk ? ' checked' : ''}> I have checked ${items.length === 1 ? 'this' : 'all ' + items.length} (the See buttons show the timesheet and the paper sheet) and the hours are right.</label></div>`;
@@ -916,12 +965,12 @@ function correctionsHTML(B, me) {
   let h = `<div class="card" id="corrCard"><div class="bar"><h2 style="margin:0">Corrections</h2><span class="small muted">to weeks already approved and sent</span>
     ${me.director && B.approved && !S.corr ? '<span class="push"></span><button class="btn sm" type="button" data-act="corr-new">Record a correction</button>' : ''}</div>`;
   if (C.error) h += `<p class="small sev-bad">Corrections couldn't be loaded: ${esc(C.error)}</p>`;
-  if (paid.length) h += `<h3 style="margin-top:10px">Paid in this week's pay run (from earlier weeks)</h3><div class="scroll"><table class="t">${head}<tbody>${paid.map(c => corrLine(c, B, me, 'paid')).join('')}</tbody></table></div>
-    <p class="small muted">Already added to Pay this week, Pay per person and both exports, each as its own line. The weeks they correct were not changed.</p>`;
-  if (made.length) h += `<h3 style="margin-top:10px">Recorded against this week</h3><div class="scroll"><table class="t">${head}<tbody>${made.map(c => corrLine(c, B, me, 'made')).join('')}</tbody></table></div>
-    <p class="small muted">This week stays exactly as it was approved and sent. Each correction is paid in the later week shown.</p>`;
+  if (paid.length) h += `<h3 style="margin-top:10px">Paid in this pay run (from earlier weeks)</h3><div class="scroll"><table class="t">${head}<tbody>${paid.map(c => corrLine(c, B, me, 'paid')).join('')}</tbody></table></div>
+    <p class="small muted">Already added to the pay run, Pay per person and both exports, each as its own line. The weeks they correct were not changed.</p>`;
+  if (made.length) h += `<h3 style="margin-top:10px">Recorded against the week on screen</h3><div class="scroll"><table class="t">${head}<tbody>${made.map(c => corrLine(c, B, me, 'made')).join('')}</tbody></table></div>
+    <p class="small muted">The week stays exactly as it was approved and sent. Each correction is paid in the later week shown.</p>`;
   if (B.approved && B.suggestions.length && me.director) {
-    h += `<h3 style="margin-top:10px">Looks wrong in this approved week</h3>${B.suggestions.map((x, i) => `<div class="corr-sugg"><b>${esc(x.name)}</b><span>${esc(dayName(x.date) + ' ' + fmtDay(x.date))}: paid ${hrs(x.oldHours)}h${x.newHours != null ? `, the sheet says ${hrs(x.newHours)}h` : ', no hours entered'}</span>${seeBtn(x.name, x.date, '')}<button class="btn sm" type="button" data-corrpre="${i}">Fill in a correction</button></div>`).join('')}
+    h += `<h3 style="margin-top:10px">Looks wrong in the approved week</h3>${B.suggestions.map((x, i) => `<div class="corr-sugg"><b>${esc(x.name)}</b><span>${esc(dayName(x.date) + ' ' + fmtDay(x.date))}: paid ${hrs(x.oldHours)}h${x.newHours != null ? `, the sheet says ${hrs(x.newHours)}h` : ', no hours entered'}</span>${seeBtn(x.name, x.date, '')}<button class="btn sm" type="button" data-corrpre="${i}">Fill in a correction</button></div>`).join('')}
       <p class="small muted">Filling in doesn't save anything. Check the sheet, change the hours if needed, then press Save the correction.</p>`;
   }
   if (S.corr && me.director && B.approved) {
@@ -938,7 +987,7 @@ function correctionsHTML(B, me) {
     </div></div>`;
     setTimeout(corrPreview, 0);
   } else if (B.approved && !paid.length && !made.length && !B.suggestions.length) {
-    h += `<p class="small muted">No corrections to this week.${me.director ? ' If something in it turns out wrong, Record a correction pays the difference in the next pay run.' : ''}</p>`;
+    h += `<p class="small muted">No corrections to the week.${me.director ? ' If something in it turns out wrong, Record a correction pays the difference in the next pay run.' : ''}</p>`;
   }
   return h + '</div>';
 }
@@ -1150,7 +1199,7 @@ async function buildWorkbook() {
   const fo = (c, bold = false, italic = false, sz = 10) => ({ color: { argb: c }, bold, italic, size: sz, name: 'Calibri' });
   const thinBot = { bottom: { style: 'thin', color: { argb: 'FF30363D' } } };
   const status = approved ? `APPROVED by ${nameOf(W.approval.by)} on ${fmtWhen(W.approval.at)}` : 'UNAPPROVED: these hours may still change';
-  const label = weekLabel(B.start);
+  const label = weekEndPaid(B.start);
   const money = B.money;
   const days = B.dates.map(d => dayName(d) + ' ' + fmtDay(d));
   const moneyCols = money ? ['Rate', 'Gross', 'Income tax (est.)', 'Employee NI (est.)', 'Net pay (est.)', 'Advances', 'Left to pay (est.)', 'Employer NI (est.)', 'Total cost (est.)'] : [];
@@ -1165,7 +1214,7 @@ async function buildWorkbook() {
   const band = (text, font, bg, height) => { const r = ws.addRow(new Array(LAST).fill(null)); r.height = height; ws.mergeCells(r.number, 1, r.number, LAST); const c = r.getCell(1); c.value = text; c.font = font; c.fill = fl(bg); c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true }; return r; };
   band('STAFF HOURS  ' + label, fo(TEXT_C, true, false, 16), BG, 34);
   band('Drainage & Groundwork Contractors Ltd  ·  ' + status, fo(approved ? H_FG : WARN_FG, true, false, 11), BG, 22);
-  band('H = paid holiday (8h)  ·  BH = bank holiday (8h)  ·  U = unpaid leave  ·  ' + (money ? `Money columns are an ESTIMATE using Isle of Man ${B.R.year} rates (gov.im): standard single allowance unless set per person; income tax on a normal week, NI on this week's pay. Not a payslip.` : 'Pay figures not included for this login.'), fo(MUTED, false, false, 8), SURF, 30);
+  band('H = paid holiday (8h)  ·  BH = bank holiday (8h)  ·  U = unpaid leave  ·  ' + (money ? `Money columns are an ESTIMATE using Isle of Man ${B.R.year} rates (gov.im): standard single allowance unless set per person; income tax on a normal week, NI on the week's pay. Not a payslip.` : 'Pay figures not included for this login.'), fo(MUTED, false, false, 8), SURF, 30);
   const hr = ws.addRow(header); hr.height = 22;
   hr.eachCell({ includeEmpty: true }, (c, i) => { c.fill = fl(BG); c.font = fo(i === 1 ? TEXT_C : MUTED, true, false, 9); c.alignment = { horizontal: i === 1 ? 'left' : 'center', vertical: 'middle', wrapText: true }; c.border = { bottom: { style: 'medium', color: { argb: 'FF30363D' } } }; });
   const firstMoney = 13; /* column number of Rate: Name, 7 days, Worked, Leave/BH, OT, Total come first */
@@ -1193,7 +1242,7 @@ async function buildWorkbook() {
   tr.eachCell({ includeEmpty: true }, (c, i) => { c.fill = fl(TEAM_BG); c.font = fo(TEXT_C, true, false, 11); c.alignment = { horizontal: i === 1 ? 'left' : i >= firstMoney ? 'right' : 'center', vertical: 'middle' }; if (i >= firstMoney) c.numFmt = '"£"#,##0.00'; });
   if (money) {
     ws.addRow([]);
-    [['Net pay to staff (est.)', B.T.net], ['Of which already paid as advances', B.T.advances], ['Left to pay this week (est.)', B.T.toPay], ['Tax and NI to pay away (est.)', B.T.tax + B.T.eeNI + B.T.erNI], ['Grand total cost (est.)', B.T.cost]].forEach(([k, v]) => {
+    [['Net pay to staff (est.)', B.T.net], ['Of which already paid as advances', B.T.advances], ['Left to pay on ' + paidOn(B.start) + ' (est.)', B.T.toPay], ['Tax and NI to pay away (est.)', B.T.tax + B.T.eeNI + B.T.erNI], ['Grand total cost (est.)', B.T.cost]].forEach(([k, v]) => {
       const r = ws.addRow([k, ...new Array(11).fill(null), r2(v)]); ws.mergeCells(r.number, 1, r.number, 12);
       r.getCell(1).font = fo(TEXT_C, true); r.getCell(1).fill = fl(SURF); r.getCell(13).numFmt = '"£"#,##0.00'; r.getCell(13).font = fo(MONEY_FG, true, false, 12); r.getCell(13).fill = fl(SURF);
     });
@@ -1233,7 +1282,7 @@ async function buildWorkbook() {
 async function doExcel() {
   if (S.busy) return; S.busy = true;
   const btn = $('#excelBtn'); if (btn) btn.disabled = true;
-  const name = `Staff Hours ${S.start} to ${addDays(S.start, 6)}${S.B.approved ? '' : ' UNAPPROVED'}.xlsx`;
+  const name = `Staff Hours w-e ${addDays(S.start, 6)} paid ${payRunOf(S.start).slice(5)}${S.B.approved ? '' : ' UNAPPROVED'}.xlsx`; /* 2.11: by week ending and payday */
   const type = { description: 'Excel Workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } };
   try {
     let handle = null;
@@ -1289,14 +1338,17 @@ function freshInfo(W, B) {
   let upTo = null; B.rows.forEach(r => r.days.forEach(x => { if (x.kind === 'hours' && (!upTo || x.date > upTo)) upTo = x.date; }));
   return { upTo, last, by: /@/.test(by) ? nameOf(by) : by };
 }
+/* the heading and payday line for the hours, one source for the page, Print, Excel, CSV and Copy (2.11) */
+const officeTitle = B => 'DGC and Silverdale hours: ' + fmtRange(B.start);
+const officePayLine = B => weekEndPaid(B.start) + ' (' + paydayWord(B.start).toLowerCase() + ').';
 function freshText(W, B) {
   const f = freshInfo(W, B);
-  if (!f.upTo && !f.last) return 'No hours in for this week yet.';
+  if (!f.upTo && !f.last) return 'No hours in for the week yet.';
   return (f.upTo ? 'Hours up to ' + dayName(f.upTo) + ' ' + fmtDay(f.upTo) : 'No hours entered yet') + (f.last ? ', last change ' + fmtWhen(f.last) + (f.by ? ' (' + f.by + ')' : '') : '') + '.';
 }
 function freshHTML(W, B) {
   const f = freshInfo(W, B);
-  const main = !f.upTo && !f.last ? '<span>No hours in for this week yet.</span>'
+  const main = !f.upTo && !f.last ? '<span>No hours in for the week yet.</span>'
     : `<span>${f.upTo ? `Hours up to <b>${esc(dayName(f.upTo) + ' ' + fmtDay(f.upTo))}</b>` : 'No hours entered yet'}${f.last ? `, last change <b>${esc(fmtWhen(f.last))}</b>${f.by ? ` <span class="small">(${esc(f.by)})</span>` : ''}` : ''}.</span>`;
   return `<div class="fresh noprint">${main}<span id="accChecked">${S.loadedAt ? 'Checked ' + esc(new Date(S.loadedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) + ', and again every few minutes.' : ''}</span><button class="btn sm" type="button" data-act="refresh">Refresh</button></div>`;
 }
@@ -1338,21 +1390,22 @@ function officeChecks(B) { const me = S.me || {}; return (me.approve || me.direc
 function officeStatusText(B) {
   const W = S.W, a = W.approval, who = (W.approvers || []).filter(p => p.active).map(p => p.name.split(' ')[0]).join(' or ') || 'an approver';
   const run = payRunOf(B.start);
-  return a ? 'APPROVED by ' + nameOf(a.by) + ' on ' + fmtWhen(a.at) + (todayIso() > run ? '. Its pay run was ' + fmtLong(run) + '.' : '. Ready for wages: pay run ' + fmtLong(run) + '.')
+  return a ? 'APPROVED by ' + nameOf(a.by) + ' on ' + fmtWhen(a.at) + (todayIso() > run ? '. Its payday was ' + dayMonYear(run) + '.' : '. Ready for wages: payday ' + dayMonYear(run) + '.')
     : 'NOT APPROVED YET: these hours can still change. Wait for ' + who + ' to approve the week before paying from it.';
 }
 function officeHTML(B, me) {
   const t = officeTable(B), checks = officeChecks(B), approved = B.approved, canOut = true, staff = !!(me.approve || me.director);
   const notOver = addDays(B.start, 6) >= todayIso();
-  let h = `<div class="card" id="officeSheet"><div class="bar"><h2 style="margin:0;font-size:1.25rem">Hours for the office: ${esc(fmtLong(B.start))} to ${esc(fmtLong(addDays(B.start, 6)))}</h2></div>
-    <p class="small" style="margin:4px 0 0"><span class="printonly">${esc(freshText(S.W, B))} </span>Pay run ${esc(fmtLong(payRunOf(B.start)))}.</p>
-    <div class="ofc-status ${approved && !checks.length ? 'ok' : 'wait'}"><b>${esc(officeStatusText(B))}</b>${notOver && !approved ? `<div class="small">This week isn't over yet (it ends ${esc(fmtLong(addDays(B.start, 6)))}).</div>` : ''}
-      ${checks.length ? `<div style="margin-top:8px"><b>${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check before paying:</b><ul>${checks.map(x => `<li class="sev-${x.sev}"><b>${esc(x.name || 'General')}</b>: ${esc(x.text)}</li>`).join('')}</ul></div>` : (staff ? `<div class="small" style="margin-top:4px">Nothing flagged amber this week.</div>` : '')}
+  let h = `<div class="card" id="officeSheet"><div class="bar"><h2 class="ofc-h">${esc(officeTitle(B))}</h2></div>
+    <p class="ofc-pay">${esc(officePayLine(B))}<span class="printonly"> ${esc(freshText(S.W, B))}</span></p>
+    <div class="ofc-status ${approved ? 'ok' : 'wait'}"><b>${esc(officeStatusText(B))}</b>${notOver && !approved ? ` <span class="small">The week isn't over yet (it ends ${esc(dayMonYear(addDays(B.start, 6)))}).</span>` : ''}${checks.length ? ` <span class="small">${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check, under the hours.</span>` : ''}
       ${!approved && me.approve ? `<div class="noprint" style="margin-top:8px"><button class="btn go" type="button" data-view="dgc">Go to approve the hours</button></div>` : ''}</div>`;
+  /* 2.11 (Ash, 22 Oct 2026: hours first): the things to check go under the hours, not above them */
+  const checksBox = checks.length ? `<div class="ofc-checks" id="ofcChecks"><b>${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check before paying:</b><ul>${checks.map(x => `<li class="sev-${x.sev}"><b>${esc(x.name || 'General')}</b>: ${esc(x.text)}</li>`).join('')}</ul></div>` : (staff ? `<p class="small muted">Nothing flagged amber in the week.</p>` : '');
   h += `<div class="ofc-tools noprint">${canOut ? `<button class="btn primary" type="button" data-act="ofc-print">Print</button><button class="btn" type="button" data-act="ofc-excel">Download Excel</button><button class="btn" type="button" data-act="ofc-csv">Download CSV</button><button class="btn" type="button" data-act="ofc-copy">Copy</button>`
       : '<span class="muted">Print, Download and Copy open once the week is approved.</span>'}
     ${B.money ? `<label class="small" style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" id="officePay"${S.officePay ? ' checked' : ''}> Add the rate and gross pay</label>` : ''}</div>`;
-  h += `<div class="scroll" style="margin-top:10px"><table class="t ofc" id="officeTable"><thead><tr>${t.head.map((x, i) => `<th class="${i === 0 || i === t.head.length - 1 ? 'l' : 'c'}${i >= 1 && i <= 7 && !isWeekday(B.dates[i - 1]) ? ' wk' : ''}">${esc(x)}</th>`).join('')}</tr></thead><tbody>`;
+  h += `<div class="scroll" style="margin-top:10px"><table class="t ofc" id="officeTable"><thead><tr>${t.head.map((x, i) => `<th class="${i === 0 || i === t.head.length - 1 ? 'l' : 'c'}${i >= 1 && i <= 7 && !isWeekday(B.dates[i - 1]) ? ' wk' : ''}">${i >= 1 && i <= 7 ? `${esc(dayName(B.dates[i - 1]))}<span class="dd">${esc(fmtDay(B.dates[i - 1]))}</span>` : esc(x)}</th>`).join('')}</tr></thead><tbody>`;
   t.O.forEach((o, ri) => {
     const row = t.rows[ri];
     h += '<tr>' + row.map((v, i) => {
@@ -1363,10 +1416,10 @@ function officeHTML(B, me) {
     }).join('') + '</tr>';
   });
   h += `<tr class="tot">${t.tot.map((v, i) => i === 0 ? `<td class="name">${esc(v)}</td>` : `<td class="${i === t.tot.length - 1 ? 'notes' : 'c'}">${esc(v)}</td>`).join('')}</tr></tbody></table></div>
-    <p class="small muted">${B.rows.length} people. H = paid holiday (8h), B = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime${B.T.ot > 0 ? ' (OT = overtime hours)' : ''}.${staff ? ' Amber = check it; red = changed after approval.' : ''}${t.adj ? ' A correction pays hours from an earlier week in this run; Hours to pay = Total hours plus the correction.' : ''} John and Andy are salaried and kept off the hours, as on the Staff screen.${t.pay ? ' Gross pay is hours times the rate, plus any bonus and correction, before tax and NI.' : ''}</p></div>`;
+    <p class="small muted">${B.rows.length} people. H = paid holiday (8h), B = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime${B.T.ot > 0 ? ' (OT = overtime hours)' : ''}.${staff ? ' Amber = check it; red = changed after approval.' : ''}${t.adj ? ' A correction pays hours from an earlier week in this run; Hours to pay = Total hours plus the correction.' : ''} John and Andy are salaried and kept off the hours, as on the Staff screen.${t.pay ? ' Gross pay is hours times the rate, plus any bonus and correction, before tax and NI.' : ''}</p>${checksBox}</div>`;
   return h;
 }
-function officeFileName(ext) { return `Hours for the office ${S.start} to ${addDays(S.start, 6)}${S.B.approved ? '' : ' UNAPPROVED'}.${ext}`; }
+function officeFileName(ext) { return `DGC and Silverdale hours w-e ${addDays(S.start, 6)}${S.B.approved ? '' : ' UNAPPROVED'}.${ext}`; }
 function officeOk() {
   const me = S.me || {};
   return true; /* Ash, 22 Oct 2026: show the hours whether they've been approved or not; the status and UNAPPROVED are on the page and in the file */
@@ -1375,13 +1428,13 @@ async function officeExcel() {
   if (!officeOk() || S.busy) return; S.busy = true;
   try {
     const B = S.B, t = officeTable(B), checks = officeChecks(B), N = t.head.length;
-    const wb = new ExcelJS.Workbook(); wb.creator = 'Accounts, Hours for the office';
+    const wb = new ExcelJS.Workbook(); wb.creator = 'Accounts, DGC and Silverdale hours';
     const ws = wb.addWorksheet(B.approved ? 'Hours' : 'UNAPPROVED Hours');
     ws.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } };
     const line = (text, font, fill) => { const r = ws.addRow([text]); ws.mergeCells(r.number, 1, r.number, N); const c = r.getCell(1); c.font = font; c.alignment = { wrapText: true, vertical: 'middle' }; if (fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }; return r; };
-    line('Hours for the office: ' + fmtLong(B.start) + ' to ' + fmtLong(addDays(B.start, 6)), { bold: true, size: 15 }).height = 24;
+    line(officeTitle(B), { bold: true, size: 15 }).height = 24;
     line(officeStatusText(B), { bold: true, size: 11, color: { argb: B.approved ? 'FF15803D' : 'FFB45309' } }, B.approved ? 'FFE8F5EC' : 'FFFFF4E0').height = 20;
-    line(freshText(S.W, B) + ' Pay run ' + fmtLong(payRunOf(B.start)) + '.', { size: 10, color: { argb: 'FF4A657E' } });
+    line(officePayLine(B) + ' ' + freshText(S.W, B), { size: 10, color: { argb: 'FF4A657E' } });
     if (checks.length) { line(checks.length + ' to check before paying:', { bold: true, size: 10, color: { argb: 'FFB45309' } }); checks.forEach(x => line('  ' + (x.name || 'General') + ': ' + x.text, { size: 10 })); }
     ws.addRow([]);
     const hr = ws.addRow(t.head); hr.font = { bold: true }; hr.height = 30;
@@ -1400,7 +1453,7 @@ async function officeExcel() {
 }
 function officeCsvText() {
   const B = S.B, t = officeTable(B), q = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-  const lines = [[`Hours for the office: ${fmtLong(B.start)} to ${fmtLong(addDays(B.start, 6))}`].map(q).join(','), [officeStatusText(B)].map(q).join(','), [freshText(S.W, B)].map(q).join(',')];
+  const lines = [[officeTitle(B)].map(q).join(','), [officePayLine(B)].map(q).join(','), [officeStatusText(B)].map(q).join(','), [freshText(S.W, B)].map(q).join(',')];
   officeChecks(B).forEach(x => lines.push(['Check before paying: ' + (x.name || 'General') + ': ' + x.text].map(q).join(',')));
   lines.push('', t.head.map(q).join(','), ...t.rows.map(r => r.map(q).join(',')), t.tot.map(q).join(','));
   return lines.join('\r\n');
@@ -1414,10 +1467,10 @@ async function officeCsv() {
 async function officeCopy() {
   if (!officeOk()) return;
   const B = S.B, t = officeTable(B), checks = officeChecks(B);
-  const title = 'Hours for the office: ' + fmtLong(B.start) + ' to ' + fmtLong(addDays(B.start, 6));
-  const tsv = [title, officeStatusText(B), freshText(S.W, B), ...checks.map(x => 'Check: ' + (x.name || 'General') + ': ' + x.text), '', t.head.join('\t'), ...t.rows.map(r => r.join('\t')), t.tot.join('\t')].join('\n');
+  const title = officeTitle(B);
+  const tsv = [title, officePayLine(B), officeStatusText(B), freshText(S.W, B), ...checks.map(x => 'Check: ' + (x.name || 'General') + ': ' + x.text), '', t.head.join('\t'), ...t.rows.map(r => r.join('\t')), t.tot.join('\t')].join('\n');
   const td = (v, b) => `<td style="border:1px solid #999;padding:4px 6px;${b ? 'font-weight:bold;' : ''}">${esc(v)}</td>`;
-  const html = `<p><b>${esc(title)}</b><br>${esc(officeStatusText(B))}<br>${esc(freshText(S.W, B))}</p>${checks.length ? `<ul>${checks.map(x => `<li>${esc((x.name || 'General') + ': ' + x.text)}</li>`).join('')}</ul>` : ''}
+  const html = `<p><b>${esc(title)}</b><br>${esc(officePayLine(B))}<br>${esc(officeStatusText(B))}<br>${esc(freshText(S.W, B))}</p>${checks.length ? `<ul>${checks.map(x => `<li>${esc((x.name || 'General') + ': ' + x.text)}</li>`).join('')}</ul>` : ''}
     <table style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt"><tr>${t.head.map(x => td(x, true)).join('')}</tr>${t.rows.map(r => `<tr>${r.map(v => td(v)).join('')}</tr>`).join('')}<tr>${t.tot.map(v => td(v, true)).join('')}</tr></table>`;
   let ok = false;
   try { if (navigator.clipboard && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ 'text/plain': new Blob([tsv], { type: 'text/plain' }), 'text/html': new Blob([html], { type: 'text/html' }) })]); ok = true; } } catch (e) {}
@@ -1436,6 +1489,7 @@ function accIdle() {
 }
 async function quietRefresh() {
   if (document.hidden || !S.W || !S.me || !accIdle()) return;
+  if (S.day && S.day !== todayIso()) { S.day = todayIso(); S.fc = null; if (!S.picked && S.start !== defaultWeek(S.view)) return goWeek(defaultWeek(S.view), true); render(); }
   const start = S.start;
   try {
     const [W, C] = await Promise.all([rpc('acc_week', { p_start: start }), rpc('acc_corrections_for', { p_start: start }).catch(e => ({ paidHere: [], madeHere: [], checks: [], error: e.message }))]);
@@ -1468,7 +1522,7 @@ function reopenHTML(B, a) {
     : `Its pay run is ${esc(fmtLong(run))}. Opening it again lets the hours be changed on the Staff screen; approve it again when they're right.`;
   if (!can) return `<span class="small muted" style="flex-basis:100%">${paidLine} Only an approver or a director can open the week again. Anything changed after approval is flagged in red below.</span>`;
   if (!S.reopenAsk) return `<span class="small muted" style="flex-basis:100%">${paidLine} Anything changed after approval is flagged in red below.</span>
-        <button class="btn" type="button" data-act="reopen" id="reopenBtn">Open this week again</button>`;
+        <button class="btn" type="button" data-act="reopen" id="reopenBtn">Open the week again</button>`;
   return `<div class="confirm" style="flex-basis:100%" id="reopenForm"><b>Open ${esc(weekLabel(B.start))} again?</b>
         <p class="small" style="margin:6px 0">${paidLine}</p>
         <p class="small muted" style="margin:6px 0">Nothing is deleted: the approval stays in the history, with this beside it (who, when, where and why). The week shows as waiting for approval until someone approves it again.</p>
@@ -1476,7 +1530,7 @@ function reopenHTML(B, a) {
         <div class="bar" style="margin-top:8px"><button class="btn primary" type="button" data-act="reopen-yes" id="reopenYes">Yes, open it again</button><button class="btn" type="button" data-act="reopen-no">Cancel</button></div></div>`;
 }
 function say(m, k) { S.msg = m; S.msgKind = k || ''; const el = document.querySelector('.msg'); if (el) { el.textContent = m; el.className = 'msg ' + (k || ''); } else render(); }
-async function goWeek(start) { S.start = start; S.approveAsk = false; S.reopenAsk = false; S.open.clear(); S.msg = ''; history.replaceState(null, '', '#week=' + start); await reload(); await refreshHandle(); }
+async function goWeek(start, auto) { if (!auto) S.picked = true; S.start = start; S.approveAsk = false; S.reopenAsk = false; S.open.clear(); S.msg = ''; history.replaceState(null, '', '#week=' + start); await reload(); await refreshHandle(); }
 /* Weekly Hours sends a director here with a correction filled in (Ash, 17 Oct 2026):
    #week=YYYY-MM-DD&correct=<staff id>|<day>|<should have been>|<why>. It only fills the form, once; nothing is saved
    until Save the correction, which goes through acc_correction_add as before. */
@@ -1492,9 +1546,9 @@ function applyPendingCorr() {
   const c = S.pendingCorr; if (!c || !S.B || mondayOf(c.date) !== S.start) return;
   S.pendingCorr = null;
   if (!S.me || !S.me.director) { say('Only a director can record a correction.', 'err'); return; }
-  if (!S.B.approved) { say('This week is not approved for pay yet, so change the hours on the Staff screen instead.', 'err'); return; }
+  if (!S.B.approved) { say('That week is not approved for pay yet, so change the hours on the Staff screen instead.', 'err'); return; }
   if ((S.B.fixedHere || []).some(f => f.staffId === c.staffId && f.date === c.date)) { say('There is already a correction for that day (see Corrections). Cancel it first if it is wrong.', 'err'); return; }
-  if (!S.B.rows.some(r => r.s.id === c.staffId)) { say('That person is not in this week.', 'err'); return; }
+  if (!S.B.rows.some(r => r.s.id === c.staffId)) { say('That person is not in that week.', 'err'); return; }
   S.view = 'dgc';
   S.corr = { staffId: c.staffId, date: c.date, oldHours: corrPaid(c.staffId, c.date), newHours: c.newHours, reason: c.reason, evidence: '' };
   render(); const f = $('#corrForm'); if (f) f.scrollIntoView({ block: 'center' });
@@ -1520,7 +1574,7 @@ document.addEventListener('click', async ev => {
   const d = t.dataset;
   if (d.tsName) { ev.stopPropagation(); openTimesheet(d.tsName, d.tsDate); return; }
   if (t.matches('tr.person')) { const id = d.person; S.open.has(id) ? S.open.delete(id) : S.open.add(id); render(); return; }
-  if (d.view) { S.view = d.view; try { localStorage.setItem('acc_view2', d.view); } catch (e) {} render(); window.scrollTo(0, 0); return; }
+  if (d.view) { S.view = d.view; window.scrollTo(0, 0); if (!S.picked && S.start !== defaultWeek(S.view)) return goWeek(defaultWeek(S.view), true); render(); return; } /* 2.11: no week picked yet, so the hours show the week being worked and the pay the next payday */
   if (d.week) return goWeek(d.week);
   if (d.taxedit) { S.editTax = d.taxedit; render(); return; }
   if (d.taxsave) {
@@ -1551,7 +1605,8 @@ document.addEventListener('click', async ev => {
   switch (d.act) {
     case 'prev': return goWeek(addDays(S.start, -7));
     case 'next': return goWeek(addDays(S.start, 7));
-    case 'last': return goWeek(weekJustGone());
+    case 'last': return goWeek(lastPayWeek());
+    case 'nextpay': return goWeek(nextPayWeek());
     case 'this': return goWeek(mondayOf(todayIso()));
     case 'retry': return reload();
     case 'refresh': { t.disabled = true; const y = window.scrollY; await reload(true); window.scrollTo(0, y); return; }
@@ -1570,7 +1625,7 @@ document.addEventListener('click', async ev => {
       if (!why.trim()) { say('Say why the week is being opened again first.', 'err'); const w = $('#reopenWhy'); if (w) w.focus(); return; }
       t.disabled = true;
       try { const r = await rpc('acc_unapprove', { p_start: S.start, p_reason: why.trim() });
-        S.reopenAsk = false; S.reopenWhy = ''; S.fc = null; await reload(true); say(r && r.already ? 'This week was already open.' : 'Opened again. The approval and why it was opened are kept in the history. Approve it again when the hours are right.', 'ok');
+        S.reopenAsk = false; S.reopenWhy = ''; S.fc = null; await reload(true); say(r && r.already ? 'That week was already open.' : 'Opened again. The approval and why it was opened are kept in the history. Approve it again when the hours are right.', 'ok');
         try { if (window.top !== window.self) window.top.postMessage({ type: 'acc-approved', periodStart: S.start, reopened: true }, location.origin); } catch (e) {} }
       catch (e) { t.disabled = false; say('Not opened again: ' + e.message, 'err'); }
       return;
@@ -1584,7 +1639,7 @@ document.addEventListener('click', async ev => {
       if (items.length && !S.gateOk) { say('Tick the box to say you have checked the items listed first.', 'err'); t.disabled = false; return; }
       try { const r = await rpc('acc_approve_checked', { p_start: S.start, p_items: items.map(x => ({ name: x.name, date: x.date, text: x.text })) })
           .catch(e => (/acc_approve_checked|PGRST202|schema cache/i.test(e.message + ' ' + (e.code || '')) ? rpc('acc_approve', { p_start: S.start }) : Promise.reject(e)));
-        S.approveAsk = false; S.gateOk = false; S.fc = null; await reload(true); say(r && r.already ? 'This week was already approved.' : 'Approved. Accounts can now pay these hours.', 'ok');
+        S.approveAsk = false; S.gateOk = false; S.fc = null; await reload(true); say(r && r.already ? 'That week was already approved.' : 'Approved. Accounts can now pay these hours.', 'ok');
         try { if (window.parent !== window) window.parent.postMessage({ type: 'acc-approved', periodStart: S.start }, location.origin); } catch (e) {} }
       catch (e) { t.disabled = false; say('Not approved: ' + e.message, 'err'); }
       return;
@@ -1633,15 +1688,16 @@ window.addEventListener('hashchange', () => { S.pendingCorr = correctFromHash() 
     $('#app').innerHTML = `<div class="card"><h2>Accounts</h2><p>This login (${esc((S.me && S.me.email) || 'not signed in')}) can't open Accounts.</p><p class="muted">Accounts is for the directors, the hours approvers, and people with the Accounts app and "Can see money" both switched on. Ask Ash or Harry if you need it.</p><button class="btn" type="button" onclick="logout()">Sign out</button></div>`;
     return;
   }
-  /* the office (not an approver or a director) opens on Hours for the office; directors and approvers keep their last view (2.7) */
-  let v = null, old = null; try { v = localStorage.getItem('acc_view2'); old = localStorage.getItem('acc_view'); } catch (e) {}
-  const office = !S.me.approve && !S.me.director;
-  S.view = v === 'office' || v === 'silverdale' || v === 'dgc' ? v : office ? 'office' : old === 'silverdale' || old === 'dgc' ? old : (S.me.ws === 'silverdale' ? 'silverdale' : 'dgc');
+  /* Ash, 22 Oct 2026: "I want it preset to hours for everyone, so the first one that comes up is hours for DGC and
+     Silverdale." Everyone opens on DGC and Silverdale hours for the week paid on the next payday (Mon 19 to Sun 25 Oct on
+     Thu 22 Oct, paid Tue 27 Oct), whatever was open last time. Until 2.11 a director's last view was kept, and that view opened on the week just
+     gone (12 to 18 Oct on Thu 22 Oct, already paid on Tue 20 Oct). A link to approve or correct a week still opens Approve and pay. */
   const fromHash = pickStartFromHash();
   S.pendingCorr = correctFromHash();
   S.focusApprove = /approve/.test(location.hash);
-  /* default: the pay week just gone (the one being paid next), unless asked for another (2.7, 18 Oct 2026) */
-  S.start = fromHash || (S.view === 'office' ? mondayOf(todayIso()) : weekJustGone()); /* the office view opens on this week's hours (Ash, 22 Oct 2026) */
+  S.view = (S.focusApprove || S.pendingCorr) && (S.me.approve || S.me.director) ? 'dgc' : 'office';
+  S.picked = !!fromHash; S.day = todayIso();
+  S.start = fromHash || defaultWeek(S.view);
   await loadPaySet();
   await reload(); await refreshHandle();
 })();
