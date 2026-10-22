@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Holidays</title>
+<meta name="sd-version" content="1.3">
 <script src="../staff/config.js"></script>
 <script src="../staff/auth.js?v=6"></script>
 <script src="theme.js"></script>
@@ -52,10 +53,6 @@ td.r,th.r{text-align:right}
 .dy.we{color:var(--muted);opacity:.45}
 .dy.bh{background:rgba(59,130,246,.18);color:var(--blue);font-weight:700}
 .dy.hol{background:var(--green);color:#04210f;font-weight:700}
-.dy.hol.part{background:rgba(34,197,94,.3);color:var(--text);box-shadow:inset 0 0 0 2px var(--green)}
-.pbtn{margin-top:6px;min-height:36px;padding:4px 10px;border-radius:7px;border:1px solid var(--bord);background:var(--surf2);color:var(--text);font:inherit;font-size:.82rem;cursor:pointer}
-.pe{margin-top:10px;padding:12px;border:1px solid var(--accent);border-radius:10px;background:var(--surf2)}
-.pe select,.pe input{width:auto}
 .dy.unp{background:rgba(245,158,11,.35);font-weight:700}
 .dy.oth{background:rgba(148,163,184,.35)}
 .dy.wk::after{content:'';position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--muted)}
@@ -107,9 +104,6 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
       <div class="bookbar hide" id="bookBar">
         <b id="bookTxt"></b>
         <select id="bookType" style="width:auto;min-height:44px"><option value="Holiday">Paid holiday</option><option value="Unpaid">Unpaid</option></select>
-        <select id="bookLen" style="width:auto;min-height:44px" aria-label="How long"><option value="full">Full days</option><option value="half">One day is a half day (4 h)</option><option value="hours">One day is part, hours off</option></select>
-        <input id="bookHrs" class="hide" type="number" min="0.5" max="7.5" step="0.5" value="4" inputmode="decimal" aria-label="Hours off that day" style="width:90px;min-height:44px">
-        <select id="bookOn" class="hide" style="width:auto;min-height:44px" aria-label="Which day is the part day"></select>
         <button class="btn" id="bookBtn">Book them</button>
         <button class="btn sec" id="bookClear">Clear</button>
         <span class="muted" id="bookMsg"></span>
@@ -127,10 +121,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
     <div class="card">
       <h2>Holidays and days off this year</h2>
       <table id="leave"></table>
-      <div id="peBox" class="pe hide"></div>
     </div>
   </div>
   <p id="err" class="flag hide"></p>
+  <p class="muted" style="margin-top:14px;opacity:.7">Holidays 1.3: earned on the hours they came in (8 h a full day's worth, 4 h half, 2 h a quarter); booked in full days only (22 Oct 2026)</p>
 </div>
 <script>
 const REST = SUPABASE_URL + '/rest/v1';
@@ -145,15 +139,6 @@ const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date
 const nice = s => parse(s).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 const r1 = n => Math.round(n * 10) / 10;
 const half = n => Math.floor(n * 2 + 1e-9) / 2; // round down to the half day, safe for staff
-/* Part days (Ash, 22 Oct 2026): a leave row can mark some of its days as part days in part_days, e.g. {"2026-10-14": 4} = 4 hours off that day (a half day).
-   A paid part day counts as (hours off / 8) of a day taken, and earns the holiday hours plus the hours worked that day, up to 8.
-   An unpaid part day: the unpaid hours earn nothing, hours worked earn as normal. Days not listed are full days, exactly as before. */
-const offH = (l, d) => { const v = l.part_days && l.part_days[d], h = Number(v); return v != null && h > 0 && h < DAY_H ? h : DAY_H; };
-function offMap(rows, fromIso, toIso) { const m = {}; rows.forEach(l => leaveDays(l, fromIso, toIso).forEach(d => { m[d] = Math.max(m[d] || 0, offH(l, d)); })); return m; }
-const sumOff = (m, keep) => Object.keys(m).filter(keep).reduce((t, d) => t + m[d] / DAY_H, 0);
-const partWord = h => h === DAY_H / 2 ? 'half day (' + h + ' h)' : h + ' h off';
-const partTxt = l => leaveDays(l, '0000', '9999').filter(d => offH(l, d) < DAY_H).map(d => nice(d) + ', ' + partWord(offH(l, d))).join('; ');
-const rowDays = l => leaveDays(l, '0000', '9999').reduce((t, d) => t + offH(l, d) / DAY_H, 0);
 const isWork = d => d.getDay() > 0 && d.getDay() < 6 && !BANK.has(iso(d));
 function workDays(fromIso, toIso, skip) { // working days from..to inclusive, minus days in skip
   let n = 0; const d = parse(fromIso), end = parse(toIso);
@@ -176,7 +161,7 @@ async function load(s) {
   if (cache[s.id]) return cache[s.id];
   const [hours, leave] = await Promise.all([
     get('/dgc_staff_hours?staff_id=eq.' + s.id + '&select=work_date,hours&order=work_date'),
-    get('/dgc_staff_leave?staff_id=eq.' + s.id + '&select=id,leave_type,from_date,to_date,notes,part_days&order=from_date')]);
+    get('/dgc_staff_leave?staff_id=eq.' + s.id + '&select=leave_type,from_date,to_date,notes&order=from_date')]);
   return (cache[s.id] = { hours, leave });
 }
 function calc(s, data, uptoIso) {
@@ -184,22 +169,22 @@ function calc(s, data, uptoIso) {
   const yearStart = uptoIso.slice(0, 4) + '-01-01', yearEnd = uptoIso.slice(0, 4) + '-12-31';
   const from = s.start_date && s.start_date > yearStart ? s.start_date : yearStart;
   const hol = data.leave.filter(l => /holiday/i.test(l.leave_type));
-  const holOff = offMap(hol, from, yearEnd), holDays = new Set(Object.keys(holOff)); // day -> hours off (8 = full day)
+  const holDays = new Set(hol.flatMap(l => leaveDays(l, from, yearEnd)));
   // What counts as a day worked (Ash, 18 Oct 2026): hours worked, capped at 8 a day; a paid holiday day and an
   // Isle of Man bank holiday count as 8 h (the legal minimum keeps building while on paid leave). Unpaid days earn nothing.
   const dayH = {};
   data.hours.forEach(h => { if (h.work_date >= from && h.work_date <= today && Number(h.hours) > 0) dayH[h.work_date] = Math.min(DAY_H, Number(h.hours)); });
   const lastWorked = Object.keys(dayH).sort().pop() || null;
-  holDays.forEach(d => { if (d <= today) dayH[d] = holOff[d] >= DAY_H ? DAY_H : Math.min(DAY_H, holOff[d] + (dayH[d] || 0)); }); // part day: holiday hours + hours worked, up to 8
+  holDays.forEach(d => { if (d <= today) dayH[d] = DAY_H; });
   BANK.forEach(d => { const x = parse(d); if (d >= from && d <= today && x.getDay() > 0 && x.getDay() < 6) dayH[d] = DAY_H; });
   const worked = Object.keys(dayH).sort();
   const hrs = worked.reduce((t, d) => t + dayH[d], 0);
   const lastDay = lastWorked;
   const earnedNow = hrs / DAY_H * DAYS_A_YEAR / WORK_DAYS;
   const unpaid = data.leave.filter(l => /unpaid/i.test(l.leave_type));
-  const taken = sumOff(holOff, d => d <= today); // a half day counts as 0.5
-  const booked = sumOff(holOff, d => d > today && d <= uptoIso);
-  const bookedYear = sumOff(holOff, d => d > today);
+  const taken = [...holDays].filter(d => d <= today).length;
+  const booked = [...holDays].filter(d => d > today && d <= uptoIso).length;
+  const bookedYear = [...holDays].filter(d => d > today).length;
   // Forecast: every weekday after the last day worked, holidays and bank holidays included (they count as 8 h)
   const startF = iso(new Date(Math.max(parse(lastDay || from).getTime() + 864e5, parse(from).getTime())));
   const fDays = uptoIso >= startF ? weekdays(startF, uptoIso) : 0;
@@ -215,7 +200,6 @@ function show() {
   const name = $('person').value.trim().toLowerCase();
   const s = staff.find(x => x.name.toLowerCase() === name);
   if (!s) { $('out').classList.add('hide'); return; }
-  $('peBox').classList.add('hide');
   const upto = $('upto').value || iso(new Date());
   load(s).then(data => {
     const c = calc(s, data, upto), first = s.name.split(' ')[0];
@@ -233,8 +217,8 @@ function show() {
       ['Counted from', nice(c.from)],
       ['Hours counted to date (max 8 a day; paid holidays and bank holidays at 8)', r1(c.hrs) + ' h on ' + c.days + ' days (' + r1(c.hrs / DAY_H) + ' full days)'],
       ['Holiday earned to date', r1(c.earnedNow) + ' days'],
-      ['Paid holiday already taken', r1(c.taken) + ' days'],
-      ['Booked between now and ' + nice(upto), r1(c.booked) + ' days'],
+      ['Paid holiday already taken', c.taken + ' days'],
+      ['Booked between now and ' + nice(upto), c.booked + ' days'],
       ['Working days from now to ' + nice(upto), c.fDays + ' (adds ' + r1(c.fDays * DAYS_A_YEAR / WORK_DAYS) + ')'],
       ['Earned by Christmas Eve if in every day', r1(c.earnedXmas) + ' days'],
       ['Kept for the Christmas closure', XMAS_KEEP + ' days'],
@@ -242,7 +226,7 @@ function show() {
     ].map(r => '<tr><td>' + r[0] + '</td><td class="r">' + r[1] + '</td></tr>').join('');
     const rows = [...c.hol.map(l => [l, 'Holiday']), ...c.unpaid.map(l => [l, 'Unpaid'])].sort((a, b) => a[0].from_date < b[0].from_date ? -1 : 1);
     $('leave').innerHTML = '<tr><th>From</th><th>To</th><th>Type</th><th class="r">Working days</th></tr>' + (rows.length ? rows.map(([l, t]) =>
-      '<tr><td>' + nice(l.from_date) + '</td><td>' + nice(l.to_date) + '</td><td>' + t + (partTxt(l) ? '<br><span class="muted">Part day: ' + partTxt(l) + '</span>' : '') + (l.id ? '<br><button type="button" class="pbtn" data-pe="' + l.id + '">Half day or part day</button>' : '') + '</td><td class="r">' + r1(rowDays(l)) + '</td></tr>').join('') : '<tr><td colspan="4" class="muted">None recorded</td></tr>');
+      '<tr><td>' + nice(l.from_date) + '</td><td>' + nice(l.to_date) + '</td><td>' + t + '</td><td class="r">' + leaveDays(l, '0000', '9999').length + '</td></tr>').join('') : '<tr><td colspan="4" class="muted">None recorded</td></tr>');
     $('msg').textContent = 'Hi ' + first + ', your holidays:\n\n'
       + 'You earn holiday on the days you work (' + DAYS_A_YEAR + ' days a year).\n\n'
       + 'Right now you have ' + half(Math.max(0, c.nowLeft)) + ' days to take.\n'
@@ -265,12 +249,12 @@ function calModel() {
   const from = calS.start_date || (today.slice(0, 4) + '-01-01');
   const capped = {}; calData.hours.forEach(h => { if (h.work_date >= from && Number(h.hours) > 0) capped[h.work_date] = Math.min(DAY_H, Number(h.hours)); });
   const lastRec = Object.keys(capped).sort().pop() || null;
-  const hol = new Set(), unp = new Set(), oth = new Set(), holOff = {};
-  calData.leave.forEach(l => { const isH = /holiday/i.test(l.leave_type), set = isH ? hol : /unpaid/i.test(l.leave_type) ? unp : oth; leaveDays(l, '0000', '9999').forEach(x => { set.add(x); if (isH) holOff[x] = Math.max(holOff[x] || 0, offH(l, x)); }); });
+  const hol = new Set(), unp = new Set(), oth = new Set();
+  calData.leave.forEach(l => { const set = /holiday/i.test(l.leave_type) ? hol : /unpaid/i.test(l.leave_type) ? unp : oth; leaveDays(l, '0000', '9999').forEach(x => set.add(x)); });
   // Paid holiday and bank holidays count as 8 h worked (Ash, 18 Oct 2026); unpaid days earn nothing
-  hol.forEach(x => { if (x >= from && x <= today) capped[x] = holOff[x] >= DAY_H ? DAY_H : Math.min(DAY_H, holOff[x] + (capped[x] || 0)); }); // part day: holiday hours + hours worked, up to 8
+  hol.forEach(x => { if (x >= from && x <= today) capped[x] = DAY_H; });
   BANK.forEach(x => { const d = parse(x); if (x >= from && x <= today && d.getDay() > 0 && d.getDay() < 6) capped[x] = DAY_H; });
-  return { today, from, capped, lastRec, hol, unp, oth, holOff };
+  return { today, from, capped, lastRec, hol, unp, oth };
 }
 function earnedThrough(m, isoD, off) { // holiday earned from start to isoD inclusive
   let hrs = 0; for (const [d, h] of Object.entries(m.capped)) if (d <= isoD) hrs += h;
@@ -281,25 +265,12 @@ function earnedThrough(m, isoD, off) { // holiday earned from start to isoD incl
 }
 function availOn(m, isoD) { // can this day be booked as paid holiday, given what's booked and picked before it
   const off = new Set([...m.hol, ...picked]);
-  const pp = partPick(); // a half day booked or picked uses 0.5
-  const used = [...off].filter(x => x < isoD && x >= m.from).reduce((n, x) => n + (m.hol.has(x) ? m.holOff[x] : pp && pp.day === x ? pp.h : DAY_H) / DAY_H, 0);
+  const used = [...off].filter(x => x < isoD && x >= m.from).length;
   return earnedThrough(m, addWork(isoD, -BUFFER), off) - used;
-}
-function partPick() { // the half day or part day being booked, or null for full days
-  const v = $('bookLen').value; if (v === 'full' || !picked.size) return null;
-  const days = [...picked].sort(), on = $('bookOn').value;
-  return { day: days.includes(on) ? on : days[days.length - 1], h: v === 'half' ? DAY_H / 2 : Number($('bookHrs').value) };
-}
-function syncBook() {
-  const days = [...picked].sort(), on = $('bookOn'), keep = on.value, len = $('bookLen').value;
-  on.innerHTML = days.map(d => '<option value="' + d + '">' + nice(d) + '</option>').join('');
-  on.value = days.includes(keep) ? keep : (days[days.length - 1] || '');
-  $('bookHrs').classList.toggle('hide', len !== 'hours'); on.classList.toggle('hide', len === 'full' || days.length < 2);
 }
 function renderCal() {
   if (!calS) return;
-  syncBook();
-  const m = calModel(), pp = partPick();
+  const m = calModel();
   if (!calStart) { const t = parse(m.today); calStart = new Date(t.getFullYear(), t.getMonth() - 2, 1); }
   const end = new Date(calStart.getFullYear(), calStart.getMonth() + 12, 0);
   $('calTitle').textContent = calStart.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) + ' to ' + end.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
@@ -312,13 +283,13 @@ function renderCal() {
       if (k === m.today) cls.push('today');
       if (BANK.has(k)) { cls.push('bh'); tip += ': bank holiday (paid)'; }
       else if (d.getDay() === 0 || d.getDay() === 6) cls.push('we');
-      else if (m.hol.has(k)) { cls.push('hol'); if (m.holOff[k] < DAY_H) cls.push('part'); tip += m.holOff[k] < DAY_H ? ': holiday, ' + partWord(m.holOff[k]) : ': holiday'; }
+      else if (m.hol.has(k)) { cls.push('hol'); tip += ': holiday'; }
       else if (m.unp.has(k)) { cls.push('unp'); tip += ': unpaid'; }
       else if (m.oth.has(k)) { cls.push('oth'); tip += ': other leave'; }
       else if (k < m.from) { cls.push('no'); tip += ': before they started'; }
       else {
         if (k in m.capped) { cls.push('wk'); tip += ': worked ' + m.capped[k] + ' h'; } // a day worked can't be booked as holiday
-        else if (picked.has(k)) { cls.push('sel'); can = true; tip += ': picked' + (pp && pp.day === k ? ', ' + partWord(pp.h) : ''); }
+        else if (picked.has(k)) { cls.push('sel'); can = true; tip += ': picked'; }
         else { const a = availOn(m, k); can = a >= 1 - 1e-9; cls.push(can ? 'ok' : 'no'); tip += can ? ': can book (' + r1(a) + ' earned)' : ': not earned yet (' + r1(Math.max(0, a)) + ' by then)'; }
       }
       g += can ? '<button type="button" class="' + cls.join(' ') + '" data-d="' + k + '" title="' + tip + '" aria-label="' + tip + '" aria-pressed="' + picked.has(k) + '">' + dn + '</button>'
@@ -330,7 +301,7 @@ function renderCal() {
   $('cal').querySelectorAll('button[data-d]').forEach(b => b.onclick = () => { const k = b.dataset.d; picked.has(k) ? picked.delete(k) : picked.add(k); renderCal(); });
   $('bookBar').classList.toggle('hide', picked.size === 0);
   const sorted = [...picked].sort();
-  $('bookTxt').textContent = picked.size + ' day' + (picked.size === 1 ? '' : 's') + ' picked' + (sorted.length ? ': ' + nice(sorted[0]) + (sorted.length > 1 ? ' to ' + nice(sorted[sorted.length - 1]) : '') : '') + (pp ? ' (' + nice(pp.day) + ': ' + partWord(pp.h) + ')' : '');
+  $('bookTxt').textContent = picked.size + ' day' + (picked.size === 1 ? '' : 's') + ' picked' + (sorted.length ? ': ' + nice(sorted[0]) + (sorted.length > 1 ? ' to ' + nice(sorted[sorted.length - 1]) : '') : '');
 }
 function runs(days) { // consecutive working days become one leave row
   const out = []; let a = null, b = null;
@@ -339,51 +310,16 @@ function runs(days) { // consecutive working days become one leave row
 }
 async function bookPicked() {
   if (!calS || !picked.size) return;
-  if (window.SDView && SDView.canSave && !SDView.canSave()) { $('bookMsg').textContent = 'Viewing as someone: nothing is saved.'; return; }
-  const pp = partPick();
-  if (pp && !(pp.h > 0 && pp.h < DAY_H)) { $('bookMsg').textContent = 'Hours off must be more than 0 and less than 8.'; return; }
-  const type = $('bookType').value, rowsIn = runs([...picked]).map(([f, t]) => {
-    const r = { staff_id: calS.id, leave_type: type, from_date: f, to_date: t, notes: 'Booked in the Holidays app by ' + (session.email || 'a manager'), part_days: null };
-    if (pp && pp.day >= f && pp.day <= t) { r.part_days = { [pp.day]: pp.h }; r.notes += '. ' + nice(pp.day) + ': ' + partWord(pp.h); }
-    return r;
-  });
+  const type = $('bookType').value, rowsIn = runs([...picked]).map(([f, t]) => ({ staff_id: calS.id, leave_type: type, from_date: f, to_date: t, notes: 'Booked in the Holidays app by ' + (session.email || 'a manager') }));
   $('bookMsg').textContent = 'Booking...';
   const r = await fetch(REST + '/dgc_staff_leave', { method: 'POST', headers: authedHeaders(session, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify(rowsIn) });
   if (!r.ok) { $('bookMsg').textContent = 'Not booked (' + r.status + '). ' + (await r.text()).slice(0, 120); return; }
-  $('bookMsg').textContent = 'Booked ' + r1(picked.size - (pp ? 1 - pp.h / DAY_H : 0)) + ' day' + (picked.size === 1 && !pp ? '' : 's') + '. It shows in the Planner too.';
-  picked.clear(); $('bookLen').value = 'full'; delete cache[calS.id]; show();
-}
-function partEdit(id) { // mark a day of a booked row as a half day or part day, or back to a full day (Ash, 22 Oct 2026)
-  const l = ((calData && calData.leave) || []).find(x => x.id === id); if (!l) return;
-  const days = leaveDays(l, '0000', '9999'), box = $('peBox');
-  if (!days.length) return;
-  box.innerHTML = '<b>Half day or part day in ' + nice(l.from_date) + (l.to_date !== l.from_date ? ' to ' + nice(l.to_date) : '') + '</b><div class="row">'
-    + '<select id="peDay" aria-label="Which day">' + days.map(d => '<option value="' + d + '">' + nice(d) + (offH(l, d) < DAY_H ? ' (' + partWord(offH(l, d)) + ')' : '') + '</option>').join('') + '</select>'
-    + '<select id="peLen" aria-label="How long"><option value="full">Full day</option><option value="half">Half day (4 h)</option><option value="hours">Hours off</option></select>'
-    + '<input id="peHrs" class="hide" type="number" min="0.5" max="7.5" step="0.5" value="4" inputmode="decimal" aria-label="Hours off that day" style="width:90px">'
-    + '<button class="btn" id="peSave">Save</button><button class="btn sec" id="peCancel">Cancel</button></div><p class="muted" id="peMsg" style="margin-top:6px"></p>';
-  box.classList.remove('hide');
-  $('peLen').onchange = () => $('peHrs').classList.toggle('hide', $('peLen').value !== 'hours');
-  $('peDay').onchange = () => { const h = offH(l, $('peDay').value); $('peLen').value = h >= DAY_H ? 'full' : h === DAY_H / 2 ? 'half' : 'hours'; $('peHrs').value = h < DAY_H ? h : 4; $('peLen').onchange(); };
-  $('peDay').value = days.find(d => offH(l, d) < DAY_H) || days[days.length - 1]; $('peDay').onchange();
-  $('peCancel').onclick = () => box.classList.add('hide');
-  $('peSave').onclick = async () => {
-    if (window.SDView && SDView.canSave && !SDView.canSave()) { $('peMsg').textContent = 'Viewing as someone: nothing is saved.'; return; }
-    const d = $('peDay').value, v = $('peLen').value, h = v === 'half' ? DAY_H / 2 : Number($('peHrs').value);
-    if (v === 'hours' && !(h > 0 && h < DAY_H)) { $('peMsg').textContent = 'Hours off must be more than 0 and less than 8.'; return; }
-    const pd = Object.assign({}, l.part_days || {}); if (v === 'full') delete pd[d]; else pd[d] = h;
-    $('peMsg').textContent = 'Saving...';
-    const r = await fetch(REST + '/dgc_staff_leave?id=eq.' + l.id, { method: 'PATCH', headers: authedHeaders(session, { 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ part_days: Object.keys(pd).length ? pd : null }) });
-    const out = r.ok ? await r.json().catch(() => []) : null;
-    if (!r.ok || !out.length) { $('peMsg').textContent = 'Not saved' + (r.ok ? ': this login cannot change leave.' : ' (' + r.status + '). ' + (await r.text()).slice(0, 120)); return; }
-    box.classList.add('hide'); delete cache[calS.id]; show();
-  };
+  $('bookMsg').textContent = 'Booked ' + picked.size + ' day' + (picked.size === 1 ? '' : 's') + '. It shows in the Planner too.';
+  picked.clear(); delete cache[calS.id]; show();
 }
 $('calPrev').onclick = () => { calStart = new Date(calStart.getFullYear(), calStart.getMonth() - 3, 1); renderCal(); };
 $('calNext').onclick = () => { calStart = new Date(calStart.getFullYear(), calStart.getMonth() + 3, 1); renderCal(); };
-$('bookClear').onclick = () => { picked.clear(); $('bookLen').value = 'full'; renderCal(); };
-$('bookLen').onchange = renderCal; $('bookHrs').oninput = renderCal; $('bookOn').onchange = renderCal;
-$('leave').addEventListener('click', e => { const b = e.target.closest('[data-pe]'); if (b) partEdit(b.dataset.pe); });
+$('bookClear').onclick = () => { picked.clear(); renderCal(); };
 $('bookBtn').onclick = () => bookPicked().catch(e => { $('bookMsg').textContent = e.message; });
 $('copy').onclick = () => navigator.clipboard.writeText($('msg').textContent).then(() => { $('copy').textContent = 'Copied'; setTimeout(() => $('copy').textContent = 'Copy message', 1500); });
 $('person').addEventListener('input', show); $('person').addEventListener('change', show); $('upto').addEventListener('change', show);
