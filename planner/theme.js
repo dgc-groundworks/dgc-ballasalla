@@ -4,7 +4,8 @@
 // device (localStorage) and, in the planner, on their login too
 // (window.dgcSaveTheme), so it follows them to a new phone or computer.
 (function () {
-  const stored = localStorage.getItem('dgc_theme') || 'light';
+  // hub v102 (24 Oct 2026): no choice on this page yet, so follow the app's own ("hub.theme" on os.dgc.im), light if none
+  const stored = localStorage.getItem('dgc_theme') || (localStorage.getItem('hub.theme') === 'dark' ? 'dark' : 'light');
   document.documentElement.setAttribute('data-theme', stored);
 })();
 

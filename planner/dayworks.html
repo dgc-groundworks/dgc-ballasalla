@@ -81,7 +81,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .week-ending-block .overview-section,.week-ending-block .overview-table{margin-left:18px;margin-right:18px;width:calc(100% - 36px)}
 .week-ending-block .overview-table.overview-total-table{margin-top:12px}
 .overview-row:hover td{background:var(--surf2)}
-.overview-row.active td{background:var(--accent);color:#1a1d27}
+.overview-row.active td{background:var(--accent);color:var(--accent-ink,#1a1d27)}
 .overview-row .or-hours{font-weight:800;color:var(--accent)}
 .overview-row.active .or-hours{color:#1a1d27}
 /* Same table/colgroup as .overview-table so its number sits directly
@@ -178,7 +178,7 @@ input:focus{border-color:var(--accent)}
 .btn-save{background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit}
 /* Highlighted (glowing) only when actually actionable — flat and dim
    otherwise, so it's obvious at a glance whether there's anything to send. */
-.btn-primary{background:var(--accent);color:#1a1d27;border:none;padding:10px 22px;border-radius:6px;font-size:0.9rem;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 0 0 3px rgba(245,158,11,.3);transition:opacity .15s,box-shadow .15s}
+.btn-primary{background:var(--accent);color:var(--accent-ink,#1a1d27);border:none;padding:10px 22px;border-radius:6px;font-size:0.9rem;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 0 0 3px rgba(245,158,11,.3);transition:opacity .15s,box-shadow .15s}
 .btn-primary:disabled{opacity:.35;cursor:default;box-shadow:none}
 .btn-secondary{background:var(--surf2);color:var(--muted);border:1px solid var(--bord);padding:8px 16px;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit}
 .btn-danger{background:none;border:1px solid rgba(239,68,68,.4);color:var(--red);padding:7px 12px;border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit}
