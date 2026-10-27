@@ -261,7 +261,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.12 (22 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.13 (27 Oct 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -1943,7 +1943,6 @@ document.addEventListener('click', async ev => {
     case 'ofc-copy': return officeCopy();
     case 'theme': if (typeof toggleTheme === 'function') toggleTheme(); return;
     case 'fc-break': S.fcBreak = !S.fcBreak; render(); return;
-    case 'approve': S.approveAsk = true; render(); return;
     case 'approve-no': S.approveAsk = false; S.gateOk = false; render(); return;
     case 'reopen': S.reopenAsk = true; render(); { const w = $('#reopenWhy'); if (w) w.focus(); } return;
     case 'reopen-no': S.reopenAsk = false; render(); return;
@@ -1960,15 +1959,20 @@ document.addEventListener('click', async ev => {
     case 'corr-new': S.corr = { staffId: '', date: '', oldHours: 0, newHours: null, reason: '', evidence: '' }; render(); return;
     case 'corr-cancel-form': S.corr = null; render(); return;
     case 'corr-save': return saveCorrection(t);
+    /* 2.13 (Ash, 27 Oct 2026): "it only has to be pressed once". One press approves the week in the approver's name.
+       Anything flagged (amber, "?", not checked by a project manager) is saved with the approval in acc_approval_checks,
+       as before, and listed on Things to check; no second button or tick box. */
+    case 'approve': S.gateOk = true; S.approveAsk = true; /* falls through to approve-yes */
     case 'approve-yes':
       t.disabled = true;
       const items = gateItems(S.B);
       if (items.length && !S.gateOk) { say('Tick the box to say you have checked the items listed first.', 'err'); t.disabled = false; return; }
+      t.textContent = 'Approving...';
       try { const r = await rpc('acc_approve_checked', { p_start: S.start, p_items: items.map(x => ({ name: x.name, date: x.date, text: x.text })) })
           .catch(e => (/acc_approve_checked|PGRST202|schema cache/i.test(e.message + ' ' + (e.code || '')) ? rpc('acc_approve', { p_start: S.start }) : Promise.reject(e)));
-        S.approveAsk = false; S.gateOk = false; S.fc = null; await reload(true); say(r && r.already ? 'That week was already approved.' : 'Approved. Accounts can now pay these hours.', 'ok');
+        S.approveAsk = false; S.gateOk = false; S.fc = null; await reload(true); say(r && r.already ? 'That week was already approved.' : 'Approved by ' + ((S.me && (S.me.name || S.me.email)) || 'you') + '. Accounts can now pay these hours.' + (items.length ? ' ' + items.length + (items.length === 1 ? ' flagged item is' : ' flagged items are') + ' saved with the approval.' : ''), 'ok');
         try { if (window.parent !== window) window.parent.postMessage({ type: 'acc-approved', periodStart: S.start }, location.origin); } catch (e) {} }
-      catch (e) { t.disabled = false; say('Not approved: ' + e.message, 'err'); }
+      catch (e) { t.disabled = false; say('Not approved: ' + e.message + '. Nothing was saved; press Approve the hours again.', 'err'); S.approveAsk = false; render(); }
       return;
     case 'excel': return doExcel();
     case 'excel-change': await dropHandle(weekKey()); await refreshHandle(); return;
