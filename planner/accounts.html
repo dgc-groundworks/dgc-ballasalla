@@ -261,7 +261,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.13 (27 Oct 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.14 (4 Nov 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -872,7 +872,8 @@ function render() {
     } else {
       h += `<div class="status wait"><b class="big">Waiting for approval</b><span>${me.approve ? 'Check the hours and anything flagged below, then approve them. Accounts only treat them as final once approved.' : esc(((W.approvers || []).filter(p => p.active).map(p => p.name.split(' ')[0]).join(' or ') || 'An approver') + ' still need to approve these hours. The figures below are a draft and may change.')}</span>
         ${notOver ? `<span class="small" style="flex-basis:100%">The week isn't over yet (it ends ${esc(dayMonYear(addDays(B.start, 6)))}).</span>` : ''}
-        ${me.approve ? (S.approveAsk
+        ${me.approve && notOver ? `<span class="small" style="flex-basis:100%"><b>Approve it on Monday ${esc(dayMonYear(addDays(B.start, 7)))}, for the whole week.</b> Hours are approved once a week, after the week is over (Ash, 4 Nov 2026).</span>` : ''}
+        ${me.approve && !notOver ? (S.approveAsk
           ? `<div class="confirm" style="flex-basis:100%"><b>Approve ${esc(weekLabel(B.start))}?</b> ${B.rows.length} people, ${hrs(B.T.total)} paid hours${gateItems(B).length ? `, <span class="sev-warn">${gateItems(B).length} still to check</span>` : ''}.${gateHTML(B)}<div class="bar" style="margin-top:8px"><button class="btn go" type="button" data-act="approve-yes" id="approveYes"${gateItems(B).length && !S.gateOk ? ' disabled' : ''}>Yes, approve the hours</button><button class="btn" type="button" data-act="approve-no">Cancel</button></div></div>`
           : `<button class="btn go" type="button" data-act="approve" id="approveBtn">Approve the hours</button>`) : ''}
         ${checkLineHTML(B)}
@@ -1598,7 +1599,7 @@ function officeHTML(B, me) {
     <p class="ofc-pay">${esc(officePayLine(B))}<span class="printonly"> ${esc(freshText(S.W, B))}</span></p>
     ${S.asPm ? `<div class="hm-viewas noprint"><b>Viewing as ${esc(whMe().name || S.asPm)}:</b> this is the hours screen he sees (his people, no money). Nothing can be approved while viewing as someone. <button class="btn sm" type="button" data-act="hm-asme">Back to my view</button></div>` : ''}
     <div class="ofc-status ${approved ? 'ok' : 'wait'}"><b>${esc(payLine)}</b>${notOver && !approved ? ` <span class="small">The week isn't over yet (it ends ${esc(dayMonYear(addDays(B.start, 6)))}).</span>` : ''}${checks.length ? ` <span class="small">${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check, under the hours.</span>` : ''}
-      ${!approved && me.approve && !pmView ? `<div class="noprint" style="margin-top:8px"><button class="btn go" type="button" data-view="dgc">Go to approve the hours</button></div>` : ''}</div>`;
+      ${!approved && me.approve && !pmView && !notOver ? `<div class="noprint" style="margin-top:8px"><button class="btn go" type="button" data-view="dgc">Go to approve the hours</button></div>` : ''}</div>`;
   h += checkStatusHTML(B);
   /* 2.11 (Ash, 22 Oct 2026: hours first): the things to check go under the hours, not above them */
   const checksBox = checks.length ? `<div class="ofc-checks" id="ofcChecks"><b>${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check before paying:</b><ul>${checks.map(x => `<li class="sev-${x.sev}"><b>${esc(x.name || 'General')}</b>: ${esc(x.text)}</li>`).join('')}</ul></div>` : (staff ? `<p class="small muted">Nothing flagged amber in the week.</p>` : '');
@@ -1964,6 +1965,9 @@ document.addEventListener('click', async ev => {
        as before, and listed on Things to check; no second button or tick box. */
     case 'approve': S.gateOk = true; S.approveAsk = true; /* falls through to approve-yes */
     case 'approve-yes':
+      /* 2.14 (Ash, 4 Nov 2026: "only do approved hours once a week, not every day ... on Monday, and approve the hours for last
+         week"): a week can only be approved once it is over. */
+      if (addDays(S.start, 6) >= todayIso()) { S.approveAsk = false; say('This week is not over yet. Approve it on Monday, for the whole week.', 'err'); render(); return; }
       t.disabled = true;
       const items = gateItems(S.B);
       if (items.length && !S.gateOk) { say('Tick the box to say you have checked the items listed first.', 'err'); t.disabled = false; return; }
