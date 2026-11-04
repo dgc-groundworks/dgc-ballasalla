@@ -261,7 +261,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.14 (4 Nov 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.15 (4 Nov 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -1504,7 +1504,8 @@ function checkRows(B) {
   });
 }
 const checkFor = (B, sid) => checkRows(B).find(x => x.r.s.id === sid) || null;
-const canCheckWeek = () => !!(S.wh && !S.asPm && !whMe().viewAs && S.wh.weekStart <= todayIso());
+/* 2.15 (Ash, 4 Nov 2026: "I only want to do the check of staff hours on a Monday"): a week's hours are checked once it is over */
+const canCheckWeek = () => !!(S.wh && !S.asPm && !whMe().viewAs && addDays(S.wh.weekStart, 6) < todayIso());
 function canUncheck(c) {
   const me = whMe();
   return !!(c && c.approved && !S.asPm && !me.viewAs && (me.role === 'director' || c.c.appr.some(a => a.manager === me.email)));
@@ -1571,7 +1572,7 @@ function checkCellHTML(c, late) {
   if (c.approved) { const a = c.c.appr[c.c.appr.length - 1]; st = `<span class="hm-pb"><span class="hm-pill ok">Approved</span><span class="hm-by">${esc(whName(a.by))}, ${esc(checkWhen(a.at))}</span></span>`; }
   else if (!c.needs) st = '<span class="hm-pill">No hours</span>';
   else if (c.c.unapproved) st = `<span class="hm-pill ${late ? 'late' : 'wait'}">Unapproved</span>`;
-  else st = late ? '<span class="hm-pill late">Not approved</span>' : '<span class="hm-pill wait">To check</span>';
+  else st = late ? '<span class="hm-pill late">Not approved</span>' : (S.wh && addDays(S.wh.weekStart, 6) >= todayIso()) ? '<span class="hm-pill wait">Check on Monday</span>' : '<span class="hm-pill wait">To check</span>';
   const can = canCheckWeek();
   const btn = (can && c.needs && !c.approved ? `<button class="btn sm go" type="button" data-hmappr="${esc(c.r.s.id)}">${c.c.unapproved ? 'Approve again' : 'Approve'}</button>` : '')
     + (can && canUncheck(c) ? `<button class="btn sm" type="button" data-hmunappr="${esc(c.r.s.id)}">Unapprove</button>` : '');
