@@ -261,7 +261,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.15 (4 Nov 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.16 (4 Nov 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -1462,7 +1462,7 @@ function officeRows(B) {
 }
 /* the sheet as plain rows, one source for the page, Excel, CSV and Copy */
 function officeTable(B) {
-  const pay = !!(B.money && S.officePay), adj = B.adjAll.length > 0, O = officeRows(B), ot = B.T.ot > 0; /* an OT column only in a week that has overtime (Ash, 22 Oct 2026) */
+  const pay = !!(B.money && S.officePay && !hoursOnly()), adj = B.adjAll.length > 0, O = officeRows(B), ot = B.T.ot > 0; /* an OT column only in a week that has overtime (Ash, 22 Oct 2026) */
   const cell = x => x.kind === 'hours' ? hrs(x.value) : x.kind === 'BH' ? 'B' : (x.kind === 'H' || x.kind === 'U') ? x.kind : x.flags.includes('missing') ? '?' : '';
   const head = ['Name', ...B.dates.map(d => dayName(d) + ' ' + fmtDay(d)), ...(ot ? ['OT'] : []), 'Total hours', ...(adj ? ['Correction (earlier week)', 'Hours to pay'] : []), ...(pay ? ['Rate', 'Gross pay', 'Advances paid'] : []), 'Notes'];
   const rows = O.map(o => [o.r.s.name, ...o.r.days.map(cell), ...(ot ? [o.r.ot ? hrs(o.r.ot) : ''] : []), hrs(o.r.total), ...(adj ? [o.r.adjHours ? (o.r.adjHours > 0 ? '+' : '') + hrs(o.r.adjHours) : '', hrs(o.toPay)] : []),
@@ -1547,8 +1547,11 @@ function checkStatusHTML(B, shownCount) {
     : 'These are the people on your sites this week: booked on a job you run on the Deployment board, who put one of your jobs on their timesheet, or whose line manager you are.';
   return `<div class="hm-status s-${st} noprint" role="status"><span class="dot" aria-hidden="true"></span><span><span class="hm-step">Step 1, the project managers' check</span> ${txt}</span>
       <span class="counts"><b>${cs.length}</b> with hours &middot; <b>${done}</b> approved${notDone ? ` &middot; <b>${notDone}</b> to check` : ''}</span></div>
-    <p class="hm-info noprint">${INFO_SVG}<span>Two steps. <b>1.</b> The project managers check the hours here and press Approve for the people on their sites, by the end of Monday. <b>2.</b> ${esc(approverWords())} then approve and pay the week${S.pmMode || S.asPm ? '' : ' (Approve and pay)'}. ${who}</span></p>`;
+    ${hoursOnly() ? '' : `<p class="hm-info noprint">${INFO_SVG}<span>Two steps. <b>1.</b> The project managers check the hours here and press Approve for the people on their sites, by the end of Monday. <b>2.</b> ${esc(approverWords())} then approve and pay the week${S.pmMode || S.asPm ? '' : ' (Approve and pay)'}. ${who}</span></p>`}`;
 }
+/* 2.16 (Ash, 4 Nov 2026): John and the project managers only need to see who did what and approve it. No print, download,
+   copy, pay or long explanations for anyone who is not a director. Directors keep the full screen. */
+function hoursOnly() { const me = S.me || {}; return !me.director || !!S.asPm; }
 const INFO_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>';
 /* By site (John and the directors), as in Weekly Hours */
 function sitesHTML(B) {
@@ -1596,24 +1599,25 @@ function officeHTML(B, me) {
   const filtered = shownIdx.length !== t.O.length;
   const payLine = pmView ? (approved ? `Step 2, pay: approved by ${nameOf(S.W.approval.by)} on ${fmtWhen(S.W.approval.at)}.` : `Step 2, pay: not approved yet. After the check, ${approverWords()} approve the week for pay.`)
     : (S.whOn ? 'Step 2, approve and pay: ' : '') + officeStatusText(B);
+  const simple = hoursOnly();
   let h = `<div class="card" id="officeSheet"><div class="bar"><h2 class="ofc-h">${esc(officeTitle(B))}</h2></div>
-    <p class="ofc-pay">${esc(officePayLine(B))}<span class="printonly"> ${esc(freshText(S.W, B))}</span></p>
+    ${simple ? '' : `<p class="ofc-pay">${esc(officePayLine(B))}<span class="printonly"> ${esc(freshText(S.W, B))}</span></p>`}
     ${S.asPm ? `<div class="hm-viewas noprint"><b>Viewing as ${esc(whMe().name || S.asPm)}:</b> this is the hours screen he sees (his people, no money). Nothing can be approved while viewing as someone. <button class="btn sm" type="button" data-act="hm-asme">Back to my view</button></div>` : ''}
-    <div class="ofc-status ${approved ? 'ok' : 'wait'}"><b>${esc(payLine)}</b>${notOver && !approved ? ` <span class="small">The week isn't over yet (it ends ${esc(dayMonYear(addDays(B.start, 6)))}).</span>` : ''}${checks.length ? ` <span class="small">${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check, under the hours.</span>` : ''}
-      ${!approved && me.approve && !pmView && !notOver ? `<div class="noprint" style="margin-top:8px"><button class="btn go" type="button" data-view="dgc">Go to approve the hours</button></div>` : ''}</div>`;
+    ${simple ? '' : `<div class="ofc-status ${approved ? 'ok' : 'wait'}"><b>${esc(payLine)}</b>${notOver && !approved ? ` <span class="small">The week isn't over yet (it ends ${esc(dayMonYear(addDays(B.start, 6)))}).</span>` : ''}${checks.length ? ` <span class="small">${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check, under the hours.</span>` : ''}
+      ${!approved && me.approve && !pmView && !notOver ? `<div class="noprint" style="margin-top:8px"><button class="btn go" type="button" data-view="dgc">Go to approve the hours</button></div>` : ''}</div>`}`;
   h += checkStatusHTML(B);
   /* 2.11 (Ash, 22 Oct 2026: hours first): the things to check go under the hours, not above them */
   const checksBox = checks.length ? `<div class="ofc-checks" id="ofcChecks"><b>${checks.length} ${checks.length === 1 ? 'thing' : 'things'} to check before paying:</b><ul>${checks.map(x => `<li class="sev-${x.sev}"><b>${esc(x.name || 'General')}</b>: ${esc(x.text)}</li>`).join('')}</ul></div>` : (staff ? `<p class="small muted">Nothing flagged amber in the week.</p>` : '');
   const allOpen = canCheckWeek() ? shownIdx.map(i => CR[t.O[i].r.s.id]).filter(c => c && c.needs && !c.approved) : [];
   const asList = (S.wh && S.wh.me && S.wh.me.realDirector && (S.wh.managers || []).length && !S.pmMode) ? S.wh.managers : [];
-  h += `<div class="ofc-tools noprint">${canOut ? (pmView ? `<button class="btn primary" type="button" data-act="ofc-print">Print</button>` : `<button class="btn primary" type="button" data-act="ofc-print">Print</button><button class="btn" type="button" data-act="ofc-excel">Download Excel</button><button class="btn" type="button" data-act="ofc-csv">Download CSV</button><button class="btn" type="button" data-act="ofc-copy">Copy</button>`)
+  if (!simple) h += `<div class="ofc-tools noprint">${canOut ? (pmView ? `<button class="btn primary" type="button" data-act="ofc-print">Print</button>` : `<button class="btn primary" type="button" data-act="ofc-print">Print</button><button class="btn" type="button" data-act="ofc-excel">Download Excel</button><button class="btn" type="button" data-act="ofc-csv">Download CSV</button><button class="btn" type="button" data-act="ofc-copy">Copy</button>`)
       : '<span class="muted">Print, Download and Copy open once the week is approved.</span>'}
     ${B.money ? `<label class="small" style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" id="officePay"${S.officePay ? ' checked' : ''}> Add the rate and gross pay</label>` : ''}</div>`;
   if (S.wh) h += `<div class="hm-toolbar noprint"><div class="hm-filters" role="group" aria-label="Show">
       <button type="button" data-hmf="all" aria-pressed="${S.whFilter === 'all'}">Everyone</button><button type="button" data-hmf="open" aria-pressed="${S.whFilter === 'open'}">Not approved</button><button type="button" data-hmf="flag" aria-pressed="${S.whFilter === 'flag'}">Something to check</button></div>
       ${asList.length || S.asPm ? `<label class="small hm-as">See it as <select id="hmAs"><option value="">My own view</option>${(asList.length ? asList : []).map(m => `<option value="${esc(m.email)}"${S.asPm === m.email ? ' selected' : ''}>${esc(m.name)}${m.role === 'lead' ? ' (sees everyone)' : ''}</option>`).join('')}</select></label>` : ''}
       <span class="push"></span>${allOpen.length ? `<button class="btn go" type="button" data-act="hm-appr-all">Approve all ${allOpen.length} shown</button>` : ''}</div>
-    ${sitesHTML(B)}`;
+    ${simple ? '' : sitesHTML(B)}`;
   const checkCol = !!S.wh, nH = t.head.length;
   h += `<div class="scroll hm-scroll" style="margin-top:10px"><table class="t ofc" id="officeTable"><thead><tr>${t.head.map((x, i) => (checkCol && i === nH - 1 ? '<th class="l noprint hm-chk">Check</th>' : '') + `<th class="${i === 0 || i === nH - 1 ? 'l' : 'c'}${i >= 1 && i <= 7 && !isWeekday(B.dates[i - 1]) ? ' wk' : ''}">${i >= 1 && i <= 7 ? `${esc(dayName(B.dates[i - 1]))}<span class="dd">${esc(fmtDay(B.dates[i - 1]))}</span>` : esc(x)}</th>`).join('')}</tr></thead><tbody>`;
   shownIdx.forEach(ri => {
@@ -1631,7 +1635,7 @@ function officeHTML(B, me) {
   const tot = filtered ? shownTotals(B, t, shownIdx.map(i => t.O[i])) : t.tot;
   h += `<tr class="tot">${tot.map((v, i) => (checkCol && i === tot.length - 1 ? '<td class="noprint hm-chk"></td>' : '') + (i === 0 ? `<td class="name">${esc(v)}</td>` : `<td class="${i === tot.length - 1 ? 'notes' : 'c'}">${esc(v)}</td>`)).join('')}</tr></tbody></table></div>
     <div class="hm-legend noprint"><b>Key</b><span class="k"><span class="sw lv">H</span>paid holiday (8h)</span><span class="k"><span class="sw lv">B</span>bank holiday (8h)</span><span class="k"><span class="sw">U</span>unpaid leave</span><span class="k"><span class="sw miss">?</span>no hours on a working day</span>${staff ? '<span class="k"><span class="sw flag">8</span>amber: check it (tap the day to see why)</span><span class="k"><span class="sw chg">8</span>red: changed after the week was approved</span>' : ''}<span class="k"><span class="sw fixed">8</span>blue: corrected after approval, paid in a later pay run</span><span class="k">Tap a name for the details, or a day for what was entered.</span></div>
-    <p class="small muted">${B.rows.length} people${filtered ? `, ${shownIdx.length} shown` : ''}. H = paid holiday (8h), B = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime${B.T.ot > 0 ? ' (OT = overtime hours)' : ''}.${staff ? ' Amber = check it; red = changed after approval.' : ''}${t.adj ? ' A correction pays hours from an earlier week in this run; Hours to pay = Total hours plus the correction.' : ''} John and Andy are salaried and kept off the hours, as on the Staff screen.${t.pay ? ' Gross pay is hours times the rate, plus any bonus and correction, before tax and NI.' : ''}</p>${checksBox}</div>`;
+    ${simple ? '' : `<p class="small muted">${B.rows.length} people${filtered ? `, ${shownIdx.length} shown` : ''}. H = paid holiday (8h), B = bank holiday (8h), U = unpaid leave, ? = no hours on a working day. Total hours include paid holiday, bank holidays and overtime${B.T.ot > 0 ? ' (OT = overtime hours)' : ''}.${staff ? ' Amber = check it; red = changed after approval.' : ''}${t.adj ? ' A correction pays hours from an earlier week in this run; Hours to pay = Total hours plus the correction.' : ''} John and Andy are salaried and kept off the hours, as on the Staff screen.${t.pay ? ' Gross pay is hours times the rate, plus any bonus and correction, before tax and NI.' : ''}</p>`}${checksBox}</div>`;
   return h;
 }
 /* the panels: one person, one day, approve and unapprove (from Weekly Hours 0.3) */
