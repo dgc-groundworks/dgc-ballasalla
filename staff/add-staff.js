@@ -118,7 +118,7 @@ async function loadStaff() {
     // Try with profile join; fall back to staff-only if profile table missing
     // dgc_staff RLS allows anon reads only — always use anon key
     try {
-      staffList = await addPrivate(await sbGet('/dgc_staff?select=id,name,role,start_date,active,created_at,status,off_work_type,date_left,skills,dgc_staff_profile(id,staff_id,first_name,surname,gender,marital_status,dob,phone,email,address,contracted_hours,pay_type,line_manager,contract_date,work_permit_number,visa_required,next_of_kin,medical_conditions,skills_other,bio,notes,created_at,end_date,contract_status,contract_signed_on,probation_end,probation_note)&order=name', false));
+      staffList = await addPrivate(await sbGet('/dgc_staff?select=id,name,role,start_date,active,created_at,status,off_work_type,date_left,skills,dgc_staff_profile(id,staff_id,first_name,surname,gender,marital_status,dob,phone,email,address,contracted_hours,pay_type,line_manager,contract_date,work_permit_number,visa_required,next_of_kin,medical_conditions,skills_other,bio,notes,created_at,end_date,contract_status,contract_signed_on)&order=name', false));
     } catch {
       staffList = (await sbGet('/dgc_staff?select=id,name,role,start_date,active,created_at,status,off_work_type,date_left,skills&order=name', true))
         .map(s => ({ ...s, dgc_staff_profile: null }));
