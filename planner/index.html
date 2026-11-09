@@ -3467,7 +3467,7 @@ async function loadStaffData() {
   if (!_sb) return;
   try {
     const [sR, hR, aR, lR, tsR] = await Promise.all([
-      _sb.from('dgc_staff').select('*').order('name'),
+      _sb.from('dgc_staff').select('id,name,role,start_date,active,created_at,status,off_work_type,date_left,skills').order('name'), /* 10 Nov 2026: no rate (money people only, via dgc_staff_rates) */
       fetchAllRows('dgc_staff_hours', t => t.select('*').order('work_date')),
       _sb.from('dgc_staff_advances').select('*').order('entry_date', { ascending: false }),
       _sb.from('dgc_staff_leave').select('*').order('from_date', { ascending: false }),

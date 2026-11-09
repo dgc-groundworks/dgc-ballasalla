@@ -67,6 +67,16 @@ function sbHeaders(extra) {
   const token = (sess && sess.access_token) ? sess.access_token : SUPABASE_KEY;
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, extra || {});
 }
+/* 10 Nov 2026 (Ash: only the money people see wages): dgc_staff.rate is no longer readable from the table. Ash, Harry and
+   accounts get the rates from public.dgc_staff_rates(); everyone else gets none (the function returns no rows). */
+async function addRates(rows) {
+  try {
+    const r = await fetch(REST + '/rpc/dgc_staff_rates', { method: 'POST', headers: sbHeaders(), body: '{}' });
+    const by = {}; (r.ok ? await r.json() : []).forEach(x => { by[x.id] = x.rate; });
+    rows.forEach(s => { s.rate = by[s.id] != null ? by[s.id] : null; });
+  } catch (e) { rows.forEach(s => { s.rate = null; }); }
+  return rows;
+}
 async function sbGet(path) {
   const r = await fetch(REST + path, { headers: sbHeaders() });
   if (!r.ok) throw new Error(await r.text());
@@ -171,7 +181,7 @@ async function loadAll() {
 
   const overlappingStaffPeriods = staffPeriodsOverlapping(valFromIso(from), valFromIso(to));
   const [staffRows, hourRows, leaveRows, advRows, approvalRows, tsRows, confirmRows] = await Promise.all([
-    sbGet('/dgc_staff?select=id,name,role,rate,active&order=name'),
+    sbGet('/dgc_staff?select=id,name,role,active&order=name').then(addRates), /* 10 Nov 2026: rates only for money people (dgc_staff_rates) */
     sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours,note&work_date=gte.' + from + '&work_date=lte.' + to)
       .then(rows => { noteColumnExists = true; return rows; })
       .catch(() => { noteColumnExists = false; return sbGet('/dgc_staff_hours?select=id,staff_id,work_date,hours&work_date=gte.' + from + '&work_date=lte.' + to); }),
@@ -791,7 +801,7 @@ document.getElementById('advanceForm').addEventListener('submit', async e => {
   const status = document.getElementById('advanceStatus');
   status.textContent = 'Saving…';
   try {
-    await sbPost('dgc_staff_advances', {
+    await sbPost('dgc_staff_advances?select=id', {
       staff_id: document.getElementById('advStaff').value,
       entry_type: document.getElementById('advType').value,
       amount: Number(document.getElementById('advAmount').value),

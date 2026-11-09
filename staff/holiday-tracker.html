@@ -376,7 +376,7 @@ function wireBookingForm(year) {
   const ah = authedHeaders(session);
   try {
     const [sR, lR] = await Promise.all([
-      fetch(REST + '/dgc_staff?order=name.asc', { headers: ah }),
+      fetch(REST + '/dgc_staff?select=id,name,role,start_date,active,created_at,status,off_work_type,date_left,skills&order=name.asc', { headers: ah }), /* 10 Nov 2026: never the rate */
       fetch(REST + '/dgc_staff_leave?order=from_date.asc', { headers: ah }),
     ]);
     _staff = sR.ok ? await sR.json() : [];

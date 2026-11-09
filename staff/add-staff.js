@@ -92,15 +92,35 @@ function escHtml(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* 10 Nov 2026 (Ash: only the money people see wages, rates and bank details). The rate and the pay, bank, NI and tax fields are
+   no longer readable from the tables. Ash, Harry and accounts get them from dgc_staff_rates() and dgc_staff_profile_private();
+   everyone else gets none and the form shows them blank. They are saved through dgc_staff_profile_set_private(), and a
+   blank one is never sent, so nothing already there is wiped. */
+const PRIVATE_FIELDS = ['pay_rate', 'ni_number', 'tax_number', 'bank_name', 'bank_branch', 'account_name', 'sort_code', 'account_number'];
+async function privRpc(name, body) {
+  const r = await fetch(REST + '/rpc/' + name, { method: 'POST', headers: authedHeaders(session, { 'Content-Type': 'application/json' }), body: JSON.stringify(body || {}) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function addPrivate(list) {
+  try {
+    const [rates, priv] = await Promise.all([privRpc('dgc_staff_rates'), privRpc('dgc_staff_profile_private')]);
+    const rb = {}, pb = {}; (rates || []).forEach(x => { rb[x.id] = x.rate; }); (priv || []).forEach(x => { pb[x.staff_id] = x; });
+    list.forEach(s => { s.rate = rb[s.id] != null ? rb[s.id] : null; const p = pb[s.id];
+      if (p && s.dgc_staff_profile) PRIVATE_FIELDS.forEach(k => { s.dgc_staff_profile[k] = p[k]; }); });
+  } catch (e) { /* not a money login: no rates or bank details */ }
+  return list;
+}
+
 // ── Load + render ─────────────────────────────────────────────────────────────
 async function loadStaff() {
   try {
     // Try with profile join; fall back to staff-only if profile table missing
     // dgc_staff RLS allows anon reads only — always use anon key
     try {
-      staffList = await sbGet('/dgc_staff?select=*,dgc_staff_profile(*)&order=name', false);
+      staffList = await addPrivate(await sbGet('/dgc_staff?select=id,name,role,start_date,active,created_at,status,off_work_type,date_left,skills,dgc_staff_profile(id,staff_id,first_name,surname,gender,marital_status,dob,phone,email,address,contracted_hours,pay_type,line_manager,contract_date,work_permit_number,visa_required,next_of_kin,medical_conditions,skills_other,bio,notes,created_at,end_date,contract_status,contract_signed_on,probation_end,probation_note)&order=name', false));
     } catch {
-      staffList = (await sbGet('/dgc_staff?select=*&order=name', true))
+      staffList = (await sbGet('/dgc_staff?select=id,name,role,start_date,active,created_at,status,off_work_type,date_left,skills&order=name', true))
         .map(s => ({ ...s, dgc_staff_profile: null }));
     }
     renderList();
@@ -232,7 +252,7 @@ function renderList() {
           const newActive = status !== 'Left';
           menu.remove();
           try {
-            await sbPatch('dgc_staff', 'id=eq.' + p.id, { status, off_work_type: offType, active: newActive });
+            await sbPatch('dgc_staff', 'id=eq.' + p.id + '&select=id', { status, off_work_type: offType, active: newActive });
             await loadStaff();
           } catch (err) {
             alert('Error: ' + err.message);
@@ -365,7 +385,7 @@ function openQuickView(person) {
         ? { status: 'Working', off_work_type: null, active: true }
         : { status: 'Off Work', off_work_type: choice, active: false };
       try {
-        await sbPatch('dgc_staff', 'id=eq.' + person.id, patch);
+        await sbPatch('dgc_staff', 'id=eq.' + person.id + '&select=id', patch);
         closeQuickView();
         await loadStaff();
       } catch (err) {
@@ -647,9 +667,9 @@ async function saveForm(e) {
   try {
     let staffId = editingId;
     if (editingId) {
-      await sbPatch('dgc_staff', 'id=eq.' + editingId, { name, role, start_date, rate, skills });
+      await sbPatch('dgc_staff', 'id=eq.' + editingId + '&select=id', Object.assign({ name, role, start_date, skills }, rate != null ? { rate } : {}));
     } else {
-      const [row] = await sbPost('dgc_staff', { name, role, start_date, rate, skills, active: true, status: 'Working' });
+      const [row] = await sbPost('dgc_staff?select=id', { name, role, start_date, rate, skills, active: true, status: 'Working' });
       staffId = row.id;
     }
 
@@ -659,12 +679,13 @@ async function saveForm(e) {
       'work_permit_number','visa_required','bank_name','bank_branch','account_name',
       'sort_code','account_number','next_of_kin','medical_conditions','bio','notes','skills_other'];
     const profile = { staff_id: staffId, skills };
-    profileFields.forEach(f => { profile[f] = fd.get(f) || null; });
+    profileFields.forEach(f => { if (!PRIVATE_FIELDS.includes(f)) profile[f] = fd.get(f) || null; });
+    const priv = {}; PRIVATE_FIELDS.forEach(f => { const v = (fd.get(f) || '').toString().trim(); if (v) priv[f] = v; });
 
     // Upsert profile — surface any RLS/auth errors instead of swallowing them
     const profileRes = await fetch(REST + '/dgc_staff_profile?on_conflict=staff_id', {
       method: 'POST',
-      headers: authedHeaders(session, { Prefer: 'resolution=merge-duplicates,return=representation' }),
+      headers: authedHeaders(session, { Prefer: 'resolution=merge-duplicates,return=minimal' }),
       body: JSON.stringify(profile),
     });
     if (!profileRes.ok) {
@@ -677,6 +698,10 @@ async function saveForm(e) {
       return;
     }
 
+    if (Object.keys(priv).length) {
+      try { await privRpc('dgc_staff_profile_set_private', { p_staff_id: staffId, p: priv }); }
+      catch (e) { status.textContent = 'Saved, but pay and bank details need Ash, Harry or accounts: ' + e.message; status.className = 'form-status error'; btn.disabled = false; await loadStaff(); return; }
+    }
     status.textContent = 'Saved ✓'; status.className = 'form-status success';
     await loadStaff();
     setTimeout(closeModal, 700);
