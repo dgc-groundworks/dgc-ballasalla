@@ -261,7 +261,7 @@ try { if (window.top === window) document.getElementById("plBackBar").hidden = f
 <script>
 "use strict";
 /* ============================== settings ============================== */
-const ACC_VERSION = "Accounts 2.16 (4 Nov 2026, original Job Planner)";
+const ACC_VERSION = "Accounts 2.17 (10 Nov 2026, original Job Planner)";
 /* Same as the Planner's Staff screen (staff/app.js), so Accounts adds up exactly as the approver saw it */
 const BANK_HOLIDAYS = new Set([
   '2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-06-06','2025-07-07','2025-08-25','2025-12-25','2025-12-26',
@@ -363,6 +363,7 @@ async function testRpc(name, a) {
   const fxErr = v => { if (v && v.__error) throw Object.assign(new Error(v.message || 'not allowed'), { code: v.__error }); return v; };
   window.__hmCalls = window.__hmCalls || [];
   if (name === 'dgc_wh_who') return fxErr(FIXTURE.who);
+  if (name === 'acc_wh_status') { const v = (FIXTURE.whStatus || {})[a.p_start] || (FIXTURE.wh || {})[a.p_start]; if (!v) throw Object.assign(new Error('no test data for that week'), { code: 'test' }); const c = JSON.parse(JSON.stringify(fxErr(v))); c.me = Object.assign({}, c.me, { readOnly: true }); return c; } /* 2.17 */
   if (name === 'dgc_wh_week') { const v = a.p_as ? ((FIXTURE.whAs || {})[a.p_as] || {})[a.p_start] : (FIXTURE.wh || {})[a.p_start]; if (!v) throw Object.assign(new Error('no test data for that week'), { code: 'test' }); return JSON.parse(JSON.stringify(fxErr(v))); }
   if (name === 'acc_pm_week') { const v = a.p_as ? ((FIXTURE.pmAs || {})[a.p_as] || {})[a.p_start] : (FIXTURE.pm || {})[a.p_start]; if (!v) throw Object.assign(new Error('no test data for that week'), { code: 'test' }); return JSON.parse(JSON.stringify(fxErr(v))); }
   if (name === 'dgc_wh_approve' || name === 'dgc_wh_unapprove') {
@@ -1008,7 +1009,7 @@ function gateItems(B) {
   }));
   /* 2.12: step 1 first. Anyone with hours this week who no project manager has checked is listed, so the approver either
      waits for the check or ticks that he has checked them himself (the list is kept in acc_approval_checks, as before). */
-  checkRows(B).filter(c => c.needs && !c.approved).forEach(c => out.push({ name: c.r.s.name, staffId: c.r.s.id, date: '', text: 'not checked by a project manager yet (step 1, on DGC and Silverdale hours)' }));
+  checkRows(B).filter(c => c.needs && !c.approved).forEach(c => out.push({ name: c.r.s.name, staffId: c.r.s.id, date: '', text: 'hours not approved on the Staff app\'s Hours tab yet' }));
   return out;
 }
 function gateHTML(B) {
@@ -1505,13 +1506,14 @@ function checkRows(B) {
 }
 const checkFor = (B, sid) => checkRows(B).find(x => x.r.s.id === sid) || null;
 /* 2.15 (Ash, 4 Nov 2026: "I only want to do the check of staff hours on a Monday"): a week's hours are checked once it is over */
-const canCheckWeek = () => !!(S.wh && !S.asPm && !whMe().viewAs && addDays(S.wh.weekStart, 6) < todayIso());
+const canCheckWeek = () => !!(S.wh && !S.asPm && !whMe().viewAs && !whMe().readOnly && addDays(S.wh.weekStart, 6) < todayIso()); /* 2.17: never in Accounts */
 function canUncheck(c) {
   const me = whMe();
   return !!(c && c.approved && !S.asPm && !me.viewAs && (me.role === 'director' || c.c.appr.some(a => a.manager === me.email)));
 }
 const checkWhen = ts => { try { return new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }).replace(',', ''); } catch (e) { return ts; } };
 function whName(em) {
+  const nm = S.wh && S.wh.names && S.wh.names[String(em || '').toLowerCase()]; if (nm) return nm; /* 2.17: full names */
   const m = ((S.wh && S.wh.managers) || []).find(x => x.email === em);
   if (m) return m.shortName || m.name;
   if (S.wh && S.wh.me && S.wh.me.email === em) return S.wh.me.shortName || S.wh.me.name || em;
@@ -1525,14 +1527,14 @@ function histLineHTML(c) {
 /* one line for Approve and pay (step 2): where step 1 is up to */
 function checkLineHTML(B) {
   if (!S.whOn) return '';
-  if (!S.wh) return `<span class="small sev-warn" style="flex-basis:100%"><b>Step 1, the project managers' check:</b> couldn't be read (${esc(S.whErr || 'not loaded')}). Press Refresh.</span>`;
+  if (!S.wh) return `<span class="small sev-warn" style="flex-basis:100%"><b>The hours check (Staff app, Hours tab):</b> couldn't be read (${esc(S.whErr || 'not loaded')}). Press Refresh.</span>`;
   const cs = checkRows(B).filter(c => c.needs), miss = cs.filter(c => !c.approved);
-  return `<span class="small" style="flex-basis:100%"><b>Step 1, the project managers' check:</b> ${cs.length - miss.length} of ${cs.length} checked${miss.length ? `. Not checked yet: ${esc(miss.map(c => c.r.s.name).join(', '))}.${B.approved ? '' : ' They are listed in the tick-off box when you approve.'}` : cs.length ? '. Everyone checked.' : '.'} <button class="btn sm" type="button" data-view="office">See the check</button></span>`;
+  return `<span class="small" style="flex-basis:100%"><b>The hours check (Staff app, Hours tab):</b> ${cs.length - miss.length} of ${cs.length} checked${miss.length ? `. Not checked yet: ${esc(miss.map(c => c.r.s.name).join(', '))}.${B.approved ? '' : ' They are listed in the tick-off box when you approve.'}` : cs.length ? '. Everyone checked.' : '.'} <button class="btn sm" type="button" data-view="office">See the check</button></span>`;
 }
 /* the step 1 status on the hours tab: the same meaning as Weekly Hours' status line */
 function checkStatusHTML(B, shownCount) {
   if (!S.whOn) return '';
-  if (!S.wh) return `<div class="hm-status s-late noprint"><span class="dot" aria-hidden="true"></span><span><b>Step 1, the project managers' check, couldn't be read:</b> ${esc(S.whErr || 'not loaded')}. Press Refresh.</span></div>`;
+  if (!S.wh) return `<div class="hm-status s-late noprint"><span class="dot" aria-hidden="true"></span><span><b>The hours check (Staff app, Hours tab), couldn't be read:</b> ${esc(S.whErr || 'not loaded')}. Press Refresh.</span></div>`;
   const d = S.wh, me = d.me || {}, started = d.weekStart <= todayIso(), late = Date.now() > Date.parse(d.deadline);
   const cs = checkRows(B).filter(c => c.needs), done = cs.filter(c => c.approved).length, notDone = cs.length - done;
   const by = 'the end of ' + fmtLong(addDays(B.start, 7));
@@ -1545,9 +1547,9 @@ function checkStatusHTML(B, shownCount) {
   const who = me.viewAs ? `Viewing as ${esc(me.name || me.email)}: ${me.lead ? 'everyone' : 'the people on his sites'}. Nothing can be approved while viewing as someone.`
     : me.lead ? 'You see everyone. Each project manager sees the people on his sites and approves them on Monday.'
     : 'These are the people on your sites this week: booked on a job you run on the Deployment board, who put one of your jobs on their timesheet, or whose line manager you are.';
-  return `<div class="hm-status s-${st} noprint" role="status"><span class="dot" aria-hidden="true"></span><span><span class="hm-step">Step 1, the project managers' check</span> ${txt}</span>
+  return `<div class="hm-status s-${st} noprint" role="status"><span class="dot" aria-hidden="true"></span><span><span class="hm-step">The hours check (Staff app, Hours tab)</span> ${txt}</span>
       <span class="counts"><b>${cs.length}</b> with hours &middot; <b>${done}</b> approved${notDone ? ` &middot; <b>${notDone}</b> to check` : ''}</span></div>
-    ${hoursOnly() ? '' : `<p class="hm-info noprint">${INFO_SVG}<span>Two steps. <b>1.</b> The project managers check the hours here and press Approve for the people on their sites, by the end of Monday. <b>2.</b> ${esc(approverWords())} then approve and pay the week${S.pmMode || S.asPm ? '' : ' (Approve and pay)'}. ${who}</span></p>`}`;
+    ${hoursOnly() ? '' : `<p class="hm-info noprint">${INFO_SVG}<span>Two steps. <b>1.</b> Anyone with the Weekly Hours app checks the hours on the Staff app's Hours tab and presses Approve (per person, per site or all), by the end of Monday. Who approved each person shows here. <b>2.</b> ${esc(approverWords())} then approve and pay the week here (Approve and pay).</span></p>`}`;
 }
 /* 2.16 (Ash, 4 Nov 2026): John and the project managers only need to see who did what and approve it. No print, download,
    copy, pay or long explanations for anyone who is not a director. Directors keep the full screen. */
@@ -1572,7 +1574,7 @@ function sitesHTML(B) {
 function checkCellHTML(c, late) {
   if (!c) return '<span class="muted small">Not on the check list</span>';
   let st;
-  if (c.approved) { const a = c.c.appr[c.c.appr.length - 1]; st = `<span class="hm-pb"><span class="hm-pill ok">Approved</span><span class="hm-by">${esc(whName(a.by))}, ${esc(checkWhen(a.at))}</span></span>`; }
+  if (c.approved) { const a = c.c.appr[c.c.appr.length - 1]; st = `<span class="hm-pb"><span class="hm-pill ok">Approved by</span><span class="hm-by">${esc(whName(a.by))}, ${esc(checkWhen(a.at))}</span></span>`; }
   else if (!c.needs) st = '<span class="hm-pill">No hours</span>';
   else if (c.c.unapproved) st = `<span class="hm-pill ${late ? 'late' : 'wait'}">Unapproved</span>`;
   else st = late ? '<span class="hm-pill late">Not approved</span>' : (S.wh && addDays(S.wh.weekStart, 6) >= todayIso()) ? '<span class="hm-pill wait">Check on Monday</span>' : '<span class="hm-pill wait">To check</span>';
@@ -1869,7 +1871,7 @@ async function loadWeekData(start) {
   const [W, C, wh] = await Promise.all([
     pm ? rpc('acc_pm_week', { p_start: start, p_as: S.asPm }) : rpc('acc_week', { p_start: start }),
     pm ? Promise.resolve(NO_CORR()) : rpc('acc_corrections_for', { p_start: start }).catch(NO_CORR),
-    S.whOn ? rpc('dgc_wh_week', { p_start: start, p_as: S.asPm }).catch(e => ({ __err: e.message || 'not read' })) : Promise.resolve(null)]);
+    S.whOn ? rpc('acc_wh_status', { p_start: start }).catch(e => ({ __err: e.message || 'not read' })) : Promise.resolve(null)]); /* 2.17: read only */
   return [W, C, wh];
 }
 function takeWh(wh) { if (wh && wh.__err) { S.wh = null; S.whErr = wh.__err; } else { S.wh = wh; S.whErr = ''; } S.whReady = true; }
@@ -2023,17 +2025,28 @@ window.addEventListener('hashchange', () => { S.pendingCorr = correctFromHash() 
       await waitLogin;
     }
   }
+  /* 2.17 (Ash, 9 Nov 2026: "Ash must never again see his own wages screen while thinking he's looking as John"): while a
+     director is viewing as someone in the Silverdale app, Accounts can't show that person's screen, so it shows nothing. */
+  const viewingAs = (() => { try { if (window.top === window.self) return null; const v = JSON.parse(sessionStorage.getItem('sdv:hub:view') || 'null'); return v && (v.kind === 'person' || v.kind === 'role') ? v : null; } catch (e) { return null; } })();
+  if (viewingAs) {
+    const nm = viewingAs.kind === 'person' ? (viewingAs.name || viewingAs.email || 'someone') : 'a role';
+    $('#app').innerHTML = `<div class="card" style="border:3px solid #d97706;max-width:640px;margin:30px auto;padding:24px"><h2 style="margin-top:0">You are viewing as ${esc(nm)}</h2><p style="font-size:1.1rem"><b>Accounts doesn't show anything while you are viewing as someone.</b> It would be your own screen with your own wages, not ${esc(nm)}'s.</p><p>Accounts is for directors and accounts only. Press <b>Back to my view</b> in the Silverdale app, then open Accounts again.</p>${(() => { try { return typeof window.top.sdHubExitViewAs === 'function' ? '<button class="btn primary" type="button" id="accVaBack">Back to my view</button>' : ''; } catch (e) { return ''; } })()}</div>`;
+    const b = $('#accVaBack'); if (b) b.addEventListener('click', () => { try { window.top.sdHubExitViewAs(); } catch (e) {} });
+    return;
+  }
   try { S.me = await rpc('acc_me'); }
   catch (e) { $('#app').innerHTML = `<div class="card"><h2>Accounts</h2><p>${esc(e.message)}</p></div>`; return; }
   /* 2.12 (Ash, 22 Oct 2026: "Merge Weekly Hours into Accounts, so there's one hours screen and one approval"): the
      project managers' check (step 1) is on the hours tab. Who does it is decided by the database (dgc_wh_who): John and the
      directors for everyone, each project manager for the people on his sites. A project manager with no Accounts login gets
      the hours tab only, his people only and no money (acc_pm_week). */
-  try { S.who = await rpc('dgc_wh_who', { p_as: null }); } catch (e) { S.who = null; }
-  S.whOn = !!(S.who && (S.who.lead || S.who.manager));
-  if ((!S.me || !S.me.hours) && S.whOn) {
-    S.pmMode = true;
-    S.me = { email: S.who.email, name: S.who.name, role: 'pm', hours: true, money: false, approve: false, director: false, pm: true };
+  /* 2.17 (Ash, 9 Nov 2026: "Weekly hours shouldn't be in accounts... Accounts is the money app"): the hours are checked and
+     approved on the Staff app's Hours tab. Here everyone sees who approved each person's hours (acc_wh_status, read only),
+     and only the directors and the money logins (accounts@) can open Accounts at all. No project manager screen any more. */
+  S.whOn = true;
+  if (!S.me || !(S.me.director || S.me.money)) {
+    $('#app').innerHTML = `<div class="card" style="max-width:640px;margin:30px auto"><h2>Accounts is for directors and accounts only</h2><p>This login (${esc((S.me && S.me.email) || 'not signed in')}) can't open it. The weekly hours are checked and approved in the Staff app, on its Hours tab.</p></div>`;
+    return;
   }
   if (!S.me || !S.me.hours) {
     $('#app').innerHTML = `<div class="card"><h2>Accounts</h2><p>This login (${esc((S.me && S.me.email) || 'not signed in')}) can't open Accounts.</p><p class="muted">Accounts is for the directors, the hours approvers, the project managers (for the people on their sites) and people with the Accounts app and "Can see money" both switched on. Ask Ash or Harry if you need it.</p><button class="btn" type="button" onclick="logout()">Sign out</button></div>`;
